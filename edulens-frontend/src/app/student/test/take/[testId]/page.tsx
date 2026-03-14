@@ -40,18 +40,24 @@ export default function TestTakePage() {
   const [submitting, setSubmitting] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
-  // Initialize test
+  // Initialize test — reset if navigating to a different test
   useEffect(() => {
     if (!testId) return;
     const studentId = student?.id || user?.id;
     if (!studentId) return;
+
+    // If there's an existing session for a different test, reset it
+    if (currentSession && currentSession.testId !== testId) {
+      resetTest();
+      return; // useEffect will re-run after reset clears currentSession
+    }
 
     if (!currentSession) {
       startTest(testId, studentId).catch(() => {
         router.push('/student/test');
       });
     }
-  }, [user?.id, student?.id, testId, currentSession, startTest, router]);
+  }, [user?.id, student?.id, testId, currentSession, startTest, resetTest, router]);
 
   // Timer countdown
   useEffect(() => {

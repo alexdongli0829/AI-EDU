@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/auth-store';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,7 +16,6 @@ export default function LoginPage() {
   const [password, setPassword]     = useState('');
   const [showPw, setShowPw]         = useState(false);
 
-  // Already authenticated — go to the appropriate dashboard
   const { user } = useAuthStore();
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -29,7 +28,6 @@ export default function LoginPage() {
     e.preventDefault();
     clearError();
     try {
-      // If identifier contains @, treat as parent/admin email login; otherwise student username
       if (identifier.includes('@')) {
         await login(identifier.trim(), password);
       } else {
@@ -42,29 +40,29 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ backgroundColor: '#FAFAF9', fontFamily: "'Source Sans 3', system-ui, sans-serif" }}
-    >
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-50 via-white to-teal-50/30">
+      <div className="w-full max-w-[400px]">
 
         {/* Brand */}
-        <div className="text-center mb-8">
-          <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
+        <div className="text-center mb-10">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-200/50">
+            <Sparkles className="h-7 w-7 text-white" />
+          </div>
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
             Edu<span className="text-teal-600">Lens</span>
-          </p>
-          <p className="text-sm text-gray-500 mt-1">OC Exam Prep</p>
+          </h1>
+          <p className="text-sm text-gray-500 mt-1.5 font-medium">NSW OC & Selective Exam Prep</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-          <h1 className="text-lg font-bold text-gray-900 mb-1">Sign in</h1>
-          <p className="text-xs text-gray-500 mb-6">
-            Use your email (parent) or student username
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xl shadow-gray-200/40 p-8">
+          <h2 className="text-lg font-bold text-gray-900 mb-1" style={{ fontFamily: 'var(--font-heading)' }}>Welcome back</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Sign in with your email or student username
           </p>
 
           {error && (
-            <div className="mb-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium">
               {error}
             </div>
           )}
@@ -81,7 +79,7 @@ export default function LoginPage() {
                 onChange={e => { setIdentifier(e.target.value); clearError(); }}
                 autoComplete="username"
                 required
-                className="h-10 text-sm"
+                className="h-11 text-sm rounded-xl"
               />
             </div>
 
@@ -97,7 +95,7 @@ export default function LoginPage() {
                   onChange={e => { setPassword(e.target.value); clearError(); }}
                   autoComplete="current-password"
                   required
-                  className="h-10 text-sm pr-10"
+                  className="h-11 text-sm pr-10 rounded-xl"
                 />
                 <button
                   type="button"
@@ -112,7 +110,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full h-10 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm mt-2"
+              className="w-full h-11 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-semibold text-sm mt-2 rounded-xl shadow-md shadow-teal-200/50 transition-all hover:shadow-lg"
               disabled={isLoading || !identifier || !password}
             >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign in'}
@@ -120,17 +118,17 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 pt-5 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-500">
+            <p className="text-sm text-gray-500">
               New parent?{' '}
-              <Link href="/register" className="text-teal-600 font-semibold hover:underline">
+              <Link href="/register" className="text-teal-600 font-semibold hover:text-teal-700 hover:underline underline-offset-2">
                 Create account
               </Link>
             </p>
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
-          NSW Opportunity Class preparation · EduLens
+        <p className="text-center text-xs text-gray-400 mt-8 font-medium">
+          NSW Opportunity Class preparation
         </p>
       </div>
     </div>

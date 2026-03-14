@@ -61,16 +61,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const testData = test[0];
 
-    // Check if student already has an active session for this test
-    const existingSession = await prisma.$queryRawUnsafe(
-      `SELECT id FROM test_sessions WHERE test_id = $1::uuid AND student_id = $2::uuid AND status = 'active'`,
-      testId,
+    // Cancel any existing active sessions for this student (allow fresh start)
+    await prisma.$executeRawUnsafe(
+      `UPDATE test_sessions SET status = 'cancelled' WHERE student_id = $1::uuid AND status = 'active'`,
       studentId
-    ) as any[];
-
-    if (existingSession && existingSession.length > 0) {
-      return errorResponse(409, 'Student already has an active session for this test');
-    }
+    );
 
     // Count available questions for this test's subject + grade
     let countQuery = `SELECT COUNT(*) as cnt FROM questions WHERE grade_level = $1 AND is_active = true`;

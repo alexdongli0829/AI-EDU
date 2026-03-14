@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
+import { useTestStore } from '@/store/test-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { studentAnalyticsService, StudentAnalytics } from '@/services/student-analytics';
@@ -21,6 +22,7 @@ const SUBJECTS = [
   {
     key: 'math' as const,
     dnaKey: 'math' as const,
+    testSubject: 'math',
     label: 'Mathematical Reasoning',
     short: 'Math',
     color: '#2563EB',
@@ -32,6 +34,7 @@ const SUBJECTS = [
   {
     key: 'thinking' as const,
     dnaKey: 'thinking' as const,
+    testSubject: 'general_ability',
     label: 'Thinking Skills',
     short: 'Thinking',
     color: '#7C3AED',
@@ -43,6 +46,7 @@ const SUBJECTS = [
   {
     key: 'reading' as const,
     dnaKey: 'reading' as const,
+    testSubject: 'english',
     label: 'English Reading',
     short: 'English',
     color: '#0D9488',
@@ -62,6 +66,7 @@ function scoreStatusColor(status: 'good' | 'ok' | 'low') {
 export default function StudentDashboard() {
   const router = useRouter();
   const { user, student, isAuthenticated } = useAuthStore();
+  const { tests, loadTests } = useTestStore();
   const [analytics, setAnalytics] = useState<StudentAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,13 +77,22 @@ export default function StudentDashboard() {
       return;
     }
     if (!student) {
-      // Parent switching back to parent view — the nav handles the redirect, don't interfere
       if (user?.role === 'parent') return;
       router.push('/login');
       return;
     }
     loadAnalytics();
+    loadTests();
   }, [isAuthenticated, student, user, router]);
+
+  const startTestForSubject = (testSubject: string) => {
+    const test = tests.find(t => t.subject === testSubject);
+    if (test) {
+      router.push(`/student/test/take/${test.id}`);
+    } else {
+      router.push('/student/test');
+    }
+  };
 
   const loadAnalytics = async () => {
     if (!student?.id) return;
@@ -125,22 +139,22 @@ export default function StudentDashboard() {
   // ─── Welcome state (no tests yet) ─────────────────────────────────────────
   if (!analytics || analytics.totalTests === 0) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: '#FAFAF9', fontFamily: "'Source Sans 3', system-ui, sans-serif" }}>
+      <div className="min-h-screen bg-gradient-to-b from-teal-50/40 via-white to-white">
         <div className="max-w-3xl mx-auto px-4 py-14 text-center">
-          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <Target className="h-8 w-8 text-teal-600" />
+          <div className="w-20 h-20 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-teal-200/50">
+            <Target className="h-10 w-10 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome, {user.name.split(' ')[0]}!</h2>
-          <p className="text-gray-500 mb-10">
-            Choose a subject to take your first OC practice test. Your skill breakdown and progress will appear here after each test.
+          <h2 className="text-3xl font-extrabold text-gray-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Hey {user.name.split(' ')[0]}! Ready to learn?</h2>
+          <p className="text-gray-500 text-base mb-10 max-w-md mx-auto">
+            Pick a subject below to start your first practice test. Your progress and scores will show up here!
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {SUBJECTS.map(({ label, description, color, light, border, icon: Icon, key }) => (
+            {SUBJECTS.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
               <button
                 key={key}
-                onClick={() => router.push('/student/test')}
-                className="text-left p-5 rounded-xl border-2 hover:shadow-md transition-all"
+                onClick={() => startTestForSubject(testSubject)}
+                className="text-left p-6 rounded-2xl border-2 hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
                 style={{ backgroundColor: light, borderColor: border }}
               >
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ backgroundColor: color }}>
@@ -162,10 +176,13 @@ export default function StudentDashboard() {
 
   // ─── Main Dashboard ────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#FAFAF9', fontFamily: "'Source Sans 3', system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-gradient-to-b from-teal-50/40 via-white to-white">
 
       <div className="max-w-6xl mx-auto px-4 pt-6 pb-1">
-        <p className="text-xs text-gray-400">
+        <h1 className="text-2xl font-extrabold text-gray-900 mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
+          My Dashboard
+        </h1>
+        <p className="text-sm text-gray-400">
           Grade {student.gradeLevel} · {analytics.totalTests} test{analytics.totalTests !== 1 ? 's' : ''} completed · Last activity: {analytics.lastTestDate}
         </p>
       </div>
@@ -179,10 +196,10 @@ export default function StudentDashboard() {
             { label: 'Average Score', value: `${analytics.averageScore}%`, color: analytics.averageScore >= 70 ? 'text-green-600' : analytics.averageScore >= 50 ? 'text-amber-600' : 'text-red-500' },
             { label: 'Last Activity', value: analytics.lastTestDate, color: 'text-gray-800' },
           ].map(({ label, value, color }) => (
-            <Card key={label} className="border border-gray-200 shadow-sm">
-              <CardContent className="p-4 text-center">
-                <p className={`text-2xl font-extrabold ${color}`}>{value}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+            <Card key={label} className="border border-gray-200/80 shadow-sm rounded-2xl overflow-hidden">
+              <CardContent className="p-5 text-center">
+                <p className={`text-2xl font-extrabold ${color}`} style={{ fontFamily: 'var(--font-heading)' }}>{value}</p>
+                <p className="text-xs text-gray-500 mt-1 font-medium">{label}</p>
               </CardContent>
             </Card>
           ))}
@@ -191,7 +208,7 @@ export default function StudentDashboard() {
         {/* ── Score Trend by Subject ── */}
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold text-gray-800">Score Trend</CardTitle>
+            <CardTitle className="text-base font-extrabold text-gray-800" style={{ fontFamily: 'var(--font-heading)' }}>Score Trend</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             {SUBJECTS.map(({ key, label, color }) => {
@@ -238,17 +255,17 @@ export default function StudentDashboard() {
 
         {/* ── Take a Test ── */}
         <div>
-          <h2 className="text-base font-bold text-gray-800 mb-3">Take a Test</h2>
+          <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Take a Test</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {SUBJECTS.map(({ label, description, color, light, border, icon: Icon, key }) => (
+            {SUBJECTS.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
               <button
                 key={key}
-                onClick={() => router.push('/student/test')}
-                className="text-left p-6 rounded-xl border-2 hover:shadow-lg transition-all group"
+                onClick={() => startTestForSubject(testSubject)}
+                className="text-left p-6 rounded-2xl border-2 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 group"
                 style={{ backgroundColor: light, borderColor: border }}
               >
                 <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: color }}>
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: color }}>
                     <Icon className="h-5 w-5 text-white" />
                   </div>
                   <TrendingUp className="h-4 w-4 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color }} />
@@ -266,7 +283,7 @@ export default function StudentDashboard() {
         {/* ── Previous Tests ── */}
         {analytics.recentResults.length > 0 && (
           <div>
-            <h2 className="text-base font-bold text-gray-800 mb-3">Previous Tests</h2>
+            <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Previous Tests</h2>
             <Card className="border border-gray-200 shadow-sm">
               <CardContent className="p-4">
                 <div className="space-y-2">

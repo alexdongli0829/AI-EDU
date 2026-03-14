@@ -43,11 +43,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside className="w-56 bg-gray-900 text-gray-300 flex flex-col flex-shrink-0">
         <div className="px-4 py-4 border-b border-gray-800">
-          <Link href="/admin" className="flex items-center gap-2">
-            <span className="text-sm font-extrabold text-white tracking-tight">
-              Edu<span className="text-teal-400">Lens</span>
-            </span>
-            <span className="text-[10px] bg-teal-600 text-white px-1.5 py-0.5 rounded font-semibold">Admin</span>
+          <Link href="/admin" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+            </div>
+            <div>
+              <span className="text-base font-extrabold text-white tracking-tight block" style={{ fontFamily: 'var(--font-heading)' }}>
+                Edu<span className="text-teal-400">Lens</span>
+              </span>
+              <span className="text-[10px] text-gray-500 font-medium -mt-0.5 block">Admin Panel</span>
+            </div>
           </Link>
         </div>
 
