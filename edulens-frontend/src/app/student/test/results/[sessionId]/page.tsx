@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { studentAnalyticsService, SessionDetail } from '@/services/student-analytics';
 import { getThresholds, DEFAULT_THRESHOLDS, ErrorClassificationThresholds } from '@/services/system-config';
+import { useI18n } from '@/lib/i18n';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -572,6 +573,7 @@ export default function TestResultPage() {
   const sessionId = params.sessionId as string;
   const { student, user } = useAuthStore();
 
+  const { t } = useI18n();
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -608,7 +610,7 @@ export default function TestResultPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-teal-600 mr-2" />
-        <span className="text-gray-500">Loading result...</span>
+        <span className="text-gray-500">{t.common.loading}</span>
       </div>
     );
   }
@@ -617,8 +619,8 @@ export default function TestResultPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="w-80 text-center"><CardContent className="p-8">
-          <p className="text-gray-500 mb-4">{error || 'Result not found.'}</p>
-          <Button variant="outline" onClick={() => router.push('/student/dashboard')}>Back to Dashboard</Button>
+          <p className="text-gray-500 mb-4">{error || t.results.resultNotFound}</p>
+          <Button variant="outline" onClick={() => router.push('/student/dashboard')}>{t.results.goBack}</Button>
         </CardContent></Card>
       </div>
     );
@@ -665,25 +667,25 @@ export default function TestResultPage() {
             <Card className="border border-gray-200 shadow-sm">
               <CardContent className="p-4 text-center">
                 <div className="text-3xl font-extrabold mb-1" style={{ color: scoreColor }}>{detail.scaledScore}%</div>
-                <div className="text-xs text-gray-500">Score</div>
+                <div className="text-xs text-gray-500">{t.results.score}</div>
               </CardContent>
             </Card>
             <Card className="border border-gray-200 shadow-sm">
               <CardContent className="p-4 text-center">
                 <div className="text-3xl font-extrabold mb-1 text-gray-800">{detail.correctCount}/{detail.totalItems}</div>
-                <div className="text-xs text-gray-500">Correct</div>
+                <div className="text-xs text-gray-500">{t.results.correct}</div>
               </CardContent>
             </Card>
             <Card className="border border-gray-200 shadow-sm">
               <CardContent className="p-4 text-center">
                 <div className="text-3xl font-extrabold mb-1 text-blue-600">{totalReattempts}</div>
-                <div className="text-xs text-gray-500">Reattempts</div>
+                <div className="text-xs text-gray-500">{t.results.reattempt}</div>
               </CardContent>
             </Card>
             <Card className="border border-gray-200 shadow-sm">
               <CardContent className="p-4 text-center">
                 <div className="text-3xl font-extrabold mb-1 text-teal-600">{totalAiMessages}</div>
-                <div className="text-xs text-gray-500">AI Messages</div>
+                <div className="text-xs text-gray-500">{t.results.aiTutor}</div>
               </CardContent>
             </Card>
           </div>

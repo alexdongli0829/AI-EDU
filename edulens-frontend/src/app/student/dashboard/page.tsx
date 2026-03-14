@@ -7,6 +7,7 @@ import { useTestStore } from '@/store/test-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { studentAnalyticsService, StudentAnalytics } from '@/services/student-analytics';
+import { useI18n } from '@/lib/i18n';
 import {
   Target,
   Loader2,
@@ -67,6 +68,7 @@ export default function StudentDashboard() {
   const router = useRouter();
   const { user, student, isAuthenticated } = useAuthStore();
   const { tests, loadTests } = useTestStore();
+  const { t } = useI18n();
   const [analytics, setAnalytics] = useState<StudentAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,9 +146,9 @@ export default function StudentDashboard() {
           <div className="w-20 h-20 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-teal-200/50">
             <Target className="h-10 w-10 text-white" />
           </div>
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Hey {user.name.split(' ')[0]}! Ready to learn?</h2>
+          <h2 className="text-3xl font-extrabold text-gray-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.readyToLearn(user.name.split(' ')[0])}</h2>
           <p className="text-gray-500 text-base mb-10 max-w-md mx-auto">
-            Pick a subject below to start your first practice test. Your progress and scores will show up here!
+            {t.studentDash.pickSubject}
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -167,7 +169,7 @@ export default function StudentDashboard() {
           </div>
 
           <p className="mt-10 text-xs text-gray-400">
-            After each test, your results and score history will appear here.
+            {t.studentDash.afterTest}
           </p>
         </div>
       </div>
@@ -180,7 +182,7 @@ export default function StudentDashboard() {
 
       <div className="max-w-6xl mx-auto px-4 pt-6 pb-1">
         <h1 className="text-2xl font-extrabold text-gray-900 mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
-          My Dashboard
+          {t.studentDash.myDashboard}
         </h1>
         <p className="text-sm text-gray-400">
           Grade {student.gradeLevel} · {analytics.totalTests} test{analytics.totalTests !== 1 ? 's' : ''} completed · Last activity: {analytics.lastTestDate}
@@ -192,9 +194,9 @@ export default function StudentDashboard() {
         {/* ── Row 1: Summary stat chips ── */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: 'Tests Completed', value: analytics.totalTests, color: 'text-teal-600' },
-            { label: 'Average Score', value: `${analytics.averageScore}%`, color: analytics.averageScore >= 70 ? 'text-green-600' : analytics.averageScore >= 50 ? 'text-amber-600' : 'text-red-500' },
-            { label: 'Last Activity', value: analytics.lastTestDate, color: 'text-gray-800' },
+            { label: t.common.testsCompleted, value: analytics.totalTests, color: 'text-teal-600' },
+            { label: t.common.averageScore, value: `${analytics.averageScore}%`, color: analytics.averageScore >= 70 ? 'text-green-600' : analytics.averageScore >= 50 ? 'text-amber-600' : 'text-red-500' },
+            { label: t.common.lastActivity, value: analytics.lastTestDate, color: 'text-gray-800' },
           ].map(({ label, value, color }) => (
             <Card key={label} className="border border-gray-200/80 shadow-sm rounded-2xl overflow-hidden">
               <CardContent className="p-5 text-center">
@@ -208,7 +210,7 @@ export default function StudentDashboard() {
         {/* ── Score Trend by Subject ── */}
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-extrabold text-gray-800" style={{ fontFamily: 'var(--font-heading)' }}>Score Trend</CardTitle>
+            <CardTitle className="text-base font-extrabold text-gray-800" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.scoreTrend}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             {SUBJECTS.map(({ key, label, color }) => {
@@ -255,7 +257,7 @@ export default function StudentDashboard() {
 
         {/* ── Take a Test ── */}
         <div>
-          <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Take a Test</h2>
+          <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.takeATest}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {SUBJECTS.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
               <button
@@ -273,7 +275,7 @@ export default function StudentDashboard() {
                 <p className="font-bold text-gray-900 text-base mb-1">{label}</p>
                 <p className="text-sm text-gray-500">{description}</p>
                 <div className="mt-4 flex items-center gap-1 text-xs font-semibold" style={{ color }}>
-                  Start test <ChevronRight className="h-3.5 w-3.5" />
+                  {t.studentDash.startTest} <ChevronRight className="h-3.5 w-3.5" />
                 </div>
               </button>
             ))}
@@ -283,7 +285,7 @@ export default function StudentDashboard() {
         {/* ── Previous Tests ── */}
         {analytics.recentResults.length > 0 && (
           <div>
-            <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Previous Tests</h2>
+            <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.previousTests}</h2>
             <Card className="border border-gray-200 shadow-sm">
               <CardContent className="p-4">
                 <div className="space-y-2">

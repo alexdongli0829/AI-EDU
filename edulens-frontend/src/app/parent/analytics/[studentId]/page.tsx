@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { studentAnalyticsService, StudentAnalytics, SkillEntry } from '@/services/student-analytics';
+import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -71,6 +72,7 @@ interface StudentInfo {
 export default function ParentStudentAnalyticsPage() {
   const params = useParams();
   const router = useRouter();
+  const { t } = useI18n();
   const studentId = params.studentId as string;
 
   const { user } = useAuthStore();
@@ -167,9 +169,9 @@ export default function ParentStudentAnalyticsPage() {
             {student.name.charAt(0)}
           </div>
           <div>
-            <h1 className="text-base font-bold text-gray-900">{student.name}'s Learning Analytics</h1>
+            <h1 className="text-base font-bold text-gray-900">{t.analytics.learningAnalytics(student.name)}</h1>
             <p className="text-xs text-gray-500">
-              Grade {student.gradeLevel} · Parent view · {analytics?.totalTests || 0} tests completed
+              {t.common.grade} {student.gradeLevel} · {t.analytics.parentView} · {analytics?.totalTests || 0} {t.common.testsCompleted.toLowerCase()}
             </p>
           </div>
         </div>
@@ -192,7 +194,7 @@ export default function ParentStudentAnalyticsPage() {
               <div className="text-2xl font-bold text-gray-900">
                 {analytics?.totalTests || 0}
               </div>
-              <p className="text-sm text-gray-500">Tests Completed</p>
+              <p className="text-sm text-gray-500">{t.common.testsCompleted}</p>
             </CardContent>
           </Card>
 
@@ -202,7 +204,7 @@ export default function ParentStudentAnalyticsPage() {
               <div className="text-2xl font-bold text-gray-900">
                 {analytics?.averageScore || 0}%
               </div>
-              <p className="text-sm text-gray-500">Average Score</p>
+              <p className="text-sm text-gray-500">{t.common.averageScore}</p>
             </CardContent>
           </Card>
 
@@ -210,9 +212,9 @@ export default function ParentStudentAnalyticsPage() {
             <CardContent className="p-4 text-center">
               <Clock className="h-8 w-8 mx-auto mb-2 text-blue-600" />
               <div className="text-2xl font-bold text-gray-900">
-                {analytics?.lastTestDate || 'Never'}
+                {analytics?.lastTestDate || t.common.noDataYet}
               </div>
-              <p className="text-sm text-gray-500">Last Activity</p>
+              <p className="text-sm text-gray-500">{t.common.lastActivity}</p>
             </CardContent>
           </Card>
 
@@ -225,7 +227,7 @@ export default function ParentStudentAnalyticsPage() {
                       .flat().filter(s => s.total > 0).length
                   : 0}
               </div>
-              <p className="text-sm text-gray-500">Skills Assessed</p>
+              <p className="text-sm text-gray-500">{t.common.skillsAssessed}</p>
             </CardContent>
           </Card>
         </div>
@@ -236,7 +238,7 @@ export default function ParentStudentAnalyticsPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-teal-600" />
-              <h2 className="text-sm font-bold text-gray-800">AI Performance Insights</h2>
+              <h2 className="text-sm font-bold text-gray-800">{t.analytics.aiInsights}</h2>
               {insights && (
                 <span className="text-[10px] text-gray-400">
                   · Updated {new Date(insights.generatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
@@ -251,7 +253,7 @@ export default function ParentStudentAnalyticsPage() {
               className="h-7 text-xs"
             >
               <RefreshCw className={`h-3 w-3 mr-1 ${insightsRegenerating ? 'animate-spin' : ''}`} />
-              {insightsRegenerating ? 'Analysing…' : 'Refresh'}
+              {insightsRegenerating ? t.analytics.analysing : t.analytics.refresh}
             </Button>
           </div>
 
@@ -260,9 +262,9 @@ export default function ParentStudentAnalyticsPage() {
               <CardContent className="py-10 text-center">
                 <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3 text-teal-600" />
                 <p className="text-sm text-gray-500">
-                  {insightsRegenerating ? 'Regenerating analysis with Claude…' : 'Generating AI insights with Claude…'}
+                  {insightsRegenerating ? t.analytics.regenerating : t.analytics.generatingInsights}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">This takes 20–40 seconds</p>
+                <p className="text-xs text-gray-400 mt-1">{t.analytics.takesTime}</p>
               </CardContent>
             </Card>
           ) : !insights ? (
@@ -271,7 +273,7 @@ export default function ParentStudentAnalyticsPage() {
                 <Brain className="h-10 w-10 mx-auto mb-3 text-gray-300" />
                 {insightsError ? (
                   <>
-                    <p className="text-sm text-red-500 mb-1">Generation failed</p>
+                    <p className="text-sm text-red-500 mb-1">{t.analytics.generationFailed}</p>
                     <p className="text-xs text-gray-400 mb-4">{insightsError}</p>
                     <Button size="sm" onClick={handleRegenerateInsights} className="bg-teal-600 hover:bg-teal-700">
                       <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
@@ -424,8 +426,8 @@ export default function ParentStudentAnalyticsPage() {
           <Card className="mb-6">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Detailed Skill Analysis</CardTitle>
-                <span className="text-xs text-gray-400 font-normal">Last 3 months</span>
+                <CardTitle>{t.analytics.detailedSkill}</CardTitle>
+                <span className="text-xs text-gray-400 font-normal">{t.analytics.last3Months}</span>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -442,13 +444,13 @@ export default function ParentStudentAnalyticsPage() {
                     <div className={`flex items-center justify-between px-3 py-2 rounded-md mb-3 ${bg}`}>
                       <span className="text-sm font-bold" style={{ color }}>{label}</span>
                       {practiced.length === 0 && (
-                        <span className="text-xs text-gray-400">No tests completed yet</span>
+                        <span className="text-xs text-gray-400">{t.analytics.noTestsCompleted}</span>
                       )}
                     </div>
                     {/* 30-day subject trend line */}
                     {trendData.length >= 2 ? (
                       <div className="mb-4">
-                        <div className="text-xs text-gray-400 mb-1">Score trend — recent sessions</div>
+                        <div className="text-xs text-gray-400 mb-1">{t.analytics.scoreTrendRecent}</div>
                         <div className="h-28">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
@@ -483,7 +485,7 @@ export default function ParentStudentAnalyticsPage() {
                     {/* Radar chart — skill profile for this subject */}
                     {practiced.length > 0 && (
                       <div className="mb-4">
-                        <div className="text-xs text-gray-400 mb-1">Skill profile</div>
+                        <div className="text-xs text-gray-400 mb-1">{t.analytics.skillProfile}</div>
                         <div className="h-56">
                           <ResponsiveContainer width="100%" height="100%">
                             <RadarChart data={skills.map(s => ({ skill: s.skill, value: s.total > 0 ? s.percentage : 0 }))}>
@@ -518,7 +520,7 @@ export default function ParentStudentAnalyticsPage() {
                         const trendColor  = trendUp ? 'text-green-600'  : trendDown ? 'text-red-500'  : 'text-gray-400';
                         const trendBg     = trendUp ? 'bg-green-50'     : trendDown ? 'bg-red-50'     : 'bg-gray-50';
                         const trendBorder = trendUp ? 'border-green-200': trendDown ? 'border-red-200': 'border-gray-200';
-                        const trendLabel  = trendUp ? 'Improving'       : trendDown ? 'Declining'     : 'Stable';
+                        const trendLabel  = trendUp ? t.analytics.improving : trendDown ? t.analytics.declining : t.analytics.stable;
                         const lineColor   = trendUp ? '#16a34a'         : trendDown ? '#ef4444'       : '#9ca3af';
                         return (
                           <div key={i} className={`p-3 border rounded-lg ${trendBorder} ${skill.total === 0 ? 'opacity-50' : ''}`}>
@@ -585,9 +587,9 @@ export default function ParentStudentAnalyticsPage() {
         {analytics && (analytics.errorAnalysis.math.total > 0 || analytics.errorAnalysis.thinking.total > 0 || analytics.errorAnalysis.reading.total > 0) && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Error Analysis</CardTitle>
+              <CardTitle>{t.analytics.errorAnalysis}</CardTitle>
               <p className="text-xs text-gray-400 mt-0.5">
-                Breakdown of incorrect answers by error type across all completed tests
+                {t.analytics.errorAnalysisDesc}
               </p>
             </CardHeader>
             <CardContent>
@@ -603,14 +605,14 @@ export default function ParentStudentAnalyticsPage() {
                       <div className={`px-3 py-1.5 rounded-md mb-3 ${bg}`}>
                         <span className="text-xs font-bold" style={{ color }}>{label}</span>
                       </div>
-                      <p className="text-xs text-gray-400 px-1">No errors recorded yet</p>
+                      <p className="text-xs text-gray-400 px-1">{t.analytics.noErrorsYet}</p>
                     </div>
                   );
                   const items = [
-                    { label: 'Careless Error', count: err.careless, color: '#F59E0B', bg: 'bg-amber-50', desc: 'Answered too quickly (<5s)' },
-                    { label: 'Time Pressure',  count: err.timePressure, color: '#EF4444', bg: 'bg-red-50', desc: 'Running out of time' },
-                    { label: 'Concept Gap',    count: err.conceptGap, color: '#8B5CF6', bg: 'bg-purple-50', desc: 'Spent >2min but still wrong' },
-                    { label: 'Other',          count: err.other, color: '#6B7280', bg: 'bg-gray-50', desc: 'Standard errors' },
+                    { label: t.analytics.carelessError, count: err.careless, color: '#F59E0B', bg: 'bg-amber-50', desc: t.analytics.carelessDesc },
+                    { label: t.analytics.timePressure,  count: err.timePressure, color: '#EF4444', bg: 'bg-red-50', desc: t.analytics.timePressureDesc },
+                    { label: t.analytics.conceptGap,    count: err.conceptGap, color: '#8B5CF6', bg: 'bg-purple-50', desc: t.analytics.conceptGapDesc },
+                    { label: t.analytics.otherError,    count: err.other, color: '#6B7280', bg: 'bg-gray-50', desc: t.analytics.otherErrorDesc },
                   ];
                   return (
                     <div key={key}>
@@ -650,7 +652,7 @@ export default function ParentStudentAnalyticsPage() {
         {analytics && analytics.recentResults.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Recent Tests</CardTitle>
+              <CardTitle>{t.analytics.recentTests}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

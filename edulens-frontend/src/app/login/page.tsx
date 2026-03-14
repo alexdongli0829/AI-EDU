@@ -6,11 +6,13 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/auth-store';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Sparkles, Globe } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, studentLogin, isAuthenticated, isLoading, error, clearError } = useAuthStore();
+  const { lang, setLang, t } = useI18n();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword]     = useState('');
@@ -51,14 +53,25 @@ export default function LoginPage() {
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
             Edu<span className="text-teal-600">Lens</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1.5 font-medium">NSW OC & Selective Exam Prep</p>
+          <p className="text-sm text-gray-500 mt-1.5 font-medium">{t.login.tagline}</p>
         </div>
 
         {/* Card */}
         <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xl shadow-gray-200/40 p-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-1" style={{ fontFamily: 'var(--font-heading)' }}>Welcome back</h2>
+          {/* Language switcher */}
+          <div className="flex justify-end mb-3 -mt-2 -mr-2">
+            <button
+              onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50"
+            >
+              <Globe className="h-3.5 w-3.5" />
+              <span className="font-medium">{lang === 'en' ? '中文' : 'English'}</span>
+            </button>
+          </div>
+
+          <h2 className="text-lg font-bold text-gray-900 mb-1" style={{ fontFamily: 'var(--font-heading)' }}>{t.login.welcomeBack}</h2>
           <p className="text-sm text-gray-500 mb-6">
-            Sign in with your email or student username
+            {t.login.subtitle}
           </p>
 
           {error && (
@@ -70,11 +83,11 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-semibold text-gray-700 block mb-1.5">
-                Email or username
+                {t.login.emailOrUsername}
               </label>
               <Input
                 type="text"
-                placeholder="e.g. parent@email.com or alex123"
+                placeholder={t.login.emailPlaceholder}
                 value={identifier}
                 onChange={e => { setIdentifier(e.target.value); clearError(); }}
                 autoComplete="username"
@@ -85,12 +98,12 @@ export default function LoginPage() {
 
             <div>
               <label className="text-xs font-semibold text-gray-700 block mb-1.5">
-                Password
+                {t.login.password}
               </label>
               <div className="relative">
                 <Input
                   type={showPw ? 'text' : 'password'}
-                  placeholder="Enter your password"
+                  placeholder={t.login.passwordPlaceholder}
                   value={password}
                   onChange={e => { setPassword(e.target.value); clearError(); }}
                   autoComplete="current-password"
@@ -113,22 +126,22 @@ export default function LoginPage() {
               className="w-full h-11 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-semibold text-sm mt-2 rounded-xl shadow-md shadow-teal-200/50 transition-all hover:shadow-lg"
               disabled={isLoading || !identifier || !password}
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign in'}
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t.common.signIn}
             </Button>
           </form>
 
           <div className="mt-6 pt-5 border-t border-gray-100 text-center">
             <p className="text-sm text-gray-500">
-              New parent?{' '}
+              {t.login.newParent}{' '}
               <Link href="/register" className="text-teal-600 font-semibold hover:text-teal-700 hover:underline underline-offset-2">
-                Create account
+                {t.login.createAccount}
               </Link>
             </p>
           </div>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-8 font-medium">
-          NSW Opportunity Class preparation
+          {t.login.tagline}
         </p>
       </div>
     </div>

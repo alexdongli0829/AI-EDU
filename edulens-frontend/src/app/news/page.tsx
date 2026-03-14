@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n';
 import {
   Loader2, Megaphone, Lightbulb, RefreshCw, ChevronRight,
   Calendar, Tag, ArrowLeft,
@@ -10,11 +11,11 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
-const CATEGORIES: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  announcement: { label: 'Announcement', color: '#DC2626', bg: 'bg-red-50', border: 'border-red-200' },
-  update:       { label: 'Platform Update', color: '#2563EB', bg: 'bg-blue-50', border: 'border-blue-200' },
-  tips:         { label: 'Tips & Advice', color: '#7C3AED', bg: 'bg-purple-50', border: 'border-purple-200' },
-  general:      { label: 'General', color: '#6B7280', bg: 'bg-gray-50', border: 'border-gray-200' },
+const CATEGORIES: Record<string, { labelKey: keyof typeof import('@/lib/i18n/en').default.news; color: string; bg: string; border: string }> = {
+  announcement: { labelKey: 'announcement', color: '#DC2626', bg: 'bg-red-50', border: 'border-red-200' },
+  update:       { labelKey: 'platformUpdate', color: '#2563EB', bg: 'bg-blue-50', border: 'border-blue-200' },
+  tips:         { labelKey: 'tipsAdvice', color: '#7C3AED', bg: 'bg-purple-50', border: 'border-purple-200' },
+  general:      { labelKey: 'general', color: '#6B7280', bg: 'bg-gray-50', border: 'border-gray-200' },
 };
 
 interface NewsPost {
@@ -28,6 +29,7 @@ interface NewsPost {
 }
 
 export default function NewsPage() {
+  const { t } = useI18n();
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<NewsPost | null>(null);
@@ -59,7 +61,10 @@ export default function NewsPage() {
     return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  const getCat = (cat: string) => CATEGORIES[cat] || CATEGORIES.general;
+  const getCat = (cat: string) => {
+    const c = CATEGORIES[cat] || CATEGORIES.general;
+    return { ...c, label: (t.news as any)[c.labelKey] || c.labelKey };
+  };
 
   // ─── Single post view ───
   if (selectedPost) {
@@ -71,7 +76,7 @@ export default function NewsPage() {
             onClick={() => setSelectedPost(null)}
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6 font-medium"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to News
+            <ArrowLeft className="h-4 w-4" /> {t.news.backToNews}
           </button>
 
           <div className="flex items-center gap-2 mb-4">
@@ -123,10 +128,10 @@ export default function NewsPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-extrabold text-gray-900" style={{ fontFamily: 'var(--font-heading)' }}>
-            News & Updates
+            {t.news.title}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Stay up to date with OC test information, platform updates, and learning tips.
+            {t.news.subtitle}
           </p>
         </div>
 
@@ -138,9 +143,9 @@ export default function NewsPage() {
               !filterCategory ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
             }`}
           >
-            All
+            {t.news.all}
           </button>
-          {Object.entries(CATEGORIES).map(([key, { label, color, bg, border }]) => (
+          {Object.entries(CATEGORIES).map(([key, { labelKey, color, bg, border }]) => (
             <button
               key={key}
               onClick={() => setFilterCategory(filterCategory === key ? '' : key)}
@@ -149,7 +154,7 @@ export default function NewsPage() {
               }`}
               style={filterCategory === key ? { color } : undefined}
             >
-              {label}
+              {(t.news as any)[labelKey] || labelKey}
             </button>
           ))}
         </div>
@@ -162,7 +167,7 @@ export default function NewsPage() {
           <Card className="border-dashed border-2">
             <CardContent className="py-16 text-center">
               <Megaphone className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">No news posts yet. Check back soon!</p>
+              <p className="text-sm text-gray-500">{t.news.noPosts}</p>
             </CardContent>
           </Card>
         ) : (

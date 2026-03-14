@@ -5,22 +5,23 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
+import { useI18n, Lang } from '@/lib/i18n';
 import {
   Home, LayoutDashboard, ClipboardList, Users, LogOut,
-  ChevronDown, GraduationCap, UserCheck, Sparkles, Newspaper,
+  ChevronDown, GraduationCap, UserCheck, Sparkles, Newspaper, Globe,
 } from 'lucide-react';
 
-type NavItem = { label: string; href: string; icon: React.ElementType; exact?: boolean };
+type NavItem = { labelKey: string; href: string; icon: React.ElementType; exact?: boolean };
 
 const STUDENT_ITEMS: NavItem[] = [
-  { label: 'Dashboard',      href: '/student/dashboard', icon: LayoutDashboard, exact: true },
-  { label: 'Practice Tests', href: '/student/test',      icon: ClipboardList },
-  { label: 'News',           href: '/news',              icon: Newspaper },
+  { labelKey: 'dashboard',      href: '/student/dashboard', icon: LayoutDashboard, exact: true },
+  { labelKey: 'practiceTests',  href: '/student/test',      icon: ClipboardList },
+  { labelKey: 'news',           href: '/news',              icon: Newspaper },
 ];
 
 const PARENT_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/parent/dashboard', icon: Users, exact: true },
-  { label: 'News',      href: '/news',              icon: Newspaper },
+  { labelKey: 'dashboard', href: '/parent/dashboard', icon: Users, exact: true },
+  { labelKey: 'news',      href: '/news',              icon: Newspaper },
 ];
 
 interface ChildProfile { id: string; name: string; gradeLevel: number; }
@@ -29,6 +30,7 @@ export default function AppNav() {
   const pathname   = usePathname();
   const router     = useRouter();
   const { user, student, setStudent, logout } = useAuthStore();
+  const { lang, setLang, t } = useI18n();
 
   const [children, setChildren]       = useState<ChildProfile[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -114,7 +116,7 @@ export default function AppNav() {
                 }`}
               >
                 <item.icon className="h-4 w-4 flex-shrink-0" />
-                {item.label}
+                {(t.nav as any)[item.labelKey] || item.labelKey}
               </Link>
             ))}
           </div>
@@ -154,7 +156,7 @@ export default function AppNav() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-800 truncate">{user?.name}</p>
-                      <p className="text-[11px] text-gray-400">Parent</p>
+                      <p className="text-[11px] text-gray-400">{t.common.parent}</p>
                     </div>
                     {activeIsParent && <UserCheck className="h-4 w-4 text-purple-500 flex-shrink-0" />}
                   </button>
@@ -162,7 +164,7 @@ export default function AppNav() {
                   {children.length > 0 && (
                     <>
                       <div className="border-t border-gray-100 mx-3 my-1" />
-                      <p className="px-3.5 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Children</p>
+                      <p className="px-3.5 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{t.common.children}</p>
                       {children.map(child => {
                         const active = student?.id === child.id;
                         return (
@@ -201,12 +203,22 @@ export default function AppNav() {
             </div>
           )}
 
+          {/* Language switcher */}
+          <button
+            onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors px-2 py-2 rounded-lg hover:bg-gray-50"
+            title={lang === 'en' ? '切换中文' : 'Switch to English'}
+          >
+            <Globe className="h-4 w-4" />
+            <span className="font-medium">{lang === 'en' ? '中文' : 'EN'}</span>
+          </button>
+
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors px-2.5 py-2 rounded-lg hover:bg-gray-50"
           >
             <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline font-medium">Logout</span>
+            <span className="hidden sm:inline font-medium">{t.common.logout}</span>
           </button>
         </div>
 
