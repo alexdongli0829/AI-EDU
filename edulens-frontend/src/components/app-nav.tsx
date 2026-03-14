@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
 import {
   Home, LayoutDashboard, ClipboardList, Users, LogOut,
-  ChevronDown, GraduationCap, UserCheck, Sparkles,
+  ChevronDown, GraduationCap, UserCheck, Sparkles, Newspaper,
 } from 'lucide-react';
 
 type NavItem = { label: string; href: string; icon: React.ElementType; exact?: boolean };
@@ -15,10 +15,12 @@ type NavItem = { label: string; href: string; icon: React.ElementType; exact?: b
 const STUDENT_ITEMS: NavItem[] = [
   { label: 'Dashboard',      href: '/student/dashboard', icon: LayoutDashboard, exact: true },
   { label: 'Practice Tests', href: '/student/test',      icon: ClipboardList },
+  { label: 'News',           href: '/news',              icon: Newspaper },
 ];
 
 const PARENT_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/parent/dashboard', icon: Users, exact: true },
+  { label: 'News',      href: '/news',              icon: Newspaper },
 ];
 
 interface ChildProfile { id: string; name: string; gradeLevel: number; }

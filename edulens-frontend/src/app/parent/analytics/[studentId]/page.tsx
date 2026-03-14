@@ -581,6 +581,71 @@ export default function ParentStudentAnalyticsPage() {
           </Card>
         )}
 
+        {/* ── Error Analysis by Subject ── */}
+        {analytics && (analytics.errorAnalysis.math.total > 0 || analytics.errorAnalysis.thinking.total > 0 || analytics.errorAnalysis.reading.total > 0) && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Error Analysis</CardTitle>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Breakdown of incorrect answers by error type across all completed tests
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {([
+                  { key: 'math' as const,     label: 'Mathematical Reasoning', color: '#2563EB', bg: 'bg-blue-50' },
+                  { key: 'thinking' as const, label: 'Thinking Skills',        color: '#7C3AED', bg: 'bg-purple-50' },
+                  { key: 'reading' as const,  label: 'English Reading',        color: '#0D9488', bg: 'bg-teal-50' },
+                ] as const).map(({ key, label, color, bg }) => {
+                  const err = analytics.errorAnalysis[key];
+                  if (err.total === 0) return (
+                    <div key={key}>
+                      <div className={`px-3 py-1.5 rounded-md mb-3 ${bg}`}>
+                        <span className="text-xs font-bold" style={{ color }}>{label}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 px-1">No errors recorded yet</p>
+                    </div>
+                  );
+                  const items = [
+                    { label: 'Careless Error', count: err.careless, color: '#F59E0B', bg: 'bg-amber-50', desc: 'Answered too quickly (<5s)' },
+                    { label: 'Time Pressure',  count: err.timePressure, color: '#EF4444', bg: 'bg-red-50', desc: 'Running out of time' },
+                    { label: 'Concept Gap',    count: err.conceptGap, color: '#8B5CF6', bg: 'bg-purple-50', desc: 'Spent >2min but still wrong' },
+                    { label: 'Other',          count: err.other, color: '#6B7280', bg: 'bg-gray-50', desc: 'Standard errors' },
+                  ];
+                  return (
+                    <div key={key}>
+                      <div className={`px-3 py-1.5 rounded-md mb-3 ${bg}`}>
+                        <span className="text-xs font-bold" style={{ color }}>{label}</span>
+                        <span className="text-xs text-gray-400 ml-2">{err.total} wrong answer{err.total !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {items.filter(it => it.count > 0).map(it => {
+                          const pct = Math.round((it.count / err.total) * 100);
+                          return (
+                            <div key={it.label}>
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-xs font-semibold text-gray-700">{it.label}</span>
+                                <span className="text-xs font-bold" style={{ color: it.color }}>{it.count} ({pct}%)</span>
+                              </div>
+                              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{ width: `${pct}%`, backgroundColor: it.color }}
+                                />
+                              </div>
+                              <p className="text-[10px] text-gray-400 mt-0.5">{it.desc}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Recent Tests — split by subject */}
         {analytics && analytics.recentResults.length > 0 && (
           <Card>

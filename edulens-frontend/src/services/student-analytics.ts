@@ -99,6 +99,19 @@ export interface StudentAnalytics {
     sessionId: string;
     subject: string;
   }>;
+  errorAnalysis: {
+    math: ErrorBreakdown;
+    thinking: ErrorBreakdown;
+    reading: ErrorBreakdown;
+  };
+}
+
+export interface ErrorBreakdown {
+  total: number;
+  careless: number;
+  timePressure: number;
+  conceptGap: number;
+  other: number;
 }
 
 export interface SessionDetail {
@@ -185,6 +198,7 @@ class StudentAnalyticsService {
       scoreTrend: this.buildScoreTrend(sessions),
       monthTrend: this.buildMonthTrend(sessions),
       recentResults: this.buildRecentResults(sessions),
+      errorAnalysis: this.buildErrorAnalysis(sessions),
     };
   }
 
@@ -203,6 +217,11 @@ class StudentAnalyticsService {
       scoreTrend: { math: [], thinking: [], reading: [] },
       monthTrend: { math: [], thinking: [], reading: [] },
       recentResults: [],
+      errorAnalysis: {
+        math: { total: 0, careless: 0, timePressure: 0, conceptGap: 0, other: 0 },
+        thinking: { total: 0, careless: 0, timePressure: 0, conceptGap: 0, other: 0 },
+        reading: { total: 0, careless: 0, timePressure: 0, conceptGap: 0, other: 0 },
+      },
     };
   }
 
@@ -412,6 +431,46 @@ class StudentAnalyticsService {
     });
 
     return trend;
+  }
+
+  private buildErrorAnalysis(sessions: any[]): StudentAnalytics['errorAnalysis'] {
+    const CARELESS_MAX = 5;      // seconds
+    const TIME_PRESSURE_MIN = 0.20; // fraction of test time remaining
+    const CONCEPT_GAP_MIN = 120;   // seconds
+
+    const empty = (): ErrorBreakdown => ({ total: 0, careless: 0, timePressure: 0, conceptGap: 0, other: 0 });
+    const result = { math: empty(), thinking: empty(), reading: empty() };
+
+    for (const session of sessions) {
+      const dnaKey = this.subjectToDNA(session.subject);
+      if (!dnaKey) continue;
+      const bucket = result[dnaKey];
+      const timeLimit = session.timeLimit || 1800;
+      const answers: any[] = session.answers || [];
+
+      // Build cumulative time to determine % remaining when each question started
+      let cumulative = 0;
+      for (const a of answers) {
+        if (!a.isCorrect) {
+          const timeSpent = parseInt(a.timeSpent) || 0;
+          const pctRemaining = (timeLimit - cumulative) / timeLimit;
+          bucket.total++;
+
+          if (timeSpent < CARELESS_MAX) {
+            bucket.careless++;
+          } else if (pctRemaining < TIME_PRESSURE_MIN) {
+            bucket.timePressure++;
+          } else if (timeSpent > CONCEPT_GAP_MIN) {
+            bucket.conceptGap++;
+          } else {
+            bucket.other++;
+          }
+        }
+        cumulative += parseInt(a.timeSpent) || 0;
+      }
+    }
+
+    return result;
   }
 
   private buildRecentResults(sessions: any[]): StudentAnalytics['recentResults'] {

@@ -5,12 +5,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { useEffect, useState } from 'react';
 import {
-  LayoutDashboard, HelpCircle, Settings, LogOut, Home,
+  LayoutDashboard, HelpCircle, Settings, LogOut, Home, Newspaper,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true },
   { label: 'Questions', href: '/admin/questions', icon: HelpCircle },
+  { label: 'News',      href: '/admin/news', icon: Newspaper },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
