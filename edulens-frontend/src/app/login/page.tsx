@@ -60,7 +60,7 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
           <h1 className="text-lg font-bold text-gray-900 mb-1">Sign in</h1>
           <p className="text-xs text-gray-500 mb-6">
-            Use your email (parent / admin) or student username
+            Use your email (parent) or student username
           </p>
 
           {error && (
