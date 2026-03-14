@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: edulens-postgres
+    environment:
+      POSTGRES_DB: edulens_dev
+      POSTGRES_USER: edulens
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U edulens']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: edulens-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: edulens-localstack
+    environment:
+      SERVICES: s3,sqs,dynamodb,secretsmanager,ssm,events
+      DEFAULT_REGION: us-east-1
+      DEBUG: 0
+      DATA_DIR: /tmp/localstack/data
+    ports:
+      - '4566:4566'      # LocalStack Gateway
+      - '4510-4559:4510-4559'  # External services port range
+    volumes:
+      - localstack_data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  localstack_data:
+    driver: local
+
+networks:
+  default:
+    name: edulens-network

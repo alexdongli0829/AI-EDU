@@ -1,0 +1,36 @@
+{
+  "name": "edulens-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EduLens Backend - Serverless Architecture on AWS",
+  "workspaces": [
+    "packages/shared/*",
+    "packages/aws-infra",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "echo 'Start local development'",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "npm run migrate -w packages/shared/database",
+    "db:seed": "npm run seed -w packages/shared/database",
+    "generate:types": "npm run generate -w packages/shared/database",
+    "deploy:dev": "./scripts/deploy.sh dev",
+    "deploy:staging": "./scripts/deploy.sh staging",
+    "deploy:prod": "./scripts/deploy.sh production"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  }
+}

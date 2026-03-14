@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.Python
+
+# Build artifacts
+cdk.out/
+dist/
+build/
+*.egg
+*.whl
+
+# IDE and editors
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Environment and secrets
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+*.pem
+*.key
+credentials
+secrets.json
+
+# Cache and temporary
+.pytest_cache/
+.cache/
+*.log
+.coverage
+htmlcov/
+.nyc_output/
+coverage/
+.next/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AWS
+.aws-sam/
+samconfig.toml

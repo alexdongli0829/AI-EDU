@@ -1,0 +1,27 @@
+{
+  "name": "edulens-infrastructure",
+  "version": "1.0.0",
+  "description": "AWS CDK infrastructure for EduLens platform",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "deploy:all": "cdk deploy --all",
+    "destroy": "cdk destroy",
+    "diff": "cdk diff",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.133.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "aws-cdk": "^2.133.0",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}

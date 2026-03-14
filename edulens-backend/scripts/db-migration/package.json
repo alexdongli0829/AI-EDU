@@ -1,0 +1,10 @@
+{
+  "name": "db-migration-runner",
+  "version": "1.0.0",
+  "description": "Lambda function to run database migrations",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1009.0",
+    "pg": "^8.20.0"
+  }
+}

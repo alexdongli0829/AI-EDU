@@ -1,0 +1,23 @@
+# Exclude from Lambda deployment package
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.tox/
+.git/
+.gitignore
+tests/
+*.md
+README.md
+requirements-dev.txt
+pytest.ini
+.env
+.env.local

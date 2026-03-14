@@ -1,0 +1,295 @@
+// EduLens Database Schema
+// PostgreSQL with Prisma ORM
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../node_modules/.prisma/client"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== Users & Authentication ====================
+
+// User roles are stored as plain strings: 'admin', 'parent', 'student'
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @map("updated_at")
+
+  // Relations
+  student  Student?
+  children Student[] @relation("ParentChildren")
+
+  @@index([email])
+  @@map("users")
+}
+
+model Student {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  gradeLevel  Int      @map("grade_level")
+  dateOfBirth DateTime @map("date_of_birth")
+  parentId    String   @map("parent_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent            User                @relation("ParentChildren", fields: [parentId], references: [id])
+  testSessions      TestSession[]
+  chatSessions      ChatSession[]
+  profile           StudentProfile?
+  profileSnapshots  ProfileSnapshot[]
+  conversationMemory ConversationMemory[]
+  events            Event[]
+
+  @@index([parentId])
+  @@index([userId])
+  @@map("students")
+}
+
+// ==================== Tests & Questions ====================
+
+enum QuestionType {
+  multiple_choice
+  short_answer
+  essay
+}
+
+enum Subject {
+  math
+  reading
+  science
+  writing
+}
+
+enum Difficulty {
+  easy
+  medium
+  hard
+}
+
+model Test {
+  id              String   @id @default(uuid())
+  title           String
+  description     String
+  subject         Subject
+  grade           Int
+  totalQuestions  Int
+  timeLimit       Int      // seconds
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  questions    Question[]
+  testSessions TestSession[]
+
+  @@index([subject, grade])
+  @@index([isActive])
+  @@map("tests")
+}
+
+model Question {
+  id            String       @id @default(uuid())
+  testId        String
+  type          QuestionType
+  subject       Subject
+  difficulty    Difficulty
+  text          String       @db.Text
+  options       Json?        // Array of {id, text, isCorrect}
+  correctAnswer String?      @db.Text
+  rubric        String?      @db.Text
+  skillTags     String[]     // e.g., ['reading.inference', 'reading.main-idea']
+  estimatedTime Int          // seconds
+  order         Int
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  test      Test               @relation(fields: [testId], references: [id], onDelete: Cascade)
+  responses SessionResponse[]
+
+  @@index([testId, order])
+  @@index([subject])
+  @@map("questions")
+}
+
+// ==================== Test Sessions ====================
+
+enum SessionStatus {
+  pending
+  in_progress
+  completed
+  abandoned
+}
+
+model TestSession {
+  id                   String        @id @default(uuid())
+  studentId            String
+  testId               String
+  status               SessionStatus @default(pending)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  timeRemaining        Int           // seconds
+  currentQuestionIndex Int           @default(0)
+  totalQuestions       Int
+  score                Int?          // Percentage (0-100)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relations
+  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  test      Test              @relation(fields: [testId], references: [id])
+  responses SessionResponse[]
+
+  @@index([studentId, status])
+  @@index([testId])
+  @@index([createdAt])
+  @@map("test_sessions")
+}
+
+model SessionResponse {
+  id            String   @id @default(uuid())
+  sessionId     String
+  questionId    String
+  studentAnswer String   @db.Text
+  isCorrect     Boolean?
+  timeSpent     Int      // seconds
+  confidence    Float?   // 0-1 for ML confidence
+  answeredAt    DateTime @default(now())
+
+  // Relations
+  session  TestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id])
+
+  @@unique([sessionId, questionId])
+  @@index([sessionId])
+  @@index([questionId])
+  @@map("session_responses")
+}
+
+// ==================== Chat & Conversations ====================
+
+// Chat role, message role, and agent state use plain strings in DB (VARCHAR)
+// Valid chat roles: 'student_tutor', 'parent_advisor'
+// Valid message roles: 'user', 'assistant', 'system'
+// Valid agent states: 'idle', 'processing', 'responding', 'waiting_feedback'
+
+model ChatSession {
+  id            String   @id @default(uuid())
+  studentId     String   @map("student_id")
+  role          String   @default("student_tutor")
+  agentState    String   @default("idle") @map("agent_state")
+  turnCount     Int      @default(0) @map("turn_count")
+  startedAt     DateTime @default(now()) @map("started_at")
+  lastMessageAt DateTime? @map("last_message_at")
+  metadata      Json?
+
+  // Relations
+  student            Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  messages           ChatMessage[]
+  conversationMemory ConversationMemory[]
+
+  @@index([studentId, role])
+  @@index([startedAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  role      String
+  content   String   @db.Text
+  timestamp DateTime @default(now())
+  metadata  Json?
+
+  // Relations
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, timestamp])
+  @@map("chat_messages")
+}
+
+model ConversationMemory {
+  id                 String   @id @default(uuid())
+  studentId          String
+  sessionId          String
+  summary            String   @db.Text
+  keyTopics          String[]
+  insightsExtracted  Json     // Flexible insights storage
+  parentQuestions    String[]
+  satisfactionSignal String?  // 'positive' | 'neutral' | 'negative'
+  turnCount          Int
+  createdAt          DateTime @default(now())
+
+  // Relations
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([sessionId])
+  @@map("conversation_memory")
+}
+
+// ==================== Profile & Learning DNA ====================
+
+model StudentProfile {
+  id              String   @id @default(uuid())
+  studentId       String   @unique @map("student_id")
+  skillGraph      Json     @map("skill_graph")
+  errorPatterns   Json     @map("error_patterns")
+  timeBehavior    Json     @map("time_behavior")
+  overallMastery  Float    @map("overall_mastery")
+  strengths       String[]
+  weaknesses      String[]
+  lastCalculated  DateTime @map("last_calculated")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([lastCalculated])
+  @@map("student_profiles")
+}
+
+model ProfileSnapshot {
+  id           String   @id @default(uuid())
+  studentId    String   @map("student_id")
+  profileData  Json     @map("snapshot")
+  snapshotDate DateTime @default(now()) @map("created_at")
+  trigger      String?
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, snapshotDate])
+  @@map("profile_snapshots")
+}
+
+// ==================== Events (Event Sourcing) ====================
+
+model Event {
+  id            String   @id @default(uuid())
+  studentId     String?  @map("student_id")
+  eventType     String   @map("event_type")
+  payload       Json
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, eventType])
+  @@index([eventType, createdAt])
+  @@map("events")
+}
