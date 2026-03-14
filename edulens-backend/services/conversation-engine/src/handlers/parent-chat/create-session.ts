@@ -53,13 +53,13 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const sessionId = uuidv4();
 
     await prisma.$executeRawUnsafe(
-      `INSERT INTO chat_sessions (id, user_id, student_id, agent_type, status, started_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      `INSERT INTO chat_sessions (id, student_id, role, agent_state, turn_count, started_at, metadata)
+       VALUES ($1::uuid, $2::uuid, $3, $4, 0, NOW(), $5::jsonb)`,
       sessionId,
-      parentId,
-      studentId || null,
+      studentId || parentId,
       'parent_advisor',
-      'active'
+      'IDLE',
+      JSON.stringify({ parentId, studentId: studentId || null })
     );
 
     console.log('Parent chat session created:', sessionId);
