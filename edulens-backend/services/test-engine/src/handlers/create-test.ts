@@ -4,7 +4,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getDb, query } from '../lib/database';
+import { getDb, query } from '../lib/database'; // getDb initialises the pool
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -41,16 +41,26 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'Request body is required');
     }
 
-    const { title, description, subject, gradeLevel, timeLimit, questions } = JSON.parse(event.body);
+    const { title, description, subject, gradeLevel, timeLimit, questionCount, questions } = JSON.parse(event.body);
 
-    if (!title || !subject || !gradeLevel || !timeLimit || !questions || !Array.isArray(questions)) {
-      return errorResponse(400, 'Missing required fields: title, subject, gradeLevel, timeLimit, questions');
+    if (!title || !subject || !gradeLevel || !timeLimit) {
+      return errorResponse(400, 'Missing required fields: title, subject, gradeLevel, timeLimit');
     }
 
-    const db = await getDb();
+    await getDb();
 
-    // Create test
+    // Optionally bulk-create questions supplied inline (canonical questions schema)
+    const inlineQuestions = Array.isArray(questions) ? questions : [];
+    for (let i = 0; i < inlineQuestions.length; i++) {
+      const q = inlineQuestions[i];
+      if (!q.text || !q.correctAnswer) {
+        return errorResponse(400, `Question ${i + 1} is missing text or correctAnswer`);
+      }
+    }
+
+    // Create test record
     const testId = uuidv4();
+    const resolvedCount = inlineQuestions.length > 0 ? inlineQuestions.length : (questionCount || 35);
     await query(
       `INSERT INTO tests (id, title, description, subject, grade_level, time_limit, question_count)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -60,49 +70,35 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       subject,
       gradeLevel,
       timeLimit,
-      questions.length
+      resolvedCount
     );
 
-    // Create questions
-    for (let i = 0; i < questions.length; i++) {
-      const question = questions[i];
-      const {
-        questionType = 'multiple_choice',
-        questionText,
-        options,
-        correctAnswer,
-        skillTags = [],
-        difficultyLevel = 3
-      } = question;
-
-      if (!questionText || !correctAnswer) {
-        return errorResponse(400, `Question ${i + 1} is missing questionText or correctAnswer`);
-      }
-
-      const questionId = uuidv4();
+    // Insert inline questions into the shared questions pool (canonical schema)
+    for (const q of inlineQuestions) {
       await query(
-        `INSERT INTO questions (id, test_id, question_type, subject, question_text, options, correct_answer, skill_tags, difficulty_level, order_index)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        questionId,
-        testId,
-        questionType,
+        `INSERT INTO questions (text, type, options, correct_answer, explanation, difficulty,
+          estimated_time, skill_tags, subject, grade_level, is_active)
+         VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8::text[], $9, $10, true)`,
+        q.text,
+        q.type || 'multiple_choice',
+        JSON.stringify(q.options || []),
+        q.correctAnswer,
+        q.explanation || '',
+        typeof q.difficulty === 'number' ? q.difficulty : 0.5,
+        q.estimatedTime || 60,
+        q.skillTags || [],
         subject,
-        questionText,
-        JSON.stringify(options || []),
-        correctAnswer,
-        skillTags,
-        difficultyLevel,
-        i
+        gradeLevel
       );
     }
 
-    console.log(`Test created: ${testId} with ${questions.length} questions`);
+    console.log(`Test created: ${testId}, questionCount=${resolvedCount}, inlineInserted=${inlineQuestions.length}`);
 
     return successResponse({
       success: true,
       testId,
       message: 'Test created successfully',
-      questionCount: questions.length
+      questionCount: resolvedCount,
     });
   } catch (error) {
     console.error('Create test error:', error);

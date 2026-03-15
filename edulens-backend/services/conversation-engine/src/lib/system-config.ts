@@ -14,10 +14,10 @@ import { query } from "./database";
 
 export const CONFIG_DEFAULTS: Record<string, string> = {
   // ── AI models ──────────────────────────────────────────────────────────────
-  aiParentChatModelId:          'us.anthropic.claude-sonnet-4-20250514-v1:0',
-  aiStudentChatModelId:         'us.anthropic.claude-sonnet-4-20250514-v1:0',
-  aiInsightsModelId:            'us.anthropic.claude-sonnet-4-20250514-v1:0',
-  aiSummarizationModelId:       'us.anthropic.claude-haiku-4-5-20251001',
+  aiParentChatModelId:          process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+  aiStudentChatModelId:         process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+  aiInsightsModelId:            process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+  aiSummarizationModelId:       process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-haiku-4-5-20251001',
   aiMaxTokensChat:              '2048',
   aiMaxTokensInsights:          '4096',
   aiMaxTokensSummarization:     '1024',

@@ -36,13 +36,13 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   // ── AI models ──────────────────────────────────────────────────────────────
   // env var BEDROCK_MODEL_ID is the deploy-time default; these keys override at runtime.
   /** Bedrock model ID for parent chat streaming */
-  aiParentChatModelId:          'us.anthropic.claude-sonnet-4-20250514-v1:0',
+  aiParentChatModelId:          process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0',
   /** Bedrock model ID for student chat (non-streaming) */
-  aiStudentChatModelId:         'us.anthropic.claude-sonnet-4-20250514-v1:0',
+  aiStudentChatModelId:         process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0',
   /** Bedrock model ID for per-subject performance insights generation */
-  aiInsightsModelId:            'us.anthropic.claude-sonnet-4-20250514-v1:0',
+  aiInsightsModelId:            process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0',
   /** Bedrock model ID for conversation summarization (cost-optimized) */
-  aiSummarizationModelId:       'us.anthropic.claude-haiku-4-5-20251001',
+  aiSummarizationModelId:       process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-haiku-4-5-20251001',
   /** max_tokens for chat completions */
   aiMaxTokensChat:              '2048',
   /** max_tokens for insights generation (longer output) */

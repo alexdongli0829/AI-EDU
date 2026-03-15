@@ -196,6 +196,8 @@ CREATE TABLE IF NOT EXISTS test_sessions (
     estimated_ability FLOAT DEFAULT 0.0,
     scaled_score     FLOAT,
     raw_score        FLOAT,
+    stage_id         VARCHAR(50) DEFAULT NULL REFERENCES stages(id),
+    question_count   INTEGER DEFAULT 0,
     total_items      INTEGER DEFAULT 0,
     correct_count    INTEGER DEFAULT 0,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

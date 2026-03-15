@@ -74,8 +74,10 @@ export interface ApiRouteFunctions {
   registerContestFunction: lambda.Function;
   submitContestResultFunction: lambda.Function;
   getContestResultsFunction: lambda.Function;
+  adminListContestSeriesFunction: lambda.Function;
   adminCreateContestSeriesFunction: lambda.Function;
   adminCreateContestFunction: lambda.Function;
+  adminUpdateContestFunction: lambda.Function;
   adminUpdateContestStatusFunction: lambda.Function;
   adminFinalizeContestResultsFunction: lambda.Function;
   getStudentContestHistoryFunction: lambda.Function;

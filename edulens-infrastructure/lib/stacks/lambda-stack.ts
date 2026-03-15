@@ -7,6 +7,7 @@
  * EventBridge targets  → app.ts                (wireEventBridgeTargets)
  */
 
+import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
@@ -14,6 +15,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 import { EnvironmentConfig } from '../../config/environments';
 import { NodejsLambda } from '../constructs/nodejs-lambda';
@@ -113,6 +115,8 @@ export class LambdaStack extends cdk.Stack {
   public readonly adminUpdateContestStatusFunction: lambda.Function;
   public readonly adminFinalizeContestResultsFunction: lambda.Function;
   public readonly getStudentContestHistoryFunction: lambda.Function;
+  // DB Migration
+  public readonly dbMigrateFunction: lambda.Function;
 
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
@@ -129,7 +133,14 @@ export class LambdaStack extends cdk.Stack {
       connectionsTable,
     } = props;
 
-    const bedrockModelId = 'us.anthropic.claude-sonnet-4-20250514-v1:0';
+    // Cross-region inference profiles use 'us.' or 'eu.' prefixes.
+    // For ap-* regions, Claude 4 requires inference profiles not yet available on-demand;
+    // use Claude 3.5 Sonnet v2 which supports on-demand throughput in AP.
+    const bedrockModelId = config.region.startsWith('eu-')
+      ? 'eu.anthropic.claude-sonnet-4-20250514-v1:0'
+      : config.region.startsWith('ap-')
+        ? 'anthropic.claude-3-5-sonnet-20241022-v2:0'
+        : 'us.anthropic.claude-sonnet-4-20250514-v1:0';
 
     // ============================================================
     // 0. AUTH SERVICE (Node.js)
@@ -1200,6 +1211,7 @@ export class LambdaStack extends cdk.Stack {
       this.adminExportQuestionsFunction,
       this.adminSystemMetricsFunction,
       this.adminStudentAnalyticsFunction,
+      this.adminSystemConfigFunction,
       // Stage Registry
       this.listStagesFunction,
       this.getStageFunction,
@@ -1207,6 +1219,7 @@ export class LambdaStack extends cdk.Stack {
       this.getSkillBridgesFunction,
       this.listStudentStagesFunction,
       this.activateStudentStageFunction,
+      this.deactivateStudentStageFunction,
       // Contest Service
       this.listContestsFunction,
       this.registerContestFunction,
@@ -1230,7 +1243,49 @@ export class LambdaStack extends cdk.Stack {
     allFunctions.forEach((fn) => fn.addToRolePolicy(secretReadPolicy));
 
     // ============================================================
-    // 9. OUTPUTS
+    // 9. DB MIGRATION LAMBDA
+    // Auto-runs schema migration on every deployment via AwsCustomResource.
+    // Uses CREATE TABLE IF NOT EXISTS, so re-runs are safe/idempotent.
+    // Also exposed as edulens-db-migrate-${stage} for manual SQL invocations.
+    // ============================================================
+
+    const migrationAssetPath = path.resolve(__dirname, '../../../edulens-backend/scripts/db-migration');
+
+    this.dbMigrateFunction = new lambda.Function(this, 'DbMigrateLambda', {
+      functionName: `edulens-db-migrate-${config.stage}`,
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(migrationAssetPath),
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 512,
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [lambdaSecurityGroup],
+      environment: {
+        DB_SECRET_ARN: auroraSecret.secretArn,
+      },
+      description: 'Run database schema migrations against Aurora PostgreSQL',
+    });
+
+    auroraSecret.grantRead(this.dbMigrateFunction);
+
+    // Auto-run migration on every cdk deploy via CloudFormation custom resource.
+    // The migration Lambda handles the CloudFormation event protocol and returns
+    // a compact response so the 4 KB CFN limit is not exceeded.
+    const migrationProvider = new cr.Provider(this, 'DbMigrationProvider', {
+      onEventHandler: this.dbMigrateFunction,
+    });
+
+    new cdk.CustomResource(this, 'RunDbMigration', {
+      serviceToken: migrationProvider.serviceToken,
+      properties: {
+        // Bump this value to force a re-run on the next deploy
+        Version: '1.0.0',
+      },
+    });
+
+    // ============================================================
+    // 10. OUTPUTS
     // ============================================================
 
     new cdk.CfnOutput(this, 'LambdaFunctionsDeployed', {

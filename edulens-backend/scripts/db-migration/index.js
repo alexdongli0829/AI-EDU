@@ -34,111 +34,96 @@ async function getDatabaseCredentials() {
 
 /**
  * Run SQL migration
+ *
+ * Executes the SQL as-is via a single pg.query() call so that
+ * dollar-quoted PL/pgSQL function bodies ($$...$$) are not split
+ * incorrectly by a naive semicolon splitter.
  */
 async function runMigration(client, sql) {
-  console.log('Running migration...');
-
-  // Split SQL into individual statements (separated by semicolons)
-  const statements = sql
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && !s.startsWith('--'));
-
-  const results = [];
-
-  for (let i = 0; i < statements.length; i++) {
-    const statement = statements[i];
-    console.log(`Executing statement ${i + 1}/${statements.length}...`);
-
-    try {
-      const result = await client.query(statement);
-      results.push({
-        statement: statement.substring(0, 100) + (statement.length > 100 ? '...' : ''),
-        success: true,
-        rowCount: result.rowCount,
-      });
-      console.log(`✓ Statement ${i + 1} completed (${result.rowCount} rows affected)`);
-    } catch (error) {
-      console.error(`✗ Statement ${i + 1} failed:`, error.message);
-      results.push({
-        statement: statement.substring(0, 100) + (statement.length > 100 ? '...' : ''),
-        success: false,
-        error: error.message,
-      });
-      // Continue with other statements even if one fails
-    }
+  console.log('Running migration as single query...');
+  try {
+    await client.query(sql);
+    console.log('✓ Migration query completed');
+    return [{ success: true, message: 'Full migration SQL executed successfully' }];
+  } catch (error) {
+    console.error('✗ Migration query failed:', error.message);
+    return [{ success: false, error: error.message }];
   }
-
-  return results;
 }
 
 /**
  * Lambda handler
+ *
+ * Handles two invocation modes:
+ * 1. CloudFormation custom resource event (has RequestType field) — returns
+ *    a short PhysicalResourceId response so CFN size limits are not exceeded.
+ * 2. Direct Lambda invocation (manual or CLI) — returns full statement results.
  */
 exports.handler = async (event) => {
   console.log('Starting database migration...');
+  const isCfnEvent = !!(event && event.RequestType);
 
   try {
-    // Get database credentials
-    console.log('Fetching database credentials...');
     const credentials = await getDatabaseCredentials();
     const { host, port, dbname, username, password } = credentials;
 
     console.log(`Connecting to database: ${host}:${port}/${dbname}`);
 
-    // Create PostgreSQL client
     const client = new Client({
       host,
-      port,
+      port: port || 5432,
       database: dbname,
       user: username,
       password,
-      ssl: {
-        rejectUnauthorized: false, // Aurora uses self-signed certs
-      },
+      ssl: { rejectUnauthorized: false },
     });
 
     await client.connect();
     console.log('Connected to database successfully');
 
-    // Read migration SQL file
-    const sqlPath = path.join(__dirname, 'migration.sql');
-    const sql = fs.readFileSync(sqlPath, 'utf8');
-    console.log(`Read migration file (${sql.length} characters)`);
+    // Allow overriding SQL via direct invocation payload (e.g. {"sql":"SELECT ..."})
+    let sql;
+    if (!isCfnEvent && event && event.sql) {
+      sql = event.sql;
+    } else {
+      const sqlPath = path.join(__dirname, 'migration.sql');
+      sql = fs.readFileSync(sqlPath, 'utf8');
+    }
+    console.log(`Running SQL (${sql.length} characters)...`);
 
-    // Run migration
     const results = await runMigration(client, sql);
 
-    // Disconnect
     await client.end();
     console.log('Disconnected from database');
 
-    // Count successes and failures
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
+    const message = `Migration completed: ${successCount} succeeded, ${failureCount} failed`;
+    console.log(message);
 
-    const response = {
+    // CloudFormation custom resource: return compact response to stay within 4 KB limit
+    if (isCfnEvent) {
+      return {
+        PhysicalResourceId: `edulens-db-migration-${Date.now()}`,
+        Data: { message, successCount, failureCount },
+      };
+    }
+
+    // Direct invocation: return full results
+    return {
       statusCode: failureCount === 0 ? 200 : 500,
-      body: JSON.stringify({
-        message: `Migration completed: ${successCount} succeeded, ${failureCount} failed`,
-        success: failureCount === 0,
-        results,
-      }, null, 2),
+      body: JSON.stringify({ message, success: failureCount === 0, results }, null, 2),
     };
-
-    console.log('Migration completed:', response.body);
-    return response;
 
   } catch (error) {
     console.error('Migration failed:', error);
+    if (isCfnEvent) {
+      // Throwing causes CloudFormation to mark the custom resource as FAILED
+      throw error;
+    }
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        message: 'Migration failed',
-        success: false,
-        error: error.message,
-        stack: error.stack,
-      }, null, 2),
+      body: JSON.stringify({ message: 'Migration failed', error: error.message }, null, 2),
     };
   }
 };

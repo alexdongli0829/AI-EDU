@@ -94,7 +94,9 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const isCorrect = matchedOption
       ? (typeof matchedOption === 'string'
           ? matchedOption.toLowerCase() === (question.correct_answer || '').toLowerCase()
-          : !!matchedOption.isCorrect)
+          : (matchedOption.isCorrect !== undefined
+              ? !!matchedOption.isCorrect
+              : answer.toLowerCase().trim() === (question.correct_answer || '').toLowerCase().trim()))
       : false;
 
     // Save answer

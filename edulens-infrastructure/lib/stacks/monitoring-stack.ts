@@ -45,8 +45,10 @@ export class MonitoringStack extends cdk.Stack {
     // CloudWatch Dashboard
     // ============================================================
 
+    // Include region in dashboard name — CloudWatch dashboards are global (account-scoped),
+    // so multi-region deployments of the same stage would otherwise conflict.
     this.dashboard = new cloudwatch.Dashboard(this, 'Dashboard', {
-      dashboardName: `edulens-${config.stage}`,
+      dashboardName: `edulens-${config.region}-${config.stage}`,
     });
 
     // ============================================================
