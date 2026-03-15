@@ -118,21 +118,21 @@ export default function AppNav() {
       className="sticky top-0 z-50"
       style={{ background: 'var(--oxford-navy)', borderBottom: '2px solid var(--gold)' }}
     >
-      <div className="max-w-7xl mx-auto px-5 flex items-center justify-between h-16">
+      <div className="max-w-7xl mx-auto px-5 flex items-center justify-between h-14">
 
         {/* ── Brand ────────────────────────────────────────────── */}
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-3 group flex-shrink-0">
-            <AcademicCrest size={38} />
+        <div className="flex items-center gap-5">
+          <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
+            <AcademicCrest size={30} />
             <div className="leading-tight">
               <span
-                className="block text-xl font-bold tracking-wide"
+                className="block text-base font-bold tracking-wide"
                 style={{ fontFamily: 'var(--font-heading)', color: 'var(--gold-bright)' }}
               >
                 EduLens
               </span>
               <span
-                className="block text-[10px] uppercase tracking-[0.18em] opacity-70"
+                className="block text-[9px] uppercase tracking-[0.16em] opacity-60"
                 style={{ color: '#d4c48a', fontFamily: 'var(--font-body)' }}
               >
                 Academic Excellence
@@ -141,7 +141,7 @@ export default function AppNav() {
           </Link>
 
           {/* Vertical rule */}
-          <div className="h-8 w-px opacity-30" style={{ background: 'var(--gold)' }} />
+          <div className="h-6 w-px opacity-30" style={{ background: 'var(--gold)' }} />
 
           {/* Nav links */}
           <div className="flex items-center gap-0.5">
@@ -151,13 +151,13 @@ export default function AppNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="relative flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors"
+                  className="relative flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold transition-colors"
                   style={{
                     fontFamily: 'var(--font-body)',
                     color: active ? 'var(--gold-bright)' : 'rgba(232,237,244,0.82)',
                   }}
                 >
-                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  <item.icon className="h-3.5 w-3.5 flex-shrink-0" />
                   {(t.nav as any)[item.labelKey] || item.labelKey}
                   {/* Gold underline for active */}
                   {active && (
@@ -183,7 +183,7 @@ export default function AppNav() {
                 style={{ background: dropdownOpen ? 'rgba(184,134,11,0.15)' : 'transparent' }}
               >
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                   style={{
                     background: activeIsParent ? '#6b4fa0' : 'var(--forest)',
                     color: '#fff',
@@ -193,10 +193,10 @@ export default function AppNav() {
                   {displayName?.charAt(0) ?? '?'}
                 </div>
                 <div className="hidden sm:block leading-tight text-left">
-                  <p className="text-sm font-semibold max-w-[110px] truncate" style={{ color: '#e8edf4', fontFamily: 'var(--font-body)' }}>{displayName}</p>
-                  {displaySub && <p className="text-[11px] opacity-60" style={{ color: '#d4c48a' }}>{displaySub}</p>}
+                  <p className="text-sm font-semibold max-w-[100px] truncate" style={{ color: '#e8edf4', fontFamily: 'var(--font-body)' }}>{displayName}</p>
+                  {displaySub && <p className="text-[10px] opacity-60" style={{ color: '#d4c48a' }}>{displaySub}</p>}
                 </div>
-                <ChevronDown className={`h-4 w-4 opacity-60 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#d4c48a' }} />
+                <ChevronDown className={`h-3.5 w-3.5 opacity-60 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#d4c48a' }} />
               </button>
 
               {dropdownOpen && (
@@ -207,16 +207,16 @@ export default function AppNav() {
                   {/* Parent row */}
                   <button
                     onClick={switchToParent}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
                     style={{ background: activeIsParent ? '#f5f0ff' : undefined }}
                   >
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                          style={{ background: '#ede9f7', color: '#6b4fa0', fontFamily: 'var(--font-heading)' }}>
                       {user?.name?.charAt(0) ?? 'P'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-800 truncate">{user?.name}</p>
-                      <p className="text-[11px] text-gray-400">{t.common.parent}</p>
+                      <p className="text-xs text-gray-400">{t.common.parent}</p>
                     </div>
                     {activeIsParent && <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: '#6b4fa0' }} />}
                   </button>
@@ -234,16 +234,16 @@ export default function AppNav() {
                           <button
                             key={child.id}
                             onClick={() => switchToChild(child)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
                             style={{ background: active ? '#f0faf8' : undefined }}
                           >
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                                  style={{ background: '#d8f0ea', color: 'var(--forest)', fontFamily: 'var(--font-heading)' }}>
                               {child.name.charAt(0)}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-gray-800 truncate">{child.name}</p>
-                              <p className="text-[11px] text-gray-400">Year {child.gradeLevel}</p>
+                              <p className="text-xs text-gray-400">Year {child.gradeLevel}</p>
                             </div>
                             {active && <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--forest)' }} />}
                           </button>
@@ -255,16 +255,16 @@ export default function AppNav() {
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2.5 px-2">
+            <div className="flex items-center gap-2 px-2">
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                 style={{ background: 'var(--forest)', color: '#fff', fontFamily: 'var(--font-heading)' }}
               >
                 {displayName?.charAt(0) ?? '?'}
               </div>
               <div className="hidden sm:block leading-tight">
-                <p className="text-sm font-semibold max-w-[120px] truncate" style={{ color: '#e8edf4' }}>{displayName}</p>
-                {displaySub && <p className="text-[11px] opacity-60" style={{ color: '#d4c48a' }}>{displaySub}</p>}
+                <p className="text-sm font-semibold max-w-[110px] truncate" style={{ color: '#e8edf4' }}>{displayName}</p>
+                {displaySub && <p className="text-[10px] opacity-60" style={{ color: '#d4c48a' }}>{displaySub}</p>}
               </div>
             </div>
           )}

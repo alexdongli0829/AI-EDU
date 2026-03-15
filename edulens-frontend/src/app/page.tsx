@@ -148,14 +148,14 @@ export default function HomePage() {
             Built for NSW families · OC, Selective &amp; HSC
           </div>
           <h1
-            className="text-4xl md:text-5xl font-bold mb-5 leading-tight"
+            className="text-5xl md:text-6xl font-bold mb-6 leading-tight"
             style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}
           >
             One Learning Journey,<br />
             <span style={{ color: 'var(--gold)' }}>From OC Prep to HSC</span>
           </h1>
           <p
-            className="text-lg mb-9 max-w-2xl mx-auto leading-relaxed"
+            className="text-xl mb-10 max-w-2xl mx-auto leading-relaxed"
             style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}
           >
             EduLens tracks your child's learning intelligence across every milestone —
@@ -199,23 +199,23 @@ export default function HomePage() {
               <div key={stage.id} className="flex items-center flex-1">
                 <div className="flex-1">
                   <div
-                    className="rounded-lg border p-3 text-center"
+                    className="rounded-lg border p-4 text-center"
                     style={{ borderColor: stage.color, background: `${stage.color}0f` }}
                   >
-                    <div className="font-bold text-sm" style={{ color: stage.color, fontFamily: 'var(--font-serif)' }}>{stage.label}</div>
-                    <div className="text-[10px] mt-0.5" style={{ color: stage.color, opacity: 0.7 }}>{stage.sublabel}</div>
+                    <div className="font-bold text-base" style={{ color: stage.color, fontFamily: 'var(--font-serif)' }}>{stage.label}</div>
+                    <div className="text-xs mt-0.5" style={{ color: stage.color, opacity: 0.7 }}>{stage.sublabel}</div>
                   </div>
-                  <p className="text-[9px] text-center mt-1.5 leading-tight" style={{ color: '#9ca3af' }}>{stage.description}</p>
+                  <p className="text-xs text-center mt-2 leading-tight" style={{ color: '#9ca3af' }}>{stage.description}</p>
                 </div>
                 {idx < LEARNING_STAGES.length - 1 && (
-                  <ArrowRight className="h-4 w-4 flex-shrink-0 mx-1" style={{ color: 'var(--gold)' }} />
+                  <ArrowRight className="h-5 w-5 flex-shrink-0 mx-1" style={{ color: 'var(--gold)' }} />
                 )}
               </div>
             ))}
           </div>
           <div className="mt-5 flex items-center justify-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--gold)' }} />
-            <p className="text-[10px]" style={{ color: '#9ca3af', fontFamily: 'var(--font-body)' }}>
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--gold)' }} />
+            <p className="text-sm" style={{ color: '#9ca3af', fontFamily: 'var(--font-body)' }}>
               Learning DNA — skills, patterns, and traits — carries forward across every stage
             </p>
           </div>
@@ -227,33 +227,33 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-5">
           <div className="text-center mb-10">
             <h2
-              className="text-2xl font-bold mb-2 heading-rule"
+              className="text-3xl font-bold mb-2 heading-rule"
               style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}
             >
               Intelligence that grows with your child
             </h2>
-            <p className="text-sm mt-3" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
+            <p className="text-lg mt-4" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
               Not just test prep — a lifelong learning profile
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
             <FeatureCard
-              icon={<Brain className="h-7 w-7" style={{ color: '#2563EB' }} />}
+              icon={<Brain className="h-9 w-9" style={{ color: '#2563EB' }} />}
               title="Adaptive Stage Testing"
               description="Stage-specific question banks and formats for OC, Selective, and HSC. Each test adapts to your child's current level."
             />
             <FeatureCard
-              icon={<Trophy className="h-7 w-7" style={{ color: 'var(--gold)' }} />}
+              icon={<Trophy className="h-9 w-9" style={{ color: 'var(--gold)' }} />}
               title="Weekly Contests"
               description="Compete against peers in timed contests. See your child's real percentile ranking across thousands of students."
             />
             <FeatureCard
-              icon={<TrendingUp className="h-7 w-7" style={{ color: 'var(--forest)' }} />}
+              icon={<TrendingUp className="h-9 w-9" style={{ color: 'var(--forest)' }} />}
               title="Learning DNA"
               description="Deep skill profiling, error pattern analysis, and time behaviour tracking that persists across every exam stage."
             />
             <FeatureCard
-              icon={<MessageCircle className="h-7 w-7" style={{ color: '#7C3AED' }} />}
+              icon={<MessageCircle className="h-9 w-9" style={{ color: '#7C3AED' }} />}
               title="AI Parent Advisor"
               description="Ask anything about your child's performance. Get stage-aware insights powered by Claude AI with full context."
             />
@@ -274,12 +274,12 @@ export default function HomePage() {
                 Weekly Contests
               </div>
               <h2
-                className="text-2xl font-bold mb-3"
+                className="text-3xl font-bold mb-4"
                 style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}
               >
                 Where does your child rank among peers?
               </h2>
-              <p className="mb-5 leading-relaxed" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
+              <p className="text-lg mb-6 leading-relaxed" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
                 Practice tests tell you how a student compares to themselves.
                 EduLens Contests give parents the one signal that matters most:{' '}
                 <strong style={{ color: 'var(--oxford-navy)' }}>real percentile ranking against actual peers preparing for the same exam.</strong>
@@ -291,7 +291,7 @@ export default function HomePage() {
                   'Score distribution shows exactly where your child stands',
                   'Percentile trend tracks improvement over weeks',
                 ].map(point => (
-                  <li key={point} className="flex items-start gap-2.5 text-sm" style={{ color: '#6b7280' }}>
+                  <li key={point} className="flex items-start gap-2.5 text-base" style={{ color: '#6b7280' }}>
                     <Star className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--gold)' }} />
                     {point}
                   </li>
@@ -311,11 +311,11 @@ export default function HomePage() {
               style={{ background: '#fff', borderColor: 'var(--parchment-mid)', borderTop: '3px solid var(--oxford-navy)' }}
             >
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--oxford-navy)' }}>
+                <p className="text-base font-semibold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--oxford-navy)' }}>
                   OC Weekly Challenge #12
                 </p>
                 <span
-                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
                   style={{ background: '#dcfce7', color: '#15803d' }}
                 >
                   Open
@@ -328,21 +328,21 @@ export default function HomePage() {
                   { label: 'Duration', value: '30 min' },
                 ].map(s => (
                   <div key={s.label} className="rounded-lg p-3 text-center border" style={{ borderColor: 'var(--parchment-mid)' }}>
-                    <p className="text-base font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{s.value}</p>
-                    <p className="text-[9px]" style={{ color: '#9ca3af' }}>{s.label}</p>
+                    <p className="text-xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{s.value}</p>
+                    <p className="text-xs" style={{ color: '#9ca3af' }}>{s.label}</p>
                   </div>
                 ))}
               </div>
               <div className="rounded-lg p-3 border" style={{ borderColor: 'var(--parchment-mid)' }}>
-                <p className="text-[10px] mb-2" style={{ color: '#9ca3af' }}>Last week's result — Mia Chen</p>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-bold" style={{ color: 'var(--oxford-navy)', fontFamily: 'var(--font-heading)' }}>Rank #18 of 94</span>
-                  <span className="text-sm font-bold" style={{ color: 'var(--forest)' }}>81st percentile</span>
+                <p className="text-sm mb-2" style={{ color: '#9ca3af' }}>Last week's result — Mia Chen</p>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-base font-bold" style={{ color: 'var(--oxford-navy)', fontFamily: 'var(--font-heading)' }}>Rank #18 of 94</span>
+                  <span className="text-base font-bold" style={{ color: 'var(--forest)' }}>81st percentile</span>
                 </div>
-                <div className="w-full rounded-full h-2" style={{ background: 'var(--parchment-mid)' }}>
-                  <div className="h-2 rounded-full" style={{ width: '81%', background: 'var(--forest)' }} />
+                <div className="w-full rounded-full h-2.5" style={{ background: 'var(--parchment-mid)' }}>
+                  <div className="h-2.5 rounded-full" style={{ width: '81%', background: 'var(--forest)' }} />
                 </div>
-                <p className="text-[9px] mt-1" style={{ color: '#9ca3af' }}>Better than 81% of participants</p>
+                <p className="text-xs mt-1.5" style={{ color: '#9ca3af' }}>Better than 81% of participants</p>
               </div>
             </div>
           </div>
@@ -360,8 +360,8 @@ export default function HomePage() {
               { n: 'NSW', l: 'Curriculum Aligned' },
             ].map(s => (
               <div key={s.l}>
-                <div className="text-3xl font-bold mb-1" style={{ fontFamily: 'var(--font-heading)', color: 'var(--gold-bright)' }}>{s.n}</div>
-                <div className="text-sm" style={{ color: 'rgba(232,237,244,0.65)' }}>{s.l}</div>
+                <div className="text-4xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)', color: 'var(--gold-bright)' }}>{s.n}</div>
+                <div className="text-base" style={{ color: 'rgba(232,237,244,0.65)' }}>{s.l}</div>
               </div>
             ))}
           </div>
@@ -373,12 +373,12 @@ export default function HomePage() {
         <section className="py-16" style={{ background: 'var(--parchment)' }}>
           <div className="max-w-2xl mx-auto px-5 text-center">
             <h2
-              className="text-2xl font-bold mb-3"
+              className="text-3xl font-bold mb-3"
               style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}
             >
               Start your child's learning journey today
             </h2>
-            <p className="mb-7 text-sm" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
+            <p className="mb-8 text-lg" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
               Free to start. No credit card required. Works for OC, Selective, and HSC.
             </p>
             <div className="flex gap-3 justify-center">
@@ -425,12 +425,12 @@ export default function HomePage() {
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
     <div
-      className="rounded-xl p-6 hover:shadow-md transition-shadow border"
+      className="rounded-xl p-7 hover:shadow-md transition-shadow border"
       style={{ background: '#fff', borderColor: 'var(--parchment-mid)', borderTop: '3px solid var(--oxford-navy)' }}
     >
-      <div className="mb-4">{icon}</div>
-      <h3 className="font-semibold mb-2" style={{ fontFamily: 'var(--font-serif)', color: 'var(--oxford-navy)' }}>{title}</h3>
-      <p className="text-sm leading-relaxed" style={{ color: '#6b7280', fontFamily: 'var(--font-body)' }}>{description}</p>
+      <div className="mb-5">{icon}</div>
+      <h3 className="text-xl font-semibold mb-2.5" style={{ fontFamily: 'var(--font-serif)', color: 'var(--oxford-navy)' }}>{title}</h3>
+      <p className="text-base leading-relaxed" style={{ color: '#6b7280', fontFamily: 'var(--font-body)' }}>{description}</p>
     </div>
   );
 }

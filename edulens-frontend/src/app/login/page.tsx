@@ -81,22 +81,22 @@ export default function LoginPage() {
               className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg"
               style={{ background: 'var(--oxford-navy)', border: '2px solid var(--gold)' }}
             >
-              <AcademicCrest size={52} />
+              <AcademicCrest size={62} />
             </div>
           </div>
           <h1
-            className="text-4xl font-bold tracking-wide"
+            className="text-5xl font-bold tracking-wide"
             style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}
           >
             EduLens
           </h1>
           <p
-            className="text-xs uppercase tracking-[0.22em] mt-1 font-semibold"
+            className="text-sm uppercase tracking-[0.22em] mt-1 font-semibold"
             style={{ color: 'var(--gold)', fontFamily: 'var(--font-body)' }}
           >
             Academic Excellence
           </p>
-          <p className="text-sm mt-3" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
+          <p className="text-base mt-3" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
             {t.login.tagline}
           </p>
         </div>
@@ -123,12 +123,12 @@ export default function LoginPage() {
           </div>
 
           <h2
-            className="text-xl font-bold mb-1"
+            className="text-2xl font-bold mb-1"
             style={{ fontFamily: 'var(--font-heading)', color: 'var(--navy-dark)' }}
           >
             {t.login.welcomeBack}
           </h2>
-          <p className="text-sm mb-6" style={{ color: '#6b7280', fontFamily: 'var(--font-body)' }}>
+          <p className="text-base mb-6" style={{ color: '#6b7280', fontFamily: 'var(--font-body)' }}>
             {t.login.subtitle}
           </p>
 
@@ -144,7 +144,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label
-                className="block text-xs font-semibold uppercase tracking-wider mb-2"
+                className="block text-sm font-semibold uppercase tracking-wider mb-2"
                 style={{ color: 'var(--navy-mid)', fontFamily: 'var(--font-body)' }}
               >
                 {t.login.emailOrUsername}
@@ -156,14 +156,14 @@ export default function LoginPage() {
                 onChange={e => { setIdentifier(e.target.value); clearError(); }}
                 autoComplete="username"
                 required
-                className="h-11 text-sm"
+                className="h-12 text-base"
                 style={{ borderColor: 'var(--parchment-mid)', fontFamily: 'var(--font-body)' }}
               />
             </div>
 
             <div>
               <label
-                className="block text-xs font-semibold uppercase tracking-wider mb-2"
+                className="block text-sm font-semibold uppercase tracking-wider mb-2"
                 style={{ color: 'var(--navy-mid)', fontFamily: 'var(--font-body)' }}
               >
                 {t.login.password}
@@ -176,7 +176,7 @@ export default function LoginPage() {
                   onChange={e => { setPassword(e.target.value); clearError(); }}
                   autoComplete="current-password"
                   required
-                  className="h-11 text-sm pr-10"
+                  className="h-12 text-base pr-10"
                   style={{ borderColor: 'var(--parchment-mid)', fontFamily: 'var(--font-body)' }}
                 />
                 <button
@@ -192,7 +192,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full h-11 text-sm font-semibold mt-1"
+              className="w-full h-12 text-base font-semibold mt-1"
               disabled={isLoading || !identifier || !password}
               style={{
                 background: isLoading || !identifier || !password ? undefined : 'var(--oxford-navy)',

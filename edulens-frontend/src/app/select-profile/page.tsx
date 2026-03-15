@@ -99,27 +99,27 @@ export default function SelectProfilePage() {
 
       {/* Brand lockup */}
       <div className="text-center mb-9">
-        <div className="flex justify-center mb-3">
+        <div className="flex justify-center mb-4">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+            className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg"
             style={{ background: 'var(--oxford-navy)', border: '2px solid var(--gold)' }}
           >
-            <AcademicCrest size={44} />
+            <AcademicCrest size={54} />
           </div>
         </div>
         <h1
-          className="text-3xl font-bold"
+          className="text-4xl font-bold"
           style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}
         >
           EduLens
         </h1>
         <p
-          className="text-xs uppercase tracking-[0.2em] mt-0.5 font-semibold"
+          className="text-sm uppercase tracking-[0.2em] mt-1 font-semibold"
           style={{ color: 'var(--gold)', fontFamily: 'var(--font-body)' }}
         >
           Academic Excellence
         </p>
-        <p className="text-sm mt-3" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
+        <p className="text-base mt-3" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
           Who's using EduLens today?
         </p>
       </div>
@@ -129,7 +129,7 @@ export default function SelectProfilePage() {
         {/* Parent card */}
         <button
           onClick={enterParentDashboard}
-          className="w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group"
+          className="w-full flex items-center gap-4 p-5 rounded-xl border-2 transition-all text-left group"
           style={{
             background: '#fff',
             borderColor: 'var(--parchment-mid)',
@@ -139,19 +139,19 @@ export default function SelectProfilePage() {
           onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--parchment-mid)')}
         >
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+            className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
             style={{ background: 'var(--oxford-navy)' }}
           >
-            <Users className="h-6 w-6" style={{ color: 'var(--gold-bright)' }} />
+            <Users className="h-7 w-7" style={{ color: 'var(--gold-bright)' }} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>
+            <p className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>
               {user.name}
             </p>
-            <p className="text-xs" style={{ color: '#9ca3af' }}>Parent dashboard · manage children &amp; analytics</p>
+            <p className="text-sm" style={{ color: '#9ca3af' }}>Parent dashboard · manage children &amp; analytics</p>
           </div>
           <span
-            className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
+            className="text-sm font-semibold px-3 py-1 rounded-full flex-shrink-0"
             style={{ background: 'rgba(28,53,87,0.08)', color: 'var(--oxford-navy)', border: '1px solid var(--navy-light)', fontFamily: 'var(--font-body)' }}
           >
             Parent
@@ -182,29 +182,29 @@ export default function SelectProfilePage() {
               <button
                 key={s.id}
                 onClick={() => enterStudentView(s)}
-                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left"
+                className="w-full flex items-center gap-4 p-5 rounded-xl border-2 transition-all text-left"
                 style={{ background: '#fff', borderColor: 'var(--parchment-mid)' }}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--parchment-mid)')}
               >
                 <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0"
+                  className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0"
                   style={{ background: av.bg, color: av.color, fontFamily: 'var(--font-heading)' }}
                 >
                   {s.name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>
+                  <p className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>
                     {s.name}
                   </p>
-                  <p className="text-xs" style={{ color: '#9ca3af' }}>
+                  <p className="text-sm" style={{ color: '#9ca3af' }}>
                     Year {s.gradeLevel}
                     {s.testsCompleted ? ` · ${s.testsCompleted} tests completed` : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <GraduationCap className="h-4 w-4" style={{ color: 'var(--gold)' }} />
-                  <span className="text-xs font-semibold" style={{ color: 'var(--oxford-navy)', fontFamily: 'var(--font-body)' }}>
+                  <GraduationCap className="h-5 w-5" style={{ color: 'var(--gold)' }} />
+                  <span className="text-sm font-semibold" style={{ color: 'var(--oxford-navy)', fontFamily: 'var(--font-body)' }}>
                     Student
                   </span>
                 </div>
@@ -217,7 +217,7 @@ export default function SelectProfilePage() {
         {!loadingStudents && (
           <button
             onClick={() => router.push('/parent/dashboard')}
-            className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-dashed text-sm transition-all"
+            className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-dashed text-base transition-all"
             style={{ borderColor: 'var(--parchment-mid)', color: '#9ca3af' }}
             onMouseEnter={e => {
               e.currentTarget.style.borderColor = 'var(--gold)';

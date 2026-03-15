@@ -218,19 +218,19 @@ export default function StudentDashboard() {
       <div style={{ background: 'var(--oxford-navy)', borderBottom: '2px solid var(--gold)' }}>
         <div className="max-w-6xl mx-auto px-5 py-5">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: '#e8edf4' }}>
+            <h1 className="text-3xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: '#e8edf4' }}>
               {t.studentDash.myDashboard}
             </h1>
             {stageMeta && (
               <span
-                className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+                className="text-sm font-semibold px-2.5 py-0.5 rounded-full"
                 style={{ background: 'rgba(184,134,11,0.2)', color: 'var(--gold-bright)', border: '1px solid var(--gold)', fontFamily: 'var(--font-body)' }}
               >
                 {stageMeta.label}
               </span>
             )}
           </div>
-          <p className="text-sm" style={{ color: 'rgba(232,237,244,0.6)', fontFamily: 'var(--font-body)' }}>
+          <p className="text-base" style={{ color: 'rgba(232,237,244,0.6)', fontFamily: 'var(--font-body)' }}>
             Year {student.gradeLevel} · {analytics.totalTests} test{analytics.totalTests !== 1 ? 's' : ''} completed · Last activity: {analytics.lastTestDate}
             {!stageMeta && <span className="ml-1" style={{ color: 'var(--gold)' }}>(all stages)</span>}
           </p>
@@ -253,12 +253,12 @@ export default function StudentDashboard() {
               <Card key={label} className="shadow-sm overflow-hidden" style={{ border: '1px solid var(--parchment-mid)', background: '#fff' }}>
                 <CardContent className="p-5 text-center">
                   <p
-                    className="text-2xl font-bold"
+                    className="text-3xl font-bold"
                     style={{ fontFamily: 'var(--font-heading)', color: navyAccent ? 'var(--oxford-navy)' : scoreColor }}
                   >
                     {value}
                   </p>
-                  <p className="text-xs mt-1 font-medium" style={{ color: '#9ca3af', fontFamily: 'var(--font-body)' }}>{label}</p>
+                  <p className="text-sm mt-1.5 font-medium" style={{ color: '#9ca3af', fontFamily: 'var(--font-body)' }}>{label}</p>
                 </CardContent>
               </Card>
             );
@@ -318,7 +318,7 @@ export default function StudentDashboard() {
 
         {/* ── Take a Test ── */}
         <div>
-          <h2 className="text-lg font-bold mb-3 heading-rule" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{t.studentDash.takeATest}</h2>
+          <h2 className="text-2xl font-bold mb-4 heading-rule" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{t.studentDash.takeATest}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {subjects.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
               <button
@@ -333,9 +333,9 @@ export default function StudentDashboard() {
                   </div>
                   <TrendingUp className="h-4 w-4 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color }} />
                 </div>
-                <p className="font-bold text-gray-900 text-base mb-1">{label}</p>
-                <p className="text-sm text-gray-500">{description}</p>
-                <div className="mt-4 flex items-center gap-1 text-xs font-semibold" style={{ color }}>
+                <p className="font-bold text-gray-900 text-lg mb-1">{label}</p>
+                <p className="text-base text-gray-500">{description}</p>
+                <div className="mt-4 flex items-center gap-1 text-sm font-semibold" style={{ color }}>
                   {t.studentDash.startTest} <ChevronRight className="h-3.5 w-3.5" />
                 </div>
               </button>
@@ -346,7 +346,7 @@ export default function StudentDashboard() {
         {/* ── Previous Tests ── */}
         {analytics.recentResults.length > 0 && (
           <div>
-            <h2 className="text-lg font-bold mb-3 heading-rule" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{t.studentDash.previousTests}</h2>
+            <h2 className="text-2xl font-bold mb-4 heading-rule" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{t.studentDash.previousTests}</h2>
             <Card className="shadow-sm" style={{ border: '1px solid var(--parchment-mid)', background: '#fff' }}>
               <CardContent className="p-4">
                 <div className="space-y-2">
@@ -356,9 +356,9 @@ export default function StudentDashboard() {
                       onClick={() => router.push(`/student/test/results/${test.sessionId}`)}
                       className="w-full flex items-center gap-4 px-4 py-3 rounded-lg border border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-all text-left"
                     >
-                      <span className="text-xs text-gray-400 w-14 flex-shrink-0">{test.date}</span>
-                      <span className="text-sm font-semibold text-gray-800 flex-1">{test.title}</span>
-                      <span className={`text-base font-extrabold tabular-nums ${scoreStatusColor(test.status)}`}>
+                      <span className="text-sm text-gray-400 w-16 flex-shrink-0">{test.date}</span>
+                      <span className="text-base font-semibold text-gray-800 flex-1">{test.title}</span>
+                      <span className={`text-xl font-extrabold tabular-nums ${scoreStatusColor(test.status)}`}>
                         {test.score}%
                       </span>
                       <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />

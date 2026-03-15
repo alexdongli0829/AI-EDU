@@ -449,10 +449,10 @@ export default function ParentDashboard() {
       <div style={{ background: 'var(--oxford-navy)', borderBottom: '2px solid var(--gold)' }}>
         <div className="max-w-6xl mx-auto px-5 py-5 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: '#e8edf4' }}>
+            <h1 className="text-3xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: '#e8edf4' }}>
               Children's Overview
             </h1>
-            <p className="text-sm mt-0.5" style={{ color: 'rgba(232,237,244,0.6)', fontFamily: 'var(--font-body)' }}>
+            <p className="text-base mt-0.5" style={{ color: 'rgba(232,237,244,0.6)', fontFamily: 'var(--font-body)' }}>
               {students.length} profile{students.length !== 1 ? 's' : ''} · OC, Selective & HSC preparation
             </p>
           </div>
@@ -517,7 +517,7 @@ export default function ParentDashboard() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{student.name}</p>
+                            <p className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{student.name}</p>
                             {activeStage && (
                               <span
                                 className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full text-white"
@@ -527,8 +527,8 @@ export default function ParentDashboard() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-400">
-                            Grade {student.gradeLevel}{age != null ? ` · Age ${age}` : ''}
+                          <p className="text-sm text-gray-400">
+                            Year {student.gradeLevel}{age != null ? ` · Age ${age}` : ''}
                             {a && a.totalTests > 0 && (
                               <span className="ml-2 text-gray-500">{a.totalTests} tests · {a.averageScore}% avg</span>
                             )}
@@ -655,7 +655,7 @@ export default function ParentDashboard() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-md shadow-2xl" style={{ border: '1px solid var(--parchment-mid)', borderTop: '3px solid var(--oxford-navy)' }}>
             <CardContent className="p-6">
-              <h2 className="text-lg font-bold mb-1" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>Add Child Profile</h2>
+              <h2 className="text-2xl font-bold mb-1" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>Add Child Profile</h2>
               <p className="text-xs mb-4" style={{ color: '#6b7280', fontFamily: 'var(--font-body)' }}>Create a profile for your child. They log in with username and password.</p>
               <form onSubmit={handleCreateStudent} className="space-y-4">
                 <div>
