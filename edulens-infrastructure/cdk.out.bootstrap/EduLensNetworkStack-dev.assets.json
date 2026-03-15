@@ -1,0 +1,36 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200": {
+      "displayName": "EduLensNetworkStack-dev/Custom::VpcRestrictDefaultSGCustomResourceProvider Code",
+      "source": {
+        "path": "asset.7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "163629398585-us-west-2-1f9d6a0e": {
+          "bucketName": "cdk-hnb659fds-assets-163629398585-us-west-2",
+          "objectKey": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::163629398585:role/cdk-hnb659fds-file-publishing-role-163629398585-us-west-2"
+        }
+      }
+    },
+    "05beb0e48374b4edf3e3cae98aeb17cbf66979325bcda72b829de7ab260cb5bf": {
+      "displayName": "EduLensNetworkStack-dev Template",
+      "source": {
+        "path": "EduLensNetworkStack-dev.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "163629398585-us-west-2-dc0b9447": {
+          "bucketName": "cdk-hnb659fds-assets-163629398585-us-west-2",
+          "objectKey": "05beb0e48374b4edf3e3cae98aeb17cbf66979325bcda72b829de7ab260cb5bf.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::163629398585:role/cdk-hnb659fds-file-publishing-role-163629398585-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

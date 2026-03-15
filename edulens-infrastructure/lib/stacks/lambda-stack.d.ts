@@ -1,19 +1,14 @@
 /**
  * Lambda Stack
  *
- * Deploys all 6 backend services as Lambda functions and wires them to:
- * - API Gateway (REST endpoints)
- * - WebSocket API (real-time connections)
- * - Application Load Balancer (SSE streaming)
- * - SQS Queues (async job processing)
- * - EventBridge (event-driven triggers)
+ * Deploys all backend service Lambda functions and their IAM policies.
+ * API Gateway routes   → api-gateway-stack.ts (addApiRoutes)
+ * ALB target groups    → alb-stack.ts          (addTargetGroups)
+ * EventBridge targets  → app.ts                (wireEventBridgeTargets)
  */
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as events from 'aws-cdk-lib/aws-events';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
@@ -24,15 +19,13 @@ export interface LambdaStackProps extends cdk.StackProps {
     lambdaSecurityGroup: ec2.SecurityGroup;
     auroraSecret: secretsmanager.ISecret;
     redisEndpoint: string;
-    restApi: apigateway.RestApi;
-    alb: elbv2.ApplicationLoadBalancer;
-    httpListener: elbv2.ApplicationListener;
+    /** SQS queue ARN — pass as a constructed string to avoid cyclic CFN cross-stack refs */
     summarizationQueueArn: string;
+    /** SQS queue ARN — pass as a constructed string to avoid cyclic CFN cross-stack refs */
     insightsQueueArn: string;
-    eventBus: events.IEventBus;
+    /** EventBridge default bus ARN — pass as a constructed string */
+    eventBusArn: string;
     connectionsTable: dynamodb.Table;
-    testCompletedRuleName: string;
-    timerSyncRuleName: string;
 }
 export declare class LambdaStack extends cdk.Stack {
     readonly loginFunction: lambda.Function;
@@ -48,6 +41,8 @@ export declare class LambdaStack extends cdk.Stack {
     readonly endTestSessionFunction: lambda.Function;
     readonly getTestsFunction: lambda.Function;
     readonly getResultsFunction: lambda.Function;
+    readonly getStudentSessionsFunction: lambda.Function;
+    readonly studentInsightsFunction: lambda.Function;
     readonly parentChatCreateFunction: lambda.Function;
     readonly parentChatSendFunction: lambda.Function;
     readonly parentChatSendStreamFunction: lambda.Function;
@@ -62,6 +57,8 @@ export declare class LambdaStack extends cdk.Stack {
     readonly websocketDisconnectFunction: lambda.Function;
     readonly timerSyncFunction: lambda.Function;
     readonly calculateProfileFunction: lambda.Function;
+    readonly errorPatternsAggregateFunction: lambda.Function;
+    readonly errorPatternsTrendsFunction: lambda.Function;
     readonly summarizationWorkerFunction: lambda.Function;
     readonly insightsWorkerFunction: lambda.Function;
     readonly adminCreateQuestionFunction: lambda.Function;
@@ -72,5 +69,20 @@ export declare class LambdaStack extends cdk.Stack {
     readonly adminExportQuestionsFunction: lambda.Function;
     readonly adminSystemMetricsFunction: lambda.Function;
     readonly adminStudentAnalyticsFunction: lambda.Function;
+    readonly adminSystemConfigFunction: lambda.Function;
+    readonly listStagesFunction: lambda.Function;
+    readonly getStageFunction: lambda.Function;
+    readonly getSkillTaxonomyFunction: lambda.Function;
+    readonly getSkillBridgesFunction: lambda.Function;
+    readonly listStudentStagesFunction: lambda.Function;
+    readonly activateStudentStageFunction: lambda.Function;
+    readonly listContestsFunction: lambda.Function;
+    readonly registerContestFunction: lambda.Function;
+    readonly submitContestResultFunction: lambda.Function;
+    readonly getContestResultsFunction: lambda.Function;
+    readonly adminCreateContestSeriesFunction: lambda.Function;
+    readonly adminCreateContestFunction: lambda.Function;
+    readonly adminUpdateContestStatusFunction: lambda.Function;
+    readonly adminFinalizeContestResultsFunction: lambda.Function;
     constructor(scope: Construct, id: string, props: LambdaStackProps);
 }

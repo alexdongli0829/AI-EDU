@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "142dc5da1a802f90be01099ed0146920f7fab4625e87704ce36b7c49d16ff4a2": {
+      "displayName": "EduLensApiGatewayStack-dev Template",
+      "source": {
+        "path": "EduLensApiGatewayStack-dev.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "163629398585-us-west-2-cf3b7b80": {
+          "bucketName": "cdk-hnb659fds-assets-163629398585-us-west-2",
+          "objectKey": "142dc5da1a802f90be01099ed0146920f7fab4625e87704ce36b7c49d16ff4a2.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::163629398585:role/cdk-hnb659fds-file-publishing-role-163629398585-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

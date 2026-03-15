@@ -185,6 +185,26 @@ export default function ParentStudentAnalyticsPage() {
         </Button>
       </div>
 
+      {/* Navigation Tabs */}
+      <div className="max-w-6xl mx-auto px-4 py-3">
+        <div className="flex items-center gap-1 bg-white rounded-lg border p-1">
+          <button
+            onClick={() => router.push(`/parent/analytics/${studentId}`)}
+            className="px-4 py-2 text-sm font-medium rounded-md bg-teal-600 text-white transition-colors"
+          >
+            <TrendingUp className="h-4 w-4 inline mr-2" />
+            Performance Overview
+          </button>
+          <button
+            onClick={() => router.push(`/parent/students/${studentId}/error-analysis`)}
+            className="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <AlertCircle className="h-4 w-4 inline mr-2" />
+            Error Analysis
+          </button>
+        </div>
+      </div>
+
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Performance Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

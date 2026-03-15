@@ -1,8 +1,10 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://z5hb4iztaj.execute-api.us-east-1.amazonaws.com/dev';
+// Endpoints must be set via env vars. Set NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SSE_URL,
+// and NEXT_PUBLIC_WS_URL in .env.local after deploying to us-west-2.
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const SSE_URL = process.env.NEXT_PUBLIC_SSE_URL || API_URL;
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'wss://rdtva58ibf.execute-api.us-east-1.amazonaws.com/dev';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || '';
 
 export class ApiClient {
   private client: AxiosInstance;
@@ -91,8 +93,11 @@ export class ApiClient {
     return response.data;
   }
 
-  async startTestSession(testId: string, studentId: string) {
-    const response = await this.client.post('/sessions', { testId, studentId });
+  async startTestSession(
+    studentId: string,
+    options: { testId?: string; stageId?: string; contestId?: string; testFormat?: string } = {}
+  ) {
+    const response = await this.client.post('/sessions', { studentId, ...options });
     return response.data;
   }
 
@@ -111,8 +116,8 @@ export class ApiClient {
   }
 
   // Parent Chat
-  async createParentChatSession(parentId: string, studentId: string) {
-    const response = await this.client.post('/parent-chat', { parentId, studentId });
+  async createParentChatSession(parentId: string, studentId: string, stageId?: string) {
+    const response = await this.client.post('/parent-chat', { parentId, studentId, stageId });
     return response.data;
   }
 
@@ -129,8 +134,11 @@ export class ApiClient {
   }
 
   // Student Chat
-  async createStudentChatSession(studentId: string) {
-    const response = await this.client.post('/student-chat', { studentId });
+  async createStudentChatSession(
+    studentId: string,
+    options: { questionId?: string; sessionResponseId?: string; stageId?: string } = {}
+  ) {
+    const response = await this.client.post('/student-chat', { studentId, ...options });
     return response.data;
   }
 
@@ -226,6 +234,63 @@ export class ApiClient {
 
   async getSkillDetail(studentId: string, skillId: string) {
     const response = await this.client.get(`/students/${studentId}/skills/${skillId}`);
+    return response.data;
+  }
+
+  // Error Pattern Analysis
+  async getErrorPatternsAggregate(studentId: string, days: number = 30, stageId?: string) {
+    const response = await this.client.get(`/students/${studentId}/error-patterns/aggregate`, {
+      params: { days, ...(stageId ? { stageId } : {}) },
+    });
+    return response.data;
+  }
+
+  async getErrorPatternsTrends(studentId: string, days: number = 90, period: string = 'weekly', stageId?: string) {
+    const response = await this.client.get(`/students/${studentId}/error-patterns/trends`, {
+      params: { days, period, ...(stageId ? { stageId } : {}) },
+    });
+    return response.data;
+  }
+
+  // Stage Registry
+  async listStages() {
+    const response = await this.client.get('/stages');
+    return response.data;
+  }
+
+  async getStage(stageId: string) {
+    const response = await this.client.get(`/stages/${stageId}`);
+    return response.data;
+  }
+
+  async getSkillTaxonomy(stageId: string) {
+    const response = await this.client.get(`/stages/${stageId}/skill-taxonomy`);
+    return response.data;
+  }
+
+  async listStudentStages(studentId: string) {
+    const response = await this.client.get(`/students/${studentId}/stages`);
+    return response.data;
+  }
+
+  async activateStudentStage(studentId: string, stageId: string) {
+    const response = await this.client.post(`/students/${studentId}/stages/${stageId}`);
+    return response.data;
+  }
+
+  // Contests
+  async listContests(params: { stageId?: string; status?: string } = {}) {
+    const response = await this.client.get('/contests', { params });
+    return response.data;
+  }
+
+  async registerContest(contestId: string, studentId: string) {
+    const response = await this.client.post(`/contests/${contestId}/register`, { studentId });
+    return response.data;
+  }
+
+  async getContestResults(contestId: string, studentId: string) {
+    const response = await this.client.get(`/contests/${contestId}/results/${studentId}`);
     return response.data;
   }
 }

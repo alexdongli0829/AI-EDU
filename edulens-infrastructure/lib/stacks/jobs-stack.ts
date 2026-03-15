@@ -1,13 +1,16 @@
 /**
  * Jobs Stack
  *
- * Creates SQS queues and EventBridge rules for async job processing
+ * Creates SQS queues and EventBridge rules for async job processing.
+ * EventBridge targets are wired in app.ts after LambdaStack is created,
+ * using constructed ARNs to avoid cyclic CloudFormation dependencies.
  */
 
 import * as cdk from 'aws-cdk-lib';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
 import { EnvironmentConfig } from '../../config/environments';
 
@@ -23,6 +26,8 @@ export class JobsStack extends cdk.Stack {
   public readonly eventBus: events.IEventBus;
   public readonly testCompletedRule: events.Rule;
   public readonly timerSyncRule: events.Rule;
+  public readonly dailyInsightsRule: events.Rule;
+  public readonly batchProcessingRule: events.Rule;
 
   constructor(scope: Construct, id: string, props: JobsStackProps) {
     super(scope, id, props);
@@ -33,13 +38,11 @@ export class JobsStack extends cdk.Stack {
     // Dead Letter Queues
     // ============================================================
 
-    // DLQ for summarization queue
     this.summarizationDLQ = new sqs.Queue(this, 'SummarizationDLQ', {
       queueName: `edulens-summarization-dlq-${config.stage}`,
       retentionPeriod: cdk.Duration.days(14),
     });
 
-    // DLQ for insights queue
     this.insightsDLQ = new sqs.Queue(this, 'InsightsDLQ', {
       queueName: `edulens-insights-dlq-${config.stage}`,
       retentionPeriod: cdk.Duration.days(14),
@@ -49,37 +52,29 @@ export class JobsStack extends cdk.Stack {
     // SQS Queues
     // ============================================================
 
-    // Conversation Summarization Queue
     this.summarizationQueue = new sqs.Queue(this, 'SummarizationQueue', {
       queueName: `edulens-summarization-queue-${config.stage}`,
-      visibilityTimeout: cdk.Duration.minutes(5), // 5 min timeout for summarization
+      visibilityTimeout: cdk.Duration.minutes(5),
       retentionPeriod: cdk.Duration.days(4),
-      receiveMessageWaitTime: cdk.Duration.seconds(20), // Long polling
-
-      // Dead letter queue configuration
+      receiveMessageWaitTime: cdk.Duration.seconds(20),
       deadLetterQueue: {
         queue: this.summarizationDLQ,
-        maxReceiveCount: 3, // Retry 3 times before DLQ
+        maxReceiveCount: 3,
       },
-
-      // Encryption (production)
       encryption: config.stage === 'prod'
         ? sqs.QueueEncryption.KMS_MANAGED
         : sqs.QueueEncryption.UNENCRYPTED,
     });
 
-    // Insights Extraction Queue
     this.insightsQueue = new sqs.Queue(this, 'InsightsQueue', {
       queueName: `edulens-insights-queue-${config.stage}`,
-      visibilityTimeout: cdk.Duration.minutes(10), // 10 min timeout for insights
+      visibilityTimeout: cdk.Duration.minutes(10),
       retentionPeriod: cdk.Duration.days(4),
       receiveMessageWaitTime: cdk.Duration.seconds(20),
-
       deadLetterQueue: {
         queue: this.insightsDLQ,
-        maxReceiveCount: 2, // Retry 2 times before DLQ
+        maxReceiveCount: 2,
       },
-
       encryption: config.stage === 'prod'
         ? sqs.QueueEncryption.KMS_MANAGED
         : sqs.QueueEncryption.UNENCRYPTED,
@@ -89,7 +84,6 @@ export class JobsStack extends cdk.Stack {
     // EventBridge Event Bus
     // ============================================================
 
-    // Use default event bus (cost-effective)
     this.eventBus = events.EventBus.fromEventBusName(
       this,
       'DefaultEventBus',
@@ -100,12 +94,11 @@ export class JobsStack extends cdk.Stack {
     // EventBridge Rules
     // ============================================================
 
-    // Rule 1: Chat Session Ended → Summarization Queue
+    // Rule 1: Chat Session Ended → Summarization Queue (target wired inline — no Lambda dep)
     const chatEndedRule = new events.Rule(this, 'ChatSessionEndedRule', {
       ruleName: `edulens-chat-ended-${config.stage}`,
       description: 'Trigger summarization when chat session ends',
       eventBus: this.eventBus,
-
       eventPattern: {
         source: ['edulens.conversation-engine'],
         detailType: ['chat_session.ended'],
@@ -118,62 +111,49 @@ export class JobsStack extends cdk.Stack {
       })
     );
 
-    // Rule 2: Test Completed → Profile Calculation
-    // (This will trigger Lambda directly, not via SQS)
+    // Rule 2: Test Completed → Profile Calculation (target wired in app.ts)
     this.testCompletedRule = new events.Rule(this, 'TestCompletedRule', {
       ruleName: `edulens-test-completed-${config.stage}`,
       description: 'Trigger profile calculation when test completes',
       eventBus: this.eventBus,
-
       eventPattern: {
         source: ['edulens.test-engine'],
         detailType: ['test.completed'],
       },
     });
 
-    // Target will be added in Lambda stack
-
-    // Rule 3: Scheduled Batch Processing (Hourly)
-    const batchProcessingRule = new events.Rule(this, 'BatchProcessingRule', {
+    // Rule 3: Scheduled Batch Processing (Hourly) — target wired in app.ts
+    this.batchProcessingRule = new events.Rule(this, 'BatchProcessingRule', {
       ruleName: `edulens-batch-processing-${config.stage}`,
       description: 'Hourly batch processing for unsummarized sessions',
       schedule: events.Schedule.rate(cdk.Duration.hours(1)),
     });
 
-    // Target will be added in Lambda stack
-
-    // Rule 4: Daily Insights Generation
-    const dailyInsightsRule = new events.Rule(this, 'DailyInsightsRule', {
+    // Rule 4: Daily Insights Generation (target wired in app.ts)
+    this.dailyInsightsRule = new events.Rule(this, 'DailyInsightsRule', {
       ruleName: `edulens-daily-insights-${config.stage}`,
-      description: 'Daily insights generation (2 AM UTC)',
+      description: 'Daily AI insights generation for all students (midnight UTC)',
       schedule: events.Schedule.cron({
         minute: '0',
-        hour: '2',
+        hour: '0',
         day: '*',
         month: '*',
         year: '*',
       }),
     });
 
-    // Target will be added in Lambda stack
-
-    // Rule 5: Timer Sync (Every 1 minute) - WebSocket broadcasts
-    // Note: EventBridge minimum interval is 1 minute. For sub-minute updates,
-    // use a different approach (e.g., WebSocket keep-alive from client or Step Functions)
+    // Rule 5: Timer Sync (Every 1 minute) — target wired in app.ts
     this.timerSyncRule = new events.Rule(this, 'TimerSyncRule', {
       ruleName: `edulens-timer-sync-${config.stage}`,
       description: 'Timer sync broadcasts every 1 minute',
       schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
     });
 
-    // Target will be added in Lambda stack
-
     // ============================================================
     // CloudWatch Alarms (Production)
     // ============================================================
 
     if (config.stage === 'prod') {
-      // Alarm: DLQ has messages
       this.summarizationDLQ.metricApproximateNumberOfMessagesVisible().createAlarm(
         this,
         'SummarizationDLQAlarm',
@@ -194,7 +174,6 @@ export class JobsStack extends cdk.Stack {
         }
       );
 
-      // Alarm: Queue depth is high
       this.summarizationQueue.metricApproximateNumberOfMessagesVisible().createAlarm(
         this,
         'SummarizationQueueDepthAlarm',

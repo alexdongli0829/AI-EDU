@@ -1,4 +1,4 @@
-// EduLens Database Schema
+// EduLens Database Schema — v3
 // PostgreSQL with Prisma ORM
 
 generator client {
@@ -14,8 +14,6 @@ datasource db {
 
 // ==================== Users & Authentication ====================
 
-// User roles are stored as plain strings: 'admin', 'parent', 'student'
-
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -25,7 +23,6 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @default(now()) @map("updated_at")
 
-  // Relations
   student  Student?
   children Student[] @relation("ParentChildren")
 
@@ -34,169 +31,222 @@ model User {
 }
 
 model Student {
-  id          String   @id @default(uuid())
-  userId      String   @unique @map("user_id")
-  gradeLevel  Int      @map("grade_level")
-  dateOfBirth DateTime @map("date_of_birth")
-  parentId    String   @map("parent_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id          String    @id @default(uuid())
+  userId      String    @unique @map("user_id")
+  gradeLevel  Int       @map("grade_level")
+  dateOfBirth DateTime  @map("date_of_birth")
+  parentId    String?   @map("parent_id")
+  // Core Layer: stage-agnostic persistent traits (error_patterns, time_behavior,
+  // competitive_performance). Stage-specific skill data lives in StudentStage.stageProfile.
+  coreProfile Json?     @map("core_profile")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  // Relations
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent            User                @relation("ParentChildren", fields: [parentId], references: [id])
-  testSessions      TestSession[]
-  chatSessions      ChatSession[]
-  profile           StudentProfile?
-  profileSnapshots  ProfileSnapshot[]
-  conversationMemory ConversationMemory[]
-  events            Event[]
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent               User?                 @relation("ParentChildren", fields: [parentId], references: [id])
+  testSessions         TestSession[]
+  chatSessions         ChatSession[]
+  profile              StudentProfile?
+  profileSnapshots     ProfileSnapshot[]
+  conversationMemory   ConversationMemory[]
+  events               Event[]
+  studentStages        StudentStage[]
+  contestRegistrations ContestRegistration[]
+  contestResults       ContestResult[]
 
   @@index([parentId])
   @@index([userId])
   @@map("students")
 }
 
-// ==================== Tests & Questions ====================
+// ==================== Stage Model ====================
 
-enum QuestionType {
-  multiple_choice
-  short_answer
-  essay
+model Stage {
+  id            String   @id
+  displayName   String   @map("display_name")
+  testFormats   Json     @map("test_formats")
+  studentPrompt String?  @db.Text @map("student_agent_prompt")
+  parentPrompt  String?  @db.Text @map("parent_agent_prompt")
+  sortOrder     Int      @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  skillTaxonomies SkillTaxonomy[]
+  studentStages   StudentStage[]
+  questions       Question[]
+  chatSessions    ChatSession[]
+  contestSeries   ContestSeries[]
+  contests        Contest[]
+
+  @@map("stages")
 }
 
-enum Subject {
-  math
-  reading
-  science
-  writing
+model SkillTaxonomy {
+  id         String   @id @default(uuid())
+  stageId    String   @map("stage_id")
+  version    String
+  categories Json
+  extendsId  String?  @map("extends_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  stage     Stage          @relation(fields: [stageId], references: [id])
+  extends   SkillTaxonomy? @relation("TaxonomyExtension", fields: [extendsId], references: [id])
+  extendedBy SkillTaxonomy[] @relation("TaxonomyExtension")
+
+  @@unique([stageId, version])
+  @@index([stageId])
+  @@map("skill_taxonomies")
 }
 
-enum Difficulty {
-  easy
-  medium
-  hard
+model SkillBridge {
+  id          String @id @default(uuid())
+  fromStageId String @map("from_stage_id")
+  fromSkill   String @map("from_skill")
+  toStageId   String @map("to_stage_id")
+  toSkill     String @map("to_skill")
+  priorWeight Float  @map("prior_weight")
+
+  @@index([fromStageId, toStageId])
+  @@map("skill_bridges")
 }
 
-model Test {
-  id              String   @id @default(uuid())
-  title           String
-  description     String
-  subject         Subject
-  grade           Int
-  totalQuestions  Int
-  timeLimit       Int      // seconds
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+// Student enrollment in a stage. Holds the Stage Layer of the Learning DNA:
+// stageProfile = { skill_graph, stage_error_stats, overall_mastery, strengths, weaknesses }
+model StudentStage {
+  id           String    @id @default(uuid())
+  studentId    String    @map("student_id")
+  stageId      String    @map("stage_id")
+  status       String    @default("active")
+  stageProfile Json      @map("stage_profile")
+  activatedAt  DateTime  @default(now()) @map("activated_at")
+  completedAt  DateTime? @map("completed_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  // Relations
-  questions    Question[]
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  stage        Stage         @relation(fields: [stageId], references: [id])
   testSessions TestSession[]
 
-  @@index([subject, grade])
+  @@unique([studentId, stageId])
+  @@index([studentId])
+  @@index([stageId, status])
+  @@map("student_stages")
+}
+
+// ==================== Tests & Questions ====================
+
+model Test {
+  id            String   @id @default(uuid())
+  title         String
+  description   String?
+  subject       String
+  gradeLevel    Int      @map("grade_level")
+  timeLimit     Int      @map("time_limit")
+  questionCount Int      @map("question_count")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  testSessions TestSession[]
+
   @@index([isActive])
   @@map("tests")
 }
 
+// Questions are a shared pool filtered by stage_id, not FK'd to specific tests.
 model Question {
-  id            String       @id @default(uuid())
-  testId        String
-  type          QuestionType
-  subject       Subject
-  difficulty    Difficulty
-  text          String       @db.Text
-  options       Json?        // Array of {id, text, isCorrect}
-  correctAnswer String?      @db.Text
-  rubric        String?      @db.Text
-  skillTags     String[]     // e.g., ['reading.inference', 'reading.main-idea']
-  estimatedTime Int          // seconds
-  order         Int
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id            String   @id @default(uuid())
+  type          String   @default("multiple_choice")
+  subject       String?
+  gradeLevel    Int?     @map("grade_level")
+  difficulty    Float    @default(0.5)
+  text          String   @db.Text
+  options       Json?
+  correctAnswer String?  @db.Text @map("correct_answer")
+  explanation   String?  @db.Text
+  skillTags     String[] @map("skill_tags")
+  estimatedTime Int      @default(60) @map("estimated_time")
+  stageId       String?  @map("stage_id")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  // Relations
-  test      Test               @relation(fields: [testId], references: [id], onDelete: Cascade)
+  stage     Stage?            @relation(fields: [stageId], references: [id])
   responses SessionResponse[]
 
-  @@index([testId, order])
-  @@index([subject])
+  @@index([stageId])
+  @@index([subject, gradeLevel])
   @@map("questions")
 }
 
 // ==================== Test Sessions ====================
 
-enum SessionStatus {
-  pending
-  in_progress
-  completed
-  abandoned
-}
-
 model TestSession {
-  id                   String        @id @default(uuid())
-  studentId            String
-  testId               String
-  status               SessionStatus @default(pending)
-  startedAt            DateTime?
-  completedAt          DateTime?
-  timeRemaining        Int           // seconds
-  currentQuestionIndex Int           @default(0)
-  totalQuestions       Int
-  score                Int?          // Percentage (0-100)
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  id               String    @id @default(uuid())
+  studentId        String    @map("student_id")
+  testId           String?   @map("test_id")
+  // studentStageId: links this session to the student's Stage Layer enrollment
+  studentStageId   String?   @map("student_stage_id")
+  // contestId: set when session is part of a contest
+  contestId        String?   @map("contest_id")
+  status           String    @default("pending")
+  startedAt        DateTime? @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  timeRemaining    Int?      @map("time_remaining")
+  estimatedAbility Float     @default(0.0) @map("estimated_ability")
+  scaledScore      Float?    @map("scaled_score")
+  rawScore         Float?    @map("raw_score")
+  totalItems       Int       @default(0) @map("total_items")
+  correctCount     Int       @default(0) @map("correct_count")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
-  // Relations
-  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  test      Test              @relation(fields: [testId], references: [id])
-  responses SessionResponse[]
+  student       Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  test          Test?             @relation(fields: [testId], references: [id])
+  studentStage  StudentStage?     @relation(fields: [studentStageId], references: [id])
+  contest       Contest?          @relation(fields: [contestId], references: [id])
+  responses     SessionResponse[]
+  contestResult ContestResult?
 
   @@index([studentId, status])
   @@index([testId])
+  @@index([studentStageId])
   @@index([createdAt])
   @@map("test_sessions")
 }
 
 model SessionResponse {
   id            String   @id @default(uuid())
-  sessionId     String
-  questionId    String
-  studentAnswer String   @db.Text
-  isCorrect     Boolean?
-  timeSpent     Int      // seconds
-  confidence    Float?   // 0-1 for ML confidence
-  answeredAt    DateTime @default(now())
+  sessionId     String   @map("session_id")
+  questionId    String   @map("question_id")
+  studentAnswer String?  @db.Text @map("student_answer")
+  isCorrect     Boolean? @map("is_correct")
+  timeSpent     Int?     @map("time_spent")
+  answerChanges Int      @default(0) @map("answer_changes")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  // Relations
   session  TestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   question Question    @relation(fields: [questionId], references: [id])
 
   @@unique([sessionId, questionId])
   @@index([sessionId])
-  @@index([questionId])
   @@map("session_responses")
 }
 
 // ==================== Chat & Conversations ====================
 
-// Chat role, message role, and agent state use plain strings in DB (VARCHAR)
-// Valid chat roles: 'student_tutor', 'parent_advisor'
-// Valid message roles: 'user', 'assistant', 'system'
-// Valid agent states: 'idle', 'processing', 'responding', 'waiting_feedback'
-
 model ChatSession {
-  id            String   @id @default(uuid())
-  studentId     String   @map("student_id")
-  role          String   @default("student_tutor")
-  agentState    String   @default("idle") @map("agent_state")
-  turnCount     Int      @default(0) @map("turn_count")
-  startedAt     DateTime @default(now()) @map("started_at")
+  id            String    @id @default(uuid())
+  studentId     String    @map("student_id")
+  role          String    @default("student_tutor")
+  agentState    String    @default("idle") @map("agent_state")
+  turnCount     Int       @default(0) @map("turn_count")
+  // stageId: determines which system prompt and profile layer to inject
+  stageId       String?   @map("stage_id")
+  startedAt     DateTime  @default(now()) @map("started_at")
   lastMessageAt DateTime? @map("last_message_at")
   metadata      Json?
 
-  // Relations
   student            Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  stage              Stage?               @relation(fields: [stageId], references: [id])
   messages           ChatMessage[]
   conversationMemory ConversationMemory[]
 
@@ -213,7 +263,6 @@ model ChatMessage {
   timestamp DateTime @default(now())
   metadata  Json?
 
-  // Relations
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, timestamp])
@@ -222,17 +271,16 @@ model ChatMessage {
 
 model ConversationMemory {
   id                 String   @id @default(uuid())
-  studentId          String
-  sessionId          String
+  studentId          String   @map("student_id")
+  sessionId          String   @map("session_id")
   summary            String   @db.Text
-  keyTopics          String[]
-  insightsExtracted  Json     // Flexible insights storage
-  parentQuestions    String[]
-  satisfactionSignal String?  // 'positive' | 'neutral' | 'negative'
-  turnCount          Int
-  createdAt          DateTime @default(now())
+  keyTopics          String[] @map("key_topics")
+  insightsExtracted  Json     @map("insights_extracted")
+  parentQuestions    String[] @map("parent_questions")
+  satisfactionSignal String?  @map("satisfaction_signal")
+  turnCount          Int      @map("turn_count")
+  createdAt          DateTime @default(now()) @map("created_at")
 
-  // Relations
   student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -243,23 +291,25 @@ model ConversationMemory {
 
 // ==================== Profile & Learning DNA ====================
 
+// Kept for backward compatibility during v3 transition.
+// Authoritative v3 Learning DNA: students.core_profile + student_stages.stage_profile
 model StudentProfile {
-  id              String   @id @default(uuid())
-  studentId       String   @unique @map("student_id")
-  skillGraph      Json     @map("skill_graph")
-  errorPatterns   Json     @map("error_patterns")
-  timeBehavior    Json     @map("time_behavior")
-  overallMastery  Float    @map("overall_mastery")
-  strengths       String[]
-  weaknesses      String[]
-  lastCalculated  DateTime @map("last_calculated")
-  updatedAt       DateTime @default(now()) @map("updated_at")
+  id             String    @id @default(uuid())
+  studentId      String    @unique @map("student_id")
+  skillGraph     Json      @map("skill_graph")
+  errorPatterns  Json      @map("error_patterns")
+  timeBehavior   Json      @map("time_behavior")
+  overallMastery Float     @map("overall_mastery")
+  strengths      String[]
+  weaknesses     String[]
+  insightsJson   Json?     @map("insights_json")
+  lastInsightsAt DateTime? @map("last_insights_at")
+  lastCalculated DateTime  @map("last_calculated")
+  updatedAt      DateTime  @default(now()) @map("updated_at")
 
-  // Relations
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId])
-  @@index([lastCalculated])
   @@map("student_profiles")
 }
 
@@ -270,7 +320,6 @@ model ProfileSnapshot {
   snapshotDate DateTime @default(now()) @map("created_at")
   trigger      String?
 
-  // Relations
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, snapshotDate])
@@ -280,16 +329,96 @@ model ProfileSnapshot {
 // ==================== Events (Event Sourcing) ====================
 
 model Event {
-  id            String   @id @default(uuid())
-  studentId     String?  @map("student_id")
-  eventType     String   @map("event_type")
-  payload       Json
-  createdAt     DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid())
+  studentId String?  @map("student_id")
+  eventType String   @map("event_type")
+  stageId   String?  @map("stage_id")
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at")
 
-  // Relations
   student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, eventType])
   @@index([eventType, createdAt])
   @@map("events")
+}
+
+// ==================== Contest System ====================
+
+model ContestSeries {
+  id             String   @id @default(uuid())
+  stageId        String   @map("stage_id")
+  title          String
+  recurrenceRule String   @default("") @map("recurrence_rule")
+  durationMins   Int      @map("duration_mins")
+  questionCount  Int      @map("question_count")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  stage    Stage     @relation(fields: [stageId], references: [id])
+  contests Contest[]
+
+  @@index([stageId])
+  @@map("contest_series")
+}
+
+// status lifecycle: draft → open → active → scoring → finalized
+model Contest {
+  id                String   @id @default(uuid())
+  seriesId          String?  @map("series_id")
+  stageId           String   @map("stage_id")
+  title             String
+  status            String   @default("draft")
+  questionIds       String[] @map("question_ids")
+  windowStartAt     DateTime @map("window_start_at")
+  windowEndAt       DateTime @map("window_end_at")
+  totalParticipants Int      @default(0) @map("total_participants")
+  avgScore          Float?   @map("avg_score")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  series        ContestSeries?        @relation(fields: [seriesId], references: [id])
+  stage         Stage                 @relation(fields: [stageId], references: [id])
+  registrations ContestRegistration[]
+  results       ContestResult[]
+  testSessions  TestSession[]
+
+  @@index([stageId, status])
+  @@index([windowStartAt])
+  @@map("contests")
+}
+
+model ContestRegistration {
+  id           String   @id @default(uuid())
+  contestId    String   @map("contest_id")
+  studentId    String   @map("student_id")
+  registeredAt DateTime @default(now()) @map("registered_at")
+
+  contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([contestId, studentId])
+  @@index([contestId])
+  @@index([studentId])
+  @@map("contest_registrations")
+}
+
+model ContestResult {
+  id         String   @id @default(uuid())
+  contestId  String   @map("contest_id")
+  studentId  String   @map("student_id")
+  sessionId  String   @unique @map("session_id")
+  score      Int
+  rank       Int
+  percentile Float
+  scoredAt   DateTime @default(now()) @map("scored_at")
+
+  contest Contest     @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session TestSession @relation(fields: [sessionId], references: [id])
+
+  @@unique([contestId, studentId])
+  @@index([contestId, rank])
+  @@index([studentId])
+  @@map("contest_results")
 }

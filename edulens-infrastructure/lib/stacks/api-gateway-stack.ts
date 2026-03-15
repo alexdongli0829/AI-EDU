@@ -1,15 +1,83 @@
 /**
  * API Gateway Stack
  *
- * Creates REST API and WebSocket API for EduLens services
+ * Creates REST API and WebSocket API for EduLens services.
+ * Call addApiRoutes() from app.ts after LambdaStack is created to wire
+ * all Lambda integrations. This keeps the stack separation clean:
+ *   - ApiGatewayStack owns all API Gateway resources (RestApi, routes, methods)
+ *   - LambdaStack owns Lambda functions
+ *   - No cyclic CloudFormation dependencies
  */
 
 import * as cdk from 'aws-cdk-lib';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 import { EnvironmentConfig } from '../../config/environments';
+
+/** Shape of Lambda function references needed to wire API routes */
+export interface ApiRouteFunctions {
+  // Auth
+  loginFunction: lambda.Function;
+  registerFunction: lambda.Function;
+  createStudentFunction: lambda.Function;
+  listStudentsFunction: lambda.Function;
+  studentLoginFunction: lambda.Function;
+  deleteStudentFunction: lambda.Function;
+  // Test Engine
+  createTestFunction: lambda.Function;
+  getTestFunction: lambda.Function;
+  getTestsFunction: lambda.Function;
+  startTestSessionFunction: lambda.Function;
+  submitAnswerFunction: lambda.Function;
+  endTestSessionFunction: lambda.Function;
+  getResultsFunction: lambda.Function;
+  getStudentSessionsFunction: lambda.Function;
+  studentInsightsFunction: lambda.Function;
+  // Conversation Engine
+  parentChatCreateFunction: lambda.Function;
+  parentChatSendFunction: lambda.Function;
+  parentChatGetMessagesFunction: lambda.Function;
+  parentChatEndSessionFunction: lambda.Function;
+  studentChatCreateFunction: lambda.Function;
+  studentChatSendFunction: lambda.Function;
+  studentChatGetMessagesFunction: lambda.Function;
+  studentChatEndSessionFunction: lambda.Function;
+  // WebSocket
+  websocketConnectFunction: lambda.Function;
+  websocketDisconnectFunction: lambda.Function;
+  // Profile Engine
+  errorPatternsAggregateFunction: lambda.Function;
+  errorPatternsTrendsFunction: lambda.Function;
+  // Admin Service
+  adminCreateQuestionFunction: lambda.Function;
+  adminUpdateQuestionFunction: lambda.Function;
+  adminDeleteQuestionFunction: lambda.Function;
+  adminListQuestionsFunction: lambda.Function;
+  adminImportQuestionsFunction: lambda.Function;
+  adminExportQuestionsFunction: lambda.Function;
+  adminSystemMetricsFunction: lambda.Function;
+  adminStudentAnalyticsFunction: lambda.Function;
+  adminSystemConfigFunction: lambda.Function;
+  // Stage Registry
+  listStagesFunction: lambda.Function;
+  getStageFunction: lambda.Function;
+  getSkillTaxonomyFunction: lambda.Function;
+  getSkillBridgesFunction: lambda.Function;
+  listStudentStagesFunction: lambda.Function;
+  activateStudentStageFunction: lambda.Function;
+  // Contest Service
+  listContestsFunction: lambda.Function;
+  registerContestFunction: lambda.Function;
+  submitContestResultFunction: lambda.Function;
+  getContestResultsFunction: lambda.Function;
+  adminCreateContestSeriesFunction: lambda.Function;
+  adminCreateContestFunction: lambda.Function;
+  adminUpdateContestStatusFunction: lambda.Function;
+  adminFinalizeContestResultsFunction: lambda.Function;
+}
 
 export interface ApiGatewayStackProps extends cdk.StackProps {
   config: EnvironmentConfig;
@@ -20,34 +88,33 @@ export class ApiGatewayStack extends cdk.Stack {
   public readonly websocketApi: apigatewayv2.CfnApi;
   public readonly websocketStage: apigatewayv2.CfnStage;
 
+  private readonly config: EnvironmentConfig;
+
   constructor(scope: Construct, id: string, props: ApiGatewayStackProps) {
     super(scope, id, props);
 
     const { config } = props;
+    this.config = config;
 
     // ============================================================
     // REST API Gateway
     // ============================================================
 
-    // CloudWatch log group for API Gateway
     const apiLogGroup = new logs.LogGroup(this, 'ApiGatewayLogs', {
       logGroupName: `/aws/apigateway/edulens-${config.stage}`,
       retention: config.logRetentionDays,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Create REST API
     this.restApi = new apigateway.RestApi(this, 'RestApi', {
       restApiName: `edulens-api-${config.stage}`,
       description: `EduLens REST API (${config.stage})`,
-
-      // Deploy configuration
       deploy: true,
       deployOptions: {
         stageName: config.stage,
         metricsEnabled: true,
         loggingLevel: apigateway.MethodLoggingLevel.INFO,
-        dataTraceEnabled: config.stage !== 'prod', // Disable data trace in prod
+        dataTraceEnabled: config.stage !== 'prod',
         accessLogDestination: new apigateway.LogGroupLogDestination(apiLogGroup),
         accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
           caller: true,
@@ -61,27 +128,18 @@ export class ApiGatewayStack extends cdk.Stack {
           user: true,
         }),
       },
-
-      // CORS configuration
       defaultCorsPreflightOptions: {
         allowOrigins: config.stage === 'prod'
-          ? ['https://app.edulens.com'] // Replace with actual domain
+          ? ['https://app.edulens.com']
           : apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: [
-          'Content-Type',
-          'X-Amz-Date',
-          'Authorization',
-          'X-Api-Key',
-          'X-Amz-Security-Token',
+          'Content-Type', 'X-Amz-Date', 'Authorization',
+          'X-Api-Key', 'X-Amz-Security-Token',
         ],
         allowCredentials: true,
       },
-
-      // CloudWatch role
       cloudWatchRole: true,
-
-      // Endpoint type
       endpointTypes: [apigateway.EndpointType.REGIONAL],
     });
 
@@ -104,18 +162,12 @@ export class ApiGatewayStack extends cdk.Stack {
     });
 
     usagePlan.addApiKey(apiKey);
-    usagePlan.addApiStage({
-      stage: this.restApi.deploymentStage,
-    });
-
-    // Note: API Gateway resources and methods are created in the Lambda stack
-    // to avoid cyclic dependencies
+    usagePlan.addApiStage({ stage: this.restApi.deploymentStage });
 
     // ============================================================
     // WebSocket API
     // ============================================================
 
-    // Create WebSocket API
     this.websocketApi = new apigatewayv2.CfnApi(this, 'WebSocketApi', {
       name: `edulens-ws-${config.stage}`,
       protocolType: 'WEBSOCKET',
@@ -123,7 +175,6 @@ export class ApiGatewayStack extends cdk.Stack {
       description: `EduLens WebSocket API for timer sync (${config.stage})`,
     });
 
-    // WebSocket Stage
     this.websocketStage = new apigatewayv2.CfnStage(this, 'WebSocketStage', {
       apiId: this.websocketApi.ref,
       stageName: config.stage,
@@ -135,8 +186,7 @@ export class ApiGatewayStack extends cdk.Stack {
       },
     });
 
-    // CloudWatch logs for WebSocket
-    const wsLogGroup = new logs.LogGroup(this, 'WebSocketLogs', {
+    new logs.LogGroup(this, 'WebSocketLogs', {
       logGroupName: `/aws/apigateway/websocket-${config.stage}`,
       retention: config.logRetentionDays,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -172,6 +222,214 @@ export class ApiGatewayStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ApiKeyId', {
       value: apiKey.keyId,
       description: 'API Key ID (for admin endpoints)',
+    });
+  }
+
+  // ============================================================
+  // Wire REST API routes + WebSocket integrations (called from app.ts)
+  // ============================================================
+
+  addApiRoutes(fns: ApiRouteFunctions): void {
+    const api = this.restApi;
+
+    // ----------------------------------------------------------
+    // Auth endpoints  /auth/...
+    // ----------------------------------------------------------
+    const authResource = api.root.addResource('auth');
+    authResource.addMethod('POST', new apigateway.LambdaIntegration(fns.loginFunction));
+
+    authResource.addResource('login')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.loginFunction));
+
+    authResource.addResource('register')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.registerFunction));
+
+    authResource.addResource('create-student')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.createStudentFunction));
+
+    authResource.addResource('students')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.listStudentsFunction));
+
+    authResource.addResource('student-login')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.studentLoginFunction));
+
+    authResource.addResource('delete-student')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.deleteStudentFunction));
+
+    // ----------------------------------------------------------
+    // Test Engine  /tests/... and /sessions/...
+    // ----------------------------------------------------------
+    const testsResource = api.root.addResource('tests');
+    testsResource.addMethod('POST', new apigateway.LambdaIntegration(fns.createTestFunction));
+    testsResource.addMethod('GET', new apigateway.LambdaIntegration(fns.getTestsFunction));
+
+    testsResource.addResource('{testId}')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.getTestFunction));
+
+    const sessionsResource = api.root.addResource('sessions');
+    sessionsResource.addMethod('POST', new apigateway.LambdaIntegration(fns.startTestSessionFunction));
+
+    const sessionIdResource = sessionsResource.addResource('{sessionId}');
+    sessionIdResource.addResource('answers')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.submitAnswerFunction));
+    sessionIdResource.addResource('end')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.endTestSessionFunction));
+    sessionIdResource.addResource('results')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.getResultsFunction));
+
+    // /sessions/student/{studentId}
+    sessionsResource.addResource('student')
+      .addResource('{studentId}')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.getStudentSessionsFunction));
+
+    // ----------------------------------------------------------
+    // Students  /students/{studentId}/...
+    // ----------------------------------------------------------
+    const studentsRootResource = api.root.addResource('students');
+    const studentByIdResource = studentsRootResource.addResource('{studentId}');
+
+    // /students/{studentId}/insights
+    const insightsResource = studentByIdResource.addResource('insights');
+    insightsResource.addMethod('GET', new apigateway.LambdaIntegration(fns.studentInsightsFunction));
+    insightsResource.addMethod('POST', new apigateway.LambdaIntegration(fns.studentInsightsFunction));
+
+    // /students/{studentId}/error-patterns/aggregate|trends
+    const errorPatternsResource = studentByIdResource.addResource('error-patterns');
+    errorPatternsResource.addResource('aggregate')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.errorPatternsAggregateFunction));
+    errorPatternsResource.addResource('trends')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.errorPatternsTrendsFunction));
+
+    // /students/{studentId}/stages  (Stage Registry enrollment)
+    const studentStagesResource = studentByIdResource.addResource('stages');
+    studentStagesResource.addMethod('GET', new apigateway.LambdaIntegration(fns.listStudentStagesFunction));
+    studentStagesResource.addResource('{stageId}')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.activateStudentStageFunction));
+
+    // ----------------------------------------------------------
+    // Conversation Engine  /parent-chat/... and /student-chat/...
+    // ----------------------------------------------------------
+    const parentChatResource = api.root.addResource('parent-chat');
+    parentChatResource.addMethod('POST', new apigateway.LambdaIntegration(fns.parentChatCreateFunction));
+
+    const parentSessionResource = parentChatResource.addResource('{sessionId}');
+    parentSessionResource.addResource('message')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.parentChatSendFunction));
+    parentSessionResource.addResource('messages')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.parentChatGetMessagesFunction));
+    parentSessionResource.addResource('end')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.parentChatEndSessionFunction));
+
+    const studentChatResource = api.root.addResource('student-chat');
+    studentChatResource.addMethod('POST', new apigateway.LambdaIntegration(fns.studentChatCreateFunction));
+
+    const studentSessionResource = studentChatResource.addResource('{sessionId}');
+    studentSessionResource.addResource('message')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.studentChatSendFunction));
+    studentSessionResource.addResource('messages')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.studentChatGetMessagesFunction));
+    studentSessionResource.addResource('end')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.studentChatEndSessionFunction));
+
+    // ----------------------------------------------------------
+    // Stage Registry  /stages/...
+    // ----------------------------------------------------------
+    const stagesRootResource = api.root.addResource('stages');
+    stagesRootResource.addMethod('GET', new apigateway.LambdaIntegration(fns.listStagesFunction));
+
+    const stageByIdResource = stagesRootResource.addResource('{id}');
+    stageByIdResource.addMethod('GET', new apigateway.LambdaIntegration(fns.getStageFunction));
+    stageByIdResource.addResource('skill-taxonomy')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.getSkillTaxonomyFunction));
+    stageByIdResource.addResource('bridges')
+      .addResource('{toId}')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.getSkillBridgesFunction));
+
+    // ----------------------------------------------------------
+    // Contest Service  /contests/...
+    // ----------------------------------------------------------
+    const contestsRootResource = api.root.addResource('contests');
+    contestsRootResource.addMethod('GET', new apigateway.LambdaIntegration(fns.listContestsFunction));
+
+    const contestByIdResource = contestsRootResource.addResource('{id}');
+    contestByIdResource.addResource('register')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.registerContestFunction));
+
+    const contestResultsResource = contestByIdResource.addResource('results');
+    contestResultsResource.addMethod('POST', new apigateway.LambdaIntegration(fns.submitContestResultFunction));
+    contestResultsResource.addResource('{studentId}')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.getContestResultsFunction));
+
+    // ----------------------------------------------------------
+    // Admin Service  /admin/...
+    // ----------------------------------------------------------
+    const adminResource = api.root.addResource('admin');
+
+    const questionsResource = adminResource.addResource('questions');
+    questionsResource.addMethod('POST', new apigateway.LambdaIntegration(fns.adminCreateQuestionFunction), { apiKeyRequired: true });
+    questionsResource.addMethod('GET', new apigateway.LambdaIntegration(fns.adminListQuestionsFunction), { apiKeyRequired: true });
+
+    const questionIdResource = questionsResource.addResource('{questionId}');
+    questionIdResource.addMethod('PUT', new apigateway.LambdaIntegration(fns.adminUpdateQuestionFunction), { apiKeyRequired: true });
+    questionIdResource.addMethod('DELETE', new apigateway.LambdaIntegration(fns.adminDeleteQuestionFunction), { apiKeyRequired: true });
+
+    const bulkResource = adminResource.addResource('bulk');
+    bulkResource.addResource('import')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.adminImportQuestionsFunction), { apiKeyRequired: true });
+    bulkResource.addResource('export')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.adminExportQuestionsFunction), { apiKeyRequired: true });
+
+    const analyticsResource = adminResource.addResource('analytics');
+    analyticsResource.addResource('metrics')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.adminSystemMetricsFunction), { apiKeyRequired: true });
+    analyticsResource.addResource('students')
+      .addResource('{studentId}')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.adminStudentAnalyticsFunction), { apiKeyRequired: true });
+
+    const configResource = adminResource.addResource('config');
+    configResource.addMethod('GET', new apigateway.LambdaIntegration(fns.adminSystemConfigFunction), { apiKeyRequired: true });
+    configResource.addMethod('PUT', new apigateway.LambdaIntegration(fns.adminSystemConfigFunction), { apiKeyRequired: true });
+
+    // Admin contest endpoints
+    adminResource.addResource('contest-series')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.adminCreateContestSeriesFunction), { apiKeyRequired: true });
+
+    const adminContestsResource = adminResource.addResource('contests');
+    adminContestsResource.addMethod('POST', new apigateway.LambdaIntegration(fns.adminCreateContestFunction), { apiKeyRequired: true });
+
+    const adminContestByIdResource = adminContestsResource.addResource('{id}');
+    adminContestByIdResource.addResource('status')
+      .addMethod('PATCH', new apigateway.LambdaIntegration(fns.adminUpdateContestStatusFunction), { apiKeyRequired: true });
+    adminContestByIdResource.addResource('finalize')
+      .addMethod('POST', new apigateway.LambdaIntegration(fns.adminFinalizeContestResultsFunction), { apiKeyRequired: true });
+
+    // ----------------------------------------------------------
+    // WebSocket routes  $connect / $disconnect
+    // ----------------------------------------------------------
+    const connectIntegration = new apigatewayv2.CfnIntegration(this, 'WsConnectIntegration', {
+      apiId: this.websocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${fns.websocketConnectFunction.functionArn}/invocations`,
+    });
+
+    const disconnectIntegration = new apigatewayv2.CfnIntegration(this, 'WsDisconnectIntegration', {
+      apiId: this.websocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${fns.websocketDisconnectFunction.functionArn}/invocations`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'WsConnectRoute', {
+      apiId: this.websocketApi.ref,
+      routeKey: '$connect',
+      authorizationType: 'NONE',
+      target: `integrations/${connectIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'WsDisconnectRoute', {
+      apiId: this.websocketApi.ref,
+      routeKey: '$disconnect',
+      authorizationType: 'NONE',
+      target: `integrations/${disconnectIntegration.ref}`,
     });
   }
 }

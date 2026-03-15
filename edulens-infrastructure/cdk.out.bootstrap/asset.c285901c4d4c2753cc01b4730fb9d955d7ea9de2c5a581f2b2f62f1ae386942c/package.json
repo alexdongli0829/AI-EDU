@@ -1,0 +1,33 @@
+{
+  "name": "@edulens/test-engine",
+  "version": "1.0.0",
+  "description": "EduLens Test Engine - Adaptive Testing with IRT",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "lint": "eslint src --ext .ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.470.0",
+    "@aws-sdk/client-dynamodb": "^3.470.0",
+    "@aws-sdk/client-eventbridge": "^3.470.0",
+    "@aws-sdk/client-secrets-manager": "^3.470.0",
+    "@edulens/common": "workspace:*",
+    "@edulens/database": "workspace:*",
+    "@prisma/client": "^5.7.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.130",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.6",
+    "@types/uuid": "^9.0.7",
+    "jest": "^29.7.0",
+    "prisma": "^5.7.1",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  }
+}

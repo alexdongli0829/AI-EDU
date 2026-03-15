@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "37882409833469f5558928c591526bfbcb14c0b7c1c3fcea660b817d3d4636fc": {
+      "displayName": "EduLensDatabaseStack-dev Template",
+      "source": {
+        "path": "EduLensDatabaseStack-dev.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "163629398585-us-west-2-113396d0": {
+          "bucketName": "cdk-hnb659fds-assets-163629398585-us-west-2",
+          "objectKey": "37882409833469f5558928c591526bfbcb14c0b7c1c3fcea660b817d3d4636fc.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::163629398585:role/cdk-hnb659fds-file-publishing-role-163629398585-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

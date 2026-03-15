@@ -1,0 +1,288 @@
+{
+ "Description": "EduLens ALB Infrastructure (dev)",
+ "Resources": {
+  "LoadBalancerBE9EEC3A": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     },
+     {
+      "Key": "routing.http2.enabled",
+      "Value": "true"
+     },
+     {
+      "Key": "idle_timeout.timeout_seconds",
+      "Value": "300"
+     }
+    ],
+    "Name": "edulens-alb-dev",
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Fn::ImportValue": "EduLensNetworkStack-dev:ExportsOutputFnGetAttAlbSecurityGroup86A59E99GroupIdE3A37BC7"
+     }
+    ],
+    "Subnets": [
+     {
+      "Fn::ImportValue": "EduLensNetworkStack-dev:ExportsOutputRefEduLensVpcPublicSubnet1Subnet703163237D6AA035"
+     },
+     {
+      "Fn::ImportValue": "EduLensNetworkStack-dev:ExportsOutputRefEduLensVpcPublicSubnet2SubnetAEB3040895E5F72D"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Name",
+      "Value": "edulens-alb-dev"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "Type": "application"
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensAlbStack-dev/LoadBalancer/Resource"
+   }
+  },
+  "LoadBalancerHttpListener22970844": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "FixedResponseConfig": {
+       "ContentType": "application/json",
+       "MessageBody": "{\"error\":\"Not Found\",\"message\":\"The requested resource was not found\"}",
+       "StatusCode": "404"
+      },
+      "Type": "fixed-response"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "LoadBalancerBE9EEC3A"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensAlbStack-dev/LoadBalancer/HttpListener/Resource"
+   }
+  },
+  "LoadBalancerHttpListenerParentStreamRuleRule7F0B3F22": {
+   "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+   "Properties": {
+    "Actions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "ParentStreamTargetGroup4EC5F7AC"
+      },
+      "Type": "forward"
+     }
+    ],
+    "Conditions": [
+     {
+      "Field": "path-pattern",
+      "PathPatternConfig": {
+       "Values": [
+        "/parent-chat/*/send"
+       ]
+      }
+     }
+    ],
+    "ListenerArn": {
+     "Ref": "LoadBalancerHttpListener22970844"
+    },
+    "Priority": 10
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensAlbStack-dev/LoadBalancer/HttpListener/ParentStreamRuleRule/Resource"
+   }
+  },
+  "LoadBalancerHttpListenerStudentStreamRuleRule9B490132": {
+   "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+   "Properties": {
+    "Actions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "StudentStreamTargetGroup60F97FCD"
+      },
+      "Type": "forward"
+     }
+    ],
+    "Conditions": [
+     {
+      "Field": "path-pattern",
+      "PathPatternConfig": {
+       "Values": [
+        "/student-chat/*/send"
+       ]
+      }
+     }
+    ],
+    "ListenerArn": {
+     "Ref": "LoadBalancerHttpListener22970844"
+    },
+    "Priority": 20
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensAlbStack-dev/LoadBalancer/HttpListener/StudentStreamRuleRule/Resource"
+   }
+  },
+  "ParentStreamTargetGroup4EC5F7AC": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckEnabled": false,
+    "Name": "edulens-parent-stream-dev",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "TargetType": "lambda",
+    "Targets": [
+     {
+      "Id": {
+       "Fn::ImportValue": "EduLensLambdaStack-dev:ExportsOutputFnGetAttParentChatSendStreamLambdaFunctionD498F2EFArnB68D0043"
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensAlbStack-dev/ParentStreamTargetGroup/Resource"
+   }
+  },
+  "StudentStreamTargetGroup60F97FCD": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckEnabled": false,
+    "Name": "edulens-student-stream-dev",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "TargetType": "lambda",
+    "Targets": [
+     {
+      "Id": {
+       "Fn::ImportValue": "EduLensLambdaStack-dev:ExportsOutputFnGetAttStudentChatSendStreamLambdaFunctionE1CF3780Arn53278FF5"
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensAlbStack-dev/StudentStreamTargetGroup/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/23KQQ6CMBCF4bOwhxEbL6Au3JiYoHszlEoGatu0U1gQ7m5ATWriaubP+wSI3RbKDMdQyKYvNNUwXRlln+MY7kpjYJLaYlOjRiPJtIOAae+cJolM1pwtNod1Uz4/Pn47dRRYmY/5/n/2KmqVmrUTd0PfKj55G93CkpyXvkR2kefc2EZBFzaDECAElFkXiAofDdNTQfW+L0EvAJD+AAAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensAlbStack-dev/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AlbDnsName": {
+   "Description": "ALB DNS name",
+   "Value": {
+    "Fn::GetAtt": [
+     "LoadBalancerBE9EEC3A",
+     "DNSName"
+    ]
+   },
+   "Export": {
+    "Name": "edulens-alb-dns-dev"
+   }
+  },
+  "AlbArn": {
+   "Description": "ALB ARN",
+   "Value": {
+    "Ref": "LoadBalancerBE9EEC3A"
+   }
+  },
+  "AlbUrl": {
+   "Description": "ALB URL (HTTP)",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "http://",
+      {
+       "Fn::GetAtt": [
+        "LoadBalancerBE9EEC3A",
+        "DNSName"
+       ]
+      }
+     ]
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,489 @@
+{
+ "Description": "EduLens Jobs Infrastructure (dev)",
+ "Resources": {
+  "SummarizationDLQEEC2E352": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "MessageRetentionPeriod": 1209600,
+    "QueueName": "edulens-summarization-dlq-dev",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/SummarizationDLQ/Resource"
+   }
+  },
+  "InsightsDLQAE053DA2": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "MessageRetentionPeriod": 1209600,
+    "QueueName": "edulens-insights-dlq-dev",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/InsightsDLQ/Resource"
+   }
+  },
+  "SummarizationQueue0AF3CA17": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "MessageRetentionPeriod": 345600,
+    "QueueName": "edulens-summarization-queue-dev",
+    "ReceiveMessageWaitTimeSeconds": 20,
+    "RedrivePolicy": {
+     "deadLetterTargetArn": {
+      "Fn::GetAtt": [
+       "SummarizationDLQEEC2E352",
+       "Arn"
+      ]
+     },
+     "maxReceiveCount": 3
+    },
+    "SqsManagedSseEnabled": false,
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "VisibilityTimeout": 300
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/SummarizationQueue/Resource"
+   }
+  },
+  "SummarizationQueuePolicy0180EDAF": {
+   "Type": "AWS::SQS::QueuePolicy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Condition": {
+        "ArnEquals": {
+         "aws:SourceArn": {
+          "Fn::GetAtt": [
+           "ChatSessionEndedRuleEAE38A24",
+           "Arn"
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "events.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::GetAtt": [
+         "SummarizationQueue0AF3CA17",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Queues": [
+     {
+      "Ref": "SummarizationQueue0AF3CA17"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/SummarizationQueue/Policy/Resource"
+   }
+  },
+  "InsightsQueueA6C46F56": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "MessageRetentionPeriod": 345600,
+    "QueueName": "edulens-insights-queue-dev",
+    "ReceiveMessageWaitTimeSeconds": 20,
+    "RedrivePolicy": {
+     "deadLetterTargetArn": {
+      "Fn::GetAtt": [
+       "InsightsDLQAE053DA2",
+       "Arn"
+      ]
+     },
+     "maxReceiveCount": 2
+    },
+    "SqsManagedSseEnabled": false,
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "VisibilityTimeout": 600
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/InsightsQueue/Resource"
+   }
+  },
+  "ChatSessionEndedRuleEAE38A24": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Description": "Trigger summarization when chat session ends",
+    "EventBusName": "default",
+    "EventPattern": {
+     "source": [
+      "edulens.conversation-engine"
+     ],
+     "detail-type": [
+      "chat_session.ended"
+     ]
+    },
+    "Name": "edulens-chat-ended-dev",
+    "State": "ENABLED",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "SummarizationQueue0AF3CA17",
+        "Arn"
+       ]
+      },
+      "Id": "Target0",
+      "InputPath": "$.detail"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/ChatSessionEndedRule/Resource"
+   }
+  },
+  "TestCompletedRule98856688": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Description": "Trigger profile calculation when test completes",
+    "EventBusName": "default",
+    "EventPattern": {
+     "source": [
+      "edulens.test-engine"
+     ],
+     "detail-type": [
+      "test.completed"
+     ]
+    },
+    "Name": "edulens-test-completed-dev",
+    "State": "ENABLED",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "Targets": [
+     {
+      "Arn": "arn:aws:lambda:us-west-2:163629398585:function:edulens-calculate-profile-dev",
+      "Id": "CalcProfile"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/TestCompletedRule/Resource"
+   }
+  },
+  "BatchProcessingRule8D3F6B58": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Description": "Hourly batch processing for unsummarized sessions",
+    "Name": "edulens-batch-processing-dev",
+    "ScheduleExpression": "rate(1 hour)",
+    "State": "ENABLED",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "Targets": [
+     {
+      "Arn": "arn:aws:lambda:us-west-2:163629398585:function:edulens-insights-worker-dev",
+      "Id": "InsightsWorker"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/BatchProcessingRule/Resource"
+   }
+  },
+  "DailyInsightsRule83926349": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Description": "Daily AI insights generation for all students (midnight UTC)",
+    "Name": "edulens-daily-insights-dev",
+    "ScheduleExpression": "cron(0 0 * * ? *)",
+    "State": "ENABLED",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "Targets": [
+     {
+      "Arn": "arn:aws:lambda:us-west-2:163629398585:function:edulens-student-insights-dev",
+      "Id": "StudentInsights"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/DailyInsightsRule/Resource"
+   }
+  },
+  "TimerSyncRuleB3B78E81": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Description": "Timer sync broadcasts every 1 minute",
+    "Name": "edulens-timer-sync-dev",
+    "ScheduleExpression": "rate(1 minute)",
+    "State": "ENABLED",
+    "Tags": [
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "EduLens"
+     },
+     {
+      "Key": "Stage",
+      "Value": "dev"
+     }
+    ],
+    "Targets": [
+     {
+      "Arn": "arn:aws:lambda:us-west-2:163629398585:function:edulens-timer-sync-dev",
+      "Id": "TimerSync"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/TimerSyncRule/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/z2LUQ7CIBBEz9J/utaNN/AAKh7AIF0TWgTtsm0M4e5GSPyZN/OSQcDDHobObNzbce69u0O+JmNnZTa+ZX4z5IuQkDo+Qis1z9E7+/nLNouilUJiyFp8ffxYitLEURZb1UnSS1JRIY4EE+9WRECEoZvYuX6RkNyTQDd+AZ08D5qgAAAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "EduLensJobsStack-dev/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "SummarizationQueueUrl": {
+   "Description": "Summarization queue URL",
+   "Value": {
+    "Ref": "SummarizationQueue0AF3CA17"
+   },
+   "Export": {
+    "Name": "edulens-summarization-queue-dev"
+   }
+  },
+  "SummarizationQueueArn": {
+   "Description": "Summarization queue ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "SummarizationQueue0AF3CA17",
+     "Arn"
+    ]
+   }
+  },
+  "InsightsQueueUrl": {
+   "Description": "Insights queue URL",
+   "Value": {
+    "Ref": "InsightsQueueA6C46F56"
+   },
+   "Export": {
+    "Name": "edulens-insights-queue-dev"
+   }
+  },
+  "InsightsQueueArn": {
+   "Description": "Insights queue ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "InsightsQueueA6C46F56",
+     "Arn"
+    ]
+   }
+  },
+  "EventBusName": {
+   "Description": "EventBridge event bus name",
+   "Value": "default"
+  },
+  "ExportsOutputFnGetAttSummarizationQueue0AF3CA17QueueName5FC8DA82": {
+   "Value": {
+    "Fn::GetAtt": [
+     "SummarizationQueue0AF3CA17",
+     "QueueName"
+    ]
+   },
+   "Export": {
+    "Name": "EduLensJobsStack-dev:ExportsOutputFnGetAttSummarizationQueue0AF3CA17QueueName5FC8DA82"
+   }
+  },
+  "ExportsOutputFnGetAttInsightsQueueA6C46F56QueueName74D3A2F1": {
+   "Value": {
+    "Fn::GetAtt": [
+     "InsightsQueueA6C46F56",
+     "QueueName"
+    ]
+   },
+   "Export": {
+    "Name": "EduLensJobsStack-dev:ExportsOutputFnGetAttInsightsQueueA6C46F56QueueName74D3A2F1"
+   }
+  },
+  "ExportsOutputFnGetAttSummarizationDLQEEC2E352QueueName70882B36": {
+   "Value": {
+    "Fn::GetAtt": [
+     "SummarizationDLQEEC2E352",
+     "QueueName"
+    ]
+   },
+   "Export": {
+    "Name": "EduLensJobsStack-dev:ExportsOutputFnGetAttSummarizationDLQEEC2E352QueueName70882B36"
+   }
+  },
+  "ExportsOutputFnGetAttInsightsDLQAE053DA2QueueName1019B5F6": {
+   "Value": {
+    "Fn::GetAtt": [
+     "InsightsDLQAE053DA2",
+     "QueueName"
+    ]
+   },
+   "Export": {
+    "Name": "EduLensJobsStack-dev:ExportsOutputFnGetAttInsightsDLQAE053DA2QueueName1019B5F6"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

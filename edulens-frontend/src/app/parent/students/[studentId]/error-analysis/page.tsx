@@ -7,7 +7,6 @@ import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
-  ArrowLeft, 
   Loader2, 
   RefreshCw, 
   AlertTriangle, 
@@ -43,16 +42,17 @@ export default function ErrorAnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState(30); // days
+  const [stageMode, setStageMode] = useState<'active' | 'all'>('active');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
-  }, [studentId, timeRange]);
+  }, [studentId, timeRange, stageMode]);
 
   const loadData = async () => {
     try {
       setError(null);
-      
+
       // Load student info
       if (user?.id) {
         const response = await apiClient.listStudents(user.id);
@@ -66,18 +66,13 @@ export default function ErrorAnalysisPage() {
         }
       }
 
+      const stageId = stageMode === 'active' ? 'active' : undefined;
+
       // Load error pattern analytics
-      const [analyticsResponse, trendsResponse] = await Promise.all([
-        fetch(`/api/profile/${studentId}/error-patterns/aggregate?days=${timeRange}`),
-        fetch(`/api/profile/${studentId}/error-patterns/trends?days=${Math.max(timeRange * 2, 90)}&period=weekly`)
+      const [analyticsData, trendsData] = await Promise.all([
+        apiClient.getErrorPatternsAggregate(studentId, timeRange, stageId),
+        apiClient.getErrorPatternsTrends(studentId, Math.max(timeRange * 2, 90), 'weekly', stageId)
       ]);
-
-      if (!analyticsResponse.ok || !trendsResponse.ok) {
-        throw new Error('Failed to load error analysis data');
-      }
-
-      const analyticsData = await analyticsResponse.json();
-      const trendsData = await trendsResponse.json();
 
       if (analyticsData.success) {
         setAnalytics(analyticsData.data);
@@ -150,35 +145,40 @@ export default function ErrorAnalysisPage() {
       }}
     >
       {/* Header */}
-      <div className="max-w-7xl mx-auto px-4 pt-6 pb-2">
+      <div className="max-w-7xl mx-auto px-4 pt-5 pb-1">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => router.push(`/parent/analytics/${studentId}`)}
-              className="hover:bg-gray-100"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Analytics
-            </Button>
-            
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-                {student.name.charAt(0)}
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  Error Pattern Analysis - {student.name}
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Grade {student.gradeLevel} • Comprehensive Error Dashboard
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+              {student.name.charAt(0)}
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-gray-900">
+                Error Pattern Analysis - {student.name}
+              </h1>
+              <p className="text-xs text-gray-500">
+                Grade {student.gradeLevel} • Comprehensive Error Dashboard
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Stage Scope Selector */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border p-1">
+              {(['active', 'all'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => { setStageMode(mode); setLoading(true); }}
+                  className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                    stageMode === mode
+                      ? 'bg-violet-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {mode === 'active' ? 'Current Stage' : 'All Stages'}
+                </button>
+              ))}
+            </div>
+
             {/* Time Range Selector */}
             <div className="flex items-center gap-2 bg-white rounded-lg border p-1">
               {[7, 30, 90].map((days) => (
@@ -206,6 +206,26 @@ export default function ErrorAnalysisPage() {
               Refresh
             </Button>
           </div>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="flex items-center gap-1 bg-white rounded-lg border p-1">
+          <button
+            onClick={() => router.push(`/parent/analytics/${studentId}`)}
+            className="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <TrendingUp className="h-4 w-4 inline mr-2" />
+            Performance Overview
+          </button>
+          <button
+            onClick={() => router.push(`/parent/students/${studentId}/error-analysis`)}
+            className="px-4 py-2 text-sm font-medium rounded-md bg-orange-600 text-white transition-colors"
+          >
+            <AlertTriangle className="h-4 w-4 inline mr-2" />
+            Error Analysis
+          </button>
         </div>
       </div>
 

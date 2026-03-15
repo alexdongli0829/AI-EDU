@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "07764e561daf25a6bf4196d62fabd4df31f06dd29387ee6b057ced0c6ee58ad8": {
+      "displayName": "EduLensMonitoringStack-dev Template",
+      "source": {
+        "path": "EduLensMonitoringStack-dev.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "163629398585-us-west-2-9bc960df": {
+          "bucketName": "cdk-hnb659fds-assets-163629398585-us-west-2",
+          "objectKey": "07764e561daf25a6bf4196d62fabd4df31f06dd29387ee6b057ced0c6ee58ad8.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::163629398585:role/cdk-hnb659fds-file-publishing-role-163629398585-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

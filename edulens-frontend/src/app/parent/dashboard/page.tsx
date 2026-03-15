@@ -15,6 +15,9 @@ import {
   GraduationCap,
   Loader2,
   ChevronRight,
+  AlertTriangle,
+  Route,
+  Trophy,
 } from 'lucide-react';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 
@@ -48,6 +51,7 @@ export default function ParentDashboard() {
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [analyticsMap, setAnalyticsMap] = useState<Record<string, StudentAnalytics>>({});
   const [analyticsLoading, setAnalyticsLoading] = useState<Record<string, boolean>>({});
+  const [activeStageMap, setActiveStageMap] = useState<Record<string, string>>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -90,6 +94,16 @@ export default function ParentDashboard() {
             .finally(() => {
               setAnalyticsLoading(prev => ({ ...prev, [s.id]: false }));
             });
+
+          // Load active stage for stage badge
+          apiClient.listStudentStages(s.id)
+            .then((res: any) => {
+              const active = (res.stages || []).find((st: any) => st.status === 'active');
+              if (active) {
+                setActiveStageMap(prev => ({ ...prev, [s.id]: active.display_name || active.stage_id }));
+              }
+            })
+            .catch(() => {});
         });
       }
     } catch {
@@ -165,6 +179,15 @@ export default function ParentDashboard() {
           <div className="flex gap-2">
             <Button
               size="sm"
+              variant="outline"
+              onClick={() => router.push('/parent/contests')}
+              className="border-amber-200 text-amber-700 hover:bg-amber-50"
+            >
+              <Trophy className="h-4 w-4 mr-2" />
+              Contests
+            </Button>
+            <Button
+              size="sm"
               onClick={() => router.push('/parent/chat')}
               className="bg-teal-600 hover:bg-teal-700"
             >
@@ -221,7 +244,14 @@ export default function ParentDashboard() {
                           {student.name.charAt(0)}
                         </div>
                         <div>
-                          <p className="font-bold text-gray-900">{student.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-gray-900">{student.name}</p>
+                            {activeStageMap[student.id] && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full leading-none">
+                                {activeStageMap[student.id]}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-400">
                             Grade {student.gradeLevel}
                             {student.dateOfBirth ? ` · Age ${calculateAge(student.dateOfBirth)}` : ''}
@@ -320,15 +350,37 @@ export default function ParentDashboard() {
                       </>
                     )}
 
-                    {/* Action button */}
-                    <Button
-                      size="sm"
-                      className="w-full bg-teal-600 hover:bg-teal-700"
-                      onClick={() => router.push(`/parent/analytics/${student.id}`)}
-                    >
-                      Full Analytics
-                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                    </Button>
+                    {/* Action buttons */}
+                    <div className="space-y-2">
+                      <Button
+                        size="sm"
+                        className="w-full bg-teal-600 hover:bg-teal-700"
+                        onClick={() => router.push(`/parent/analytics/${student.id}`)}
+                      >
+                        Performance Overview
+                        <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                          onClick={() => router.push(`/parent/students/${student.id}/error-analysis`)}
+                        >
+                          <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                          Errors
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-violet-200 text-violet-700 hover:bg-violet-50"
+                          onClick={() => router.push(`/parent/students/${student.id}/journey`)}
+                        >
+                          <Route className="h-3.5 w-3.5 mr-1" />
+                          Journey
+                        </Button>
+                      </div>
+                    </div>
 
                   </CardContent>
                 </Card>

@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "effc6bd2e2f4117c80d661cee5a5a7edc641a05671d9e08b354b6a72fbf5a557": {
+      "displayName": "EduLensAlbStack-dev Template",
+      "source": {
+        "path": "EduLensAlbStack-dev.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "163629398585-us-west-2-6156c89a": {
+          "bucketName": "cdk-hnb659fds-assets-163629398585-us-west-2",
+          "objectKey": "effc6bd2e2f4117c80d661cee5a5a7edc641a05671d9e08b354b6a72fbf5a557.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::163629398585:role/cdk-hnb659fds-file-publishing-role-163629398585-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

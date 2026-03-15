@@ -40,7 +40,7 @@ export interface EnvironmentConfig {
 
 // Development environment
 export const devConfig: EnvironmentConfig = {
-  account: process.env.CDK_DEFAULT_ACCOUNT || '123456789012', // Placeholder account ID for synthesis
+  account: process.env.CDK_DEFAULT_ACCOUNT || '163629398585',
   region: process.env.CDK_DEFAULT_REGION || 'us-west-2',
   stage: 'dev',
 
@@ -77,7 +77,7 @@ export const devConfig: EnvironmentConfig = {
 // Staging environment
 export const stagingConfig: EnvironmentConfig = {
   account: process.env.CDK_DEFAULT_ACCOUNT || '',
-  region: process.env.CDK_DEFAULT_REGION || 'us-east-1',
+  region: process.env.CDK_DEFAULT_REGION || 'us-west-2',
   stage: 'staging',
 
   vpcCidr: '10.1.0.0/16',
@@ -113,7 +113,7 @@ export const stagingConfig: EnvironmentConfig = {
 // Production environment
 export const prodConfig: EnvironmentConfig = {
   account: process.env.CDK_DEFAULT_ACCOUNT || '',
-  region: process.env.CDK_DEFAULT_REGION || 'us-east-1',
+  region: process.env.CDK_DEFAULT_REGION || 'us-west-2',
   stage: 'prod',
 
   vpcCidr: '10.2.0.0/16',

@@ -1,0 +1,23 @@
+{
+  "name": "@edulens/stage-registry",
+  "version": "1.0.0",
+  "description": "EduLens Stage Registry Service",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.470.0",
+    "@prisma/client": "^5.22.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.130",
+    "@types/node": "^20.10.6",
+    "@types/uuid": "^9.0.7",
+    "prisma": "^5.7.1",
+    "typescript": "^5.3.3"
+  }
+}
