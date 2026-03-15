@@ -39,6 +39,7 @@ export default function TestTakePage() {
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [startError, setStartError] = useState<string | null>(null);
 
   // Parse route param:
   //   "contest--{contestId}"  → contest mode
@@ -73,8 +74,16 @@ export default function TestTakePage() {
         : isStageSubject
           ? { stageId: parsedStageId, subject: parsedSubject }
           : { testId };
-      startTest(studentId, opts).catch(() => {
-        router.push('/student/contests');
+      startTest(studentId, opts).catch((err: any) => {
+        const msg: string = err?.response?.data?.error || 'No questions available for this test. Please try again later.';
+        setStartError(msg);
+        // Cache unavailability so the listing page can show "Coming Soon"
+        if (msg.toLowerCase().includes('no questions')) {
+          try {
+            const key = `unavailable:${testId}`;
+            localStorage.setItem(key, '1');
+          } catch {}
+        }
       });
     }
   }, [user?.id, student?.id, testId, currentSession, startTest, resetTest, router]);
@@ -141,6 +150,33 @@ export default function TestTakePage() {
     if (score >= 55) return { label: 'Developing', icon: BarChart3, color: 'text-blue-500' };
     return { label: 'Beginning', icon: Brain, color: 'text-purple-500' };
   };
+
+  // Error state — test could not be started
+  if (startError) {
+    const isComingSoon = startError.toLowerCase().includes('no questions');
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-96">
+          <CardContent className="p-8 text-center">
+            {isComingSoon ? (
+              <>
+                <div className="text-5xl mb-4">🚧</div>
+                <h3 className="text-lg font-semibold mb-2">Coming Soon</h3>
+                <p className="text-muted-foreground mb-6">Questions for this test are being prepared. Check back soon!</p>
+              </>
+            ) : (
+              <>
+                <div className="text-red-500 text-4xl mb-4">⚠</div>
+                <h3 className="text-lg font-semibold mb-2">Could Not Start Test</h3>
+                <p className="text-muted-foreground mb-6">{startError}</p>
+              </>
+            )}
+            <Button onClick={() => router.push('/student/test')}>Back to Tests</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Loading state
   if (loading && !currentSession) {

@@ -33,6 +33,27 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 
+// ─── Academic chart palette (Oxford Navy × Gold) ─────────────────────────────
+const NAVY      = '#1C3557';
+const NAVY_MID  = '#254773';
+const GOLD      = '#B8860B';
+const GOLD_BRIGHT = '#D4A017';
+const PARCHMENT_MID = '#EDE7D9';
+
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: NAVY,
+    border: `1px solid ${GOLD}`,
+    borderRadius: '4px',
+    fontSize: 11,
+    color: GOLD_BRIGHT,
+    fontFamily: "'Source Sans 3', sans-serif",
+    padding: '4px 10px',
+  },
+  itemStyle:  { color: GOLD_BRIGHT },
+  labelStyle: { color: '#e8edf4', fontWeight: 600 as const },
+};
+
 // ─── Insights types ───────────────────────────────────────────────────────────
 
 interface SubjectInsight {
@@ -231,14 +252,15 @@ function ParentStudentAnalyticsInner() {
     <div
       className="min-h-screen bg-gray-50"
       style={{
-        backgroundColor: '#FAFAF9',
+        backgroundColor: '#F6F2EB',
         fontFamily: "'Source Sans 3', 'Segoe UI', system-ui, -apple-system, sans-serif",
       }}
     >
       {/* Page title row */}
       <div className="max-w-6xl mx-auto px-4 pt-5 pb-1 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
+               style={{ backgroundColor: '#E8EDF4', color: NAVY, fontFamily: 'var(--font-heading)' }}>
             {student.name.charAt(0)}
           </div>
           <div>
@@ -289,48 +311,25 @@ function ParentStudentAnalyticsInner() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Performance Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Target className="h-8 w-8 mx-auto mb-2 text-teal-600" />
-              <div className="text-2xl font-bold text-gray-900">
-                {analytics?.totalTests || 0}
-              </div>
-              <p className="text-sm text-gray-500">{t.common.testsCompleted}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-600" />
-              <div className="text-2xl font-bold text-gray-900">
-                {analytics?.averageScore || 0}%
-              </div>
-              <p className="text-sm text-gray-500">{t.common.averageScore}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Clock className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-              <div className="text-2xl font-bold text-gray-900">
-                {analytics?.lastTestDate || t.common.noDataYet}
-              </div>
-              <p className="text-sm text-gray-500">{t.common.lastActivity}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Brain className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-              <div className="text-2xl font-bold text-gray-900">
-                {analytics
-                  ? [analytics.skillBreakdown.math, analytics.skillBreakdown.thinking, analytics.skillBreakdown.reading]
-                      .flat().filter(s => s.total > 0).length
-                  : 0}
-              </div>
-              <p className="text-sm text-gray-500">{t.common.skillsAssessed}</p>
-            </CardContent>
-          </Card>
+          {[
+            { icon: Target,    value: analytics?.totalTests || 0,        label: t.common.testsCompleted, accent: NAVY },
+            { icon: TrendingUp,value: `${analytics?.averageScore || 0}%`,label: t.common.averageScore,   accent: '#2A5C45' },
+            { icon: Clock,     value: analytics?.lastTestDate || t.common.noDataYet, label: t.common.lastActivity, accent: NAVY_MID },
+            { icon: Brain,     value: analytics
+                ? [analytics.skillBreakdown.math, analytics.skillBreakdown.thinking, analytics.skillBreakdown.reading]
+                    .flat().filter(s => s.total > 0).length
+                : 0,                                                     label: t.common.skillsAssessed, accent: '#7C3AED' },
+          ].map(({ icon: Icon, value, label, accent }) => (
+            <Card key={label} style={{ borderTop: `3px solid ${accent}` }}>
+              <CardContent className="p-4 text-center">
+                <Icon className="h-7 w-7 mx-auto mb-2" style={{ color: accent }} />
+                <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>
+                  {value}
+                </div>
+                <p className="text-sm" style={{ color: NAVY_MID, opacity: 0.7 }}>{label}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* ── AI Performance Insights ── */}
@@ -338,8 +337,8 @@ function ParentStudentAnalyticsInner() {
           {/* Section header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-teal-600" />
-              <h2 className="text-sm font-bold text-gray-800">{t.analytics.aiInsights}</h2>
+              <Sparkles className="h-4 w-4" style={{ color: GOLD }} />
+              <h2 className="text-sm font-bold" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>{t.analytics.aiInsights}</h2>
               {insights && (
                 <span className="text-[10px] text-gray-400">
                   · Updated {new Date(insights.generatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
@@ -402,7 +401,7 @@ function ParentStudentAnalyticsInner() {
             <div className="space-y-4">
               {/* Overall summary */}
               {insights.overallSummary && (
-                <div className="px-4 py-3 bg-teal-50 border border-teal-200 rounded-lg text-sm text-teal-800">
+                <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: '#F5EDD0', borderLeft: `4px solid ${GOLD}`, color: NAVY }}>
                   {insights.overallSummary}
                 </div>
               )}
@@ -527,8 +526,8 @@ function ParentStudentAnalyticsInner() {
           <Card className="mb-6">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>{t.analytics.detailedSkill}</CardTitle>
-                <span className="text-xs text-gray-400 font-normal">{t.analytics.last3Months}</span>
+                <CardTitle style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>{t.analytics.detailedSkill}</CardTitle>
+                <span className="text-xs font-normal" style={{ color: NAVY_MID, opacity: 0.6 }}>{t.analytics.last3Months}</span>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -538,8 +537,9 @@ function ParentStudentAnalyticsInner() {
                 const trendData = analytics.monthTrend[key] ?? [];
                 return (
                   <div key={key}>
-                    <div className={`flex items-center justify-between px-3 py-2 rounded-md mb-3 ${bg}`}>
-                      <span className="text-sm font-bold" style={{ color }}>{label}</span>
+                    <div className={`flex items-center justify-between px-3 py-2 rounded-md mb-3 ${bg}`}
+                         style={{ borderLeft: `3px solid ${color}` }}>
+                      <span className="text-sm font-bold" style={{ color, fontFamily: 'var(--font-heading)' }}>{label}</span>
                       {practiced.length === 0 && (
                         <span className="text-xs text-gray-400">{t.analytics.noTestsCompleted}</span>
                       )}
@@ -551,14 +551,11 @@ function ParentStudentAnalyticsInner() {
                         <div className="h-28">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                              <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} />
-                              <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                              <Tooltip
-                                contentStyle={{ fontSize: 11, padding: '3px 8px', borderRadius: 4 }}
-                                formatter={(v: number) => [`${v}%`, 'Score']}
-                              />
-                              <ReferenceLine y={70} stroke="#d1d5db" strokeDasharray="4 2" label={{ value: '70%', fontSize: 9, fill: '#9ca3af', position: 'right' }} />
+                              <CartesianGrid strokeDasharray="3 3" stroke={PARCHMENT_MID} />
+                              <XAxis dataKey="date" tick={{ fontSize: 10, fill: NAVY_MID }} tickLine={false} />
+                              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: NAVY_MID }} tickLine={false} axisLine={false} />
+                              <Tooltip {...TOOLTIP_STYLE} formatter={(v: number) => [`${v}%`, 'Score']} />
+                              <ReferenceLine y={70} stroke={GOLD} strokeDasharray="4 2" label={{ value: '70%', fontSize: 9, fill: GOLD, position: 'right' }} />
                               <Line
                                 type="monotone"
                                 dataKey="score"
@@ -586,24 +583,21 @@ function ParentStudentAnalyticsInner() {
                         <div className="h-56">
                           <ResponsiveContainer width="100%" height="100%">
                             <RadarChart data={skills.map(s => ({ skill: s.skill, value: s.total > 0 ? s.percentage : 0 }))}>
-                              <PolarGrid stroke="#e5e7eb" />
+                              <PolarGrid stroke={PARCHMENT_MID} />
                               <PolarAngleAxis
                                 dataKey="skill"
-                                tick={{ fontSize: 10, fill: '#6b7280' }}
+                                tick={{ fontSize: 10, fill: NAVY }}
                               />
                               <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                               <Radar
                                 dataKey="value"
                                 stroke={color}
                                 fill={color}
-                                fillOpacity={0.15}
+                                fillOpacity={0.2}
                                 strokeWidth={2}
                                 isAnimationActive={false}
                               />
-                              <Tooltip
-                                contentStyle={{ fontSize: 11, padding: '3px 8px', borderRadius: 4 }}
-                                formatter={(v: number) => [`${v}%`, 'Score']}
-                              />
+                              <Tooltip {...TOOLTIP_STYLE} formatter={(v: number) => [`${v}%`, 'Score']} />
                             </RadarChart>
                           </ResponsiveContainer>
                         </div>
@@ -620,14 +614,18 @@ function ParentStudentAnalyticsInner() {
                         const trendLabel  = trendUp ? t.analytics.improving : trendDown ? t.analytics.declining : t.analytics.stable;
                         const lineColor   = trendUp ? '#16a34a'         : trendDown ? '#ef4444'       : '#9ca3af';
                         return (
-                          <div key={i} className={`p-3 border rounded-lg ${trendBorder} ${skill.total === 0 ? 'opacity-50' : ''}`}>
+                          <div key={i} className={`p-3 rounded-lg ${skill.total === 0 ? 'opacity-50' : ''}`}
+                               style={{ border: `1px solid ${PARCHMENT_MID}`, backgroundColor: '#FDFBF7' }}>
                             {/* Trend badge — primary indicator */}
                             <div className="flex items-center justify-between mb-2">
                               <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${trendBg}`}>
                                 <TrendIcon className={`h-3.5 w-3.5 ${trendColor}`} />
                                 <span className={`text-xs font-semibold ${trendColor}`}>{trendLabel}</span>
                               </div>
-                              <span className={`text-sm font-bold ${skill.total === 0 ? 'text-gray-300' : skill.percentage >= 70 ? 'text-green-600' : skill.percentage >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+                              <span className="text-sm font-bold" style={{
+                                fontFamily: 'var(--font-heading)',
+                                color: skill.total === 0 ? '#d1d5db' : skill.percentage >= 70 ? '#2A5C45' : skill.percentage >= 50 ? '#B8860B' : '#8B1A1A',
+                              }}>
                                 {skill.total > 0 ? `${skill.percentage}%` : '—'}
                               </span>
                             </div>
@@ -638,11 +636,7 @@ function ParentStudentAnalyticsInner() {
                               <div className="h-10 mb-1.5">
                                 <ResponsiveContainer width="100%" height="100%">
                                   <LineChart data={skill.history} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-                                    <Tooltip
-                                      contentStyle={{ fontSize: 11, padding: '2px 6px', borderRadius: 4 }}
-                                      formatter={(v: number) => [`${v}%`, 'Score']}
-                                      labelFormatter={(l: string) => l}
-                                    />
+                                    <Tooltip {...TOOLTIP_STYLE} formatter={(v: number) => [`${v}%`, 'Score']} labelFormatter={(l: string) => l} />
                                     <Line
                                       type="monotone"
                                       dataKey="percentage"
@@ -659,13 +653,14 @@ function ParentStudentAnalyticsInner() {
                               <div className="text-xs text-gray-400 mb-1.5">1 session recorded</div>
                             ) : null}
                             {/* Progress bar — current score */}
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: PARCHMENT_MID }}>
                               {skill.total > 0 && (
                                 <div
-                                  className={`h-full rounded-full ${
-                                    skill.percentage >= 70 ? 'bg-green-500' : skill.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500'
-                                  }`}
-                                  style={{ width: `${skill.percentage}%` }}
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${skill.percentage}%`,
+                                    backgroundColor: skill.percentage >= 70 ? '#2A5C45' : skill.percentage >= 50 ? GOLD : '#8B1A1A',
+                                  }}
                                 />
                               )}
                             </div>
@@ -684,7 +679,7 @@ function ParentStudentAnalyticsInner() {
         {analytics && (analytics.errorAnalysis.math.total > 0 || analytics.errorAnalysis.thinking.total > 0 || analytics.errorAnalysis.reading.total > 0 || (analytics.errorAnalysis.writing?.total ?? 0) > 0) && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>{t.analytics.errorAnalysis}</CardTitle>
+              <CardTitle style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>{t.analytics.errorAnalysis}</CardTitle>
               <p className="text-xs text-gray-400 mt-0.5">
                 {t.analytics.errorAnalysisDesc}
               </p>
@@ -695,10 +690,10 @@ function ParentStudentAnalyticsInner() {
                   const err = analytics.errorAnalysis[key] ?? { total: 0, careless: 0, timePressure: 0, conceptGap: 0, other: 0 };
                   if (err.total === 0) return (
                     <div key={key}>
-                      <div className={`px-3 py-1.5 rounded-md mb-3 ${bg}`}>
-                        <span className="text-xs font-bold" style={{ color }}>{label}</span>
+                      <div className={`px-3 py-1.5 rounded-md mb-3 ${bg}`} style={{ borderLeft: `3px solid ${color}` }}>
+                        <span className="text-xs font-bold" style={{ color, fontFamily: 'var(--font-heading)' }}>{label}</span>
                       </div>
-                      <p className="text-xs text-gray-400 px-1">{t.analytics.noErrorsYet}</p>
+                      <p className="text-xs px-1" style={{ color: NAVY_MID, opacity: 0.6 }}>{t.analytics.noErrorsYet}</p>
                     </div>
                   );
                   const items = [
@@ -709,9 +704,9 @@ function ParentStudentAnalyticsInner() {
                   ];
                   return (
                     <div key={key}>
-                      <div className={`px-3 py-1.5 rounded-md mb-3 ${bg}`}>
-                        <span className="text-xs font-bold" style={{ color }}>{label}</span>
-                        <span className="text-xs text-gray-400 ml-2">{err.total} wrong answer{err.total !== 1 ? 's' : ''}</span>
+                      <div className={`px-3 py-1.5 rounded-md mb-3 ${bg}`} style={{ borderLeft: `3px solid ${color}` }}>
+                        <span className="text-xs font-bold" style={{ color, fontFamily: 'var(--font-heading)' }}>{label}</span>
+                        <span className="text-xs ml-2" style={{ color: NAVY_MID, opacity: 0.6 }}>{err.total} wrong answer{err.total !== 1 ? 's' : ''}</span>
                       </div>
                       <div className="space-y-2">
                         {items.filter(it => it.count > 0).map(it => {
@@ -745,7 +740,7 @@ function ParentStudentAnalyticsInner() {
         {analytics && analytics.recentResults.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>{t.analytics.recentTests}</CardTitle>
+              <CardTitle style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>{t.analytics.recentTests}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className={`grid grid-cols-1 gap-6 ${backendSubjects.length === 4 ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'}`}>
@@ -753,8 +748,8 @@ function ParentStudentAnalyticsInner() {
                   const tests = analytics.recentResults.filter(t => t.subject === subjectKey);
                   return (
                     <div key={subjectKey}>
-                      <div className={`px-3 py-1.5 rounded-md mb-2 ${bg}`}>
-                        <span className="text-xs font-bold" style={{ color }}>{label}</span>
+                      <div className={`px-3 py-1.5 rounded-md mb-2 ${bg}`} style={{ borderLeft: `3px solid ${color}` }}>
+                        <span className="text-xs font-bold" style={{ color, fontFamily: 'var(--font-heading)' }}>{label}</span>
                       </div>
                       {tests.length === 0 ? (
                         <p className="text-xs text-gray-400 px-1">No tests yet</p>
@@ -768,10 +763,10 @@ function ParentStudentAnalyticsInner() {
                             >
                               <span className="text-xs text-gray-400 w-14 flex-shrink-0">{test.date}</span>
                               <span className="text-xs font-semibold text-gray-700 flex-1 truncate">{test.title}</span>
-                              <span className={`text-sm font-extrabold flex-shrink-0 ${
-                                test.status === 'good' ? 'text-green-600' :
-                                test.status === 'ok'   ? 'text-amber-600' : 'text-red-600'
-                              }`}>{test.score}%</span>
+                              <span className="text-sm font-extrabold flex-shrink-0" style={{
+                                fontFamily: 'var(--font-heading)',
+                                color: test.status === 'good' ? '#2A5C45' : test.status === 'ok' ? GOLD : '#8B1A1A',
+                              }}>{test.score}%</span>
                               <ChevronRight className="h-3 w-3 text-gray-300 flex-shrink-0" />
                             </button>
                           ))}

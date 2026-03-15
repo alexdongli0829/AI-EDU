@@ -148,13 +148,23 @@ async function handleSingleStudent(studentId: string, forceRefresh: boolean): Pr
     }
   }
 
-  // Fetch all completed sessions (stage-based sessions have no test_id, skip them for insights)
+  // Fetch all completed sessions — include both test-based (test_id set) and stage-based (test_id NULL)
+  // For stage-based sessions, infer subject from the first response's question
   const sessions = await query(
-    `SELECT ts.id, ts.completed_at, t.subject, t.title,
+    `SELECT ts.id, ts.completed_at,
+            COALESCE(t.subject, sq.subject) AS subject,
+            COALESCE(t.title, ts.stage_id || ' Practice') AS title,
             ts.scaled_score, ts.correct_count, ts.total_items
      FROM test_sessions ts
-     JOIN tests t ON ts.test_id = t.id
-     WHERE ts.student_id = $1::uuid AND ts.status = 'completed' AND ts.test_id IS NOT NULL
+     LEFT JOIN tests t ON ts.test_id = t.id
+     LEFT JOIN LATERAL (
+       SELECT q.subject
+       FROM session_responses sr
+       JOIN questions q ON sr.question_id = q.id
+       WHERE sr.session_id = ts.id
+       LIMIT 1
+     ) sq ON true
+     WHERE ts.student_id = $1::uuid AND ts.status = 'completed'
      ORDER BY ts.completed_at ASC`,
     studentId
   ) as any[];

@@ -63,8 +63,19 @@ export class PythonLambda extends Construct {
       functionName,
       runtime: lambda.Runtime.PYTHON_3_12,
       handler,
+      // Bundle dependencies at CDK deploy time using the Lambda Python 3.12 runtime image.
+      // This installs pip packages for linux/x86_64 and copies the src/ directory.
       code: lambda.Code.fromAsset(codePath, {
-        exclude: ['venv', '.venv', '__pycache__', '*.pyc', '.pytest_cache', 'tests', '*.md', 'requirements-dev.txt', '.git', '.env'],
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_12.bundlingImage,
+          command: [
+            'bash', '-c',
+            [
+              `pip install -r /asset-input/${requirementsFile} -t /asset-output --quiet --no-cache-dir`,
+              'cp -au /asset-input/src /asset-output/',
+            ].join(' && '),
+          ],
+        },
       }),
       description,
 

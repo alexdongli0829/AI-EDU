@@ -27,8 +27,13 @@ export default function RegisterPage() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      alert('Password must be at least 6 characters');
+    if (formData.password.length < 8) {
+      alert('Password must be at least 8 characters');
+      return;
+    }
+
+    if (!/[a-zA-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)) {
+      alert('Password must contain at least one letter and one number');
       return;
     }
 
@@ -121,7 +126,7 @@ export default function RegisterPage() {
                   name="password"
                   type="password"
                   required
-                  placeholder="Create a password (min 6 characters)"
+                  placeholder="Min 8 characters, include a letter and number"
                   value={formData.password}
                   onChange={handleInputChange}
                 />

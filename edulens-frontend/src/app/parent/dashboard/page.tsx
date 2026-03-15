@@ -12,7 +12,22 @@ import {
   Plus, MessageCircle, Trash2, GraduationCap, Loader2,
   ChevronRight, CheckCircle2, Lock, Clock, BarChart2, X, ChevronDown,
 } from 'lucide-react';
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
+
+// ─── Academic chart palette ───────────────────────────────────────────────────
+const NAVY       = '#1C3557';
+const NAVY_MID   = '#254773';
+const GOLD       = '#B8860B';
+const GOLD_BRIGHT = '#D4A017';
+const PARCHMENT_MID = '#EDE7D9';
+const RADAR_TOOLTIP = {
+  contentStyle: {
+    backgroundColor: NAVY, border: `1px solid ${GOLD}`, borderRadius: '4px',
+    fontSize: 12, color: GOLD_BRIGHT, fontFamily: "'Source Sans 3', sans-serif", padding: '4px 10px',
+  },
+  itemStyle:  { color: GOLD_BRIGHT },
+  labelStyle: { color: '#e8edf4', fontWeight: 600 as const },
+};
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -97,13 +112,13 @@ function SparkLine({ pts, color }: { pts: { score: number }[]; color: string }) 
   const latest = pts[pts.length - 1].score;
   const sc = latest >= 75 ? '#16a34a' : latest >= 55 ? '#d97706' : '#ef4444';
   return (
-    <div className="flex items-center gap-1.5">
-      <svg viewBox={`0 0 ${xE + 4} 18`} className="w-14 h-3.5 flex-shrink-0">
-        <line x1="0" y1={yOf(70)} x2={xE + 4} y2={yOf(70)} stroke="#F3F4F6" strokeWidth="1" />
+    <div className="flex items-center gap-2">
+      <svg viewBox={`0 0 ${xE + 4} 18`} className="w-20 h-5 flex-shrink-0">
+        <line x1="0" y1={yOf(70)} x2={xE + 4} y2={yOf(70)} stroke={PARCHMENT_MID} strokeWidth="1" />
         {n > 1 && <polyline points={poly} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}
         {pts.map((p, i) => <circle key={i} cx={xOf(i)} cy={yOf(p.score)} r="1.5" fill={color} />)}
       </svg>
-      <span className="text-[10px] font-bold tabular-nums" style={{ color: sc }}>{latest}%</span>
+      <span className="text-xs font-bold tabular-nums" style={{ color: sc }}>{latest}%</span>
     </div>
   );
 }
@@ -143,49 +158,49 @@ function JourneyRoadmap({ studentId, stages, stageAnalytics, onViewAnalytics }: 
         // ── Active stage: prominent highlighted card ──────────────────────────
         if (isActive) {
           return (
-            <div key={stage.id} className="relative rounded-xl border-2 p-3" style={{ borderColor: stage.color, backgroundColor: stage.light }}>
+            <div key={stage.id} className="relative rounded-xl border-2 p-4" style={{ borderColor: stage.color, backgroundColor: stage.light }}>
               {/* Accent bar */}
-              <div className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full" style={{ backgroundColor: stage.color }} />
-              <div className="pl-3">
+              <div className="absolute left-0 top-4 bottom-4 w-1 rounded-r-full" style={{ backgroundColor: stage.color }} />
+              <div className="pl-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" style={{ color: stage.color }} />
-                    <span className="text-xs font-bold" style={{ color: stage.color }}>{stage.label}</span>
-                    <span className="text-[9px] text-white font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: stage.color }}>Active</span>
-                    <span className="text-[9px] text-gray-400 bg-white/70 px-1.5 py-0.5 rounded">{stage.sublabel}</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Clock className="h-4 w-4" style={{ color: stage.color }} />
+                    <span className="text-sm font-bold" style={{ color: stage.color, fontFamily: 'var(--font-heading)' }}>{stage.label}</span>
+                    <span className="text-[10px] text-white font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: stage.color }}>Active</span>
+                    <span className="text-[10px] text-gray-500 bg-white/70 px-2 py-0.5 rounded">{stage.sublabel}</span>
                   </div>
                 </div>
 
                 {/* Target exam */}
-                <p className="text-[9px] mb-2" style={{ color: stage.color, opacity: 0.7 }}>{stage.targetExam}</p>
+                <p className="text-xs mb-2" style={{ color: stage.color, opacity: 0.75 }}>{stage.targetExam}</p>
 
                 {/* Mastery bar */}
                 {mastery != null && (
-                  <div className="mb-2">
-                    <div className="flex justify-between text-[9px] mb-0.5">
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
                       <span className="text-gray-500">Stage Mastery</span>
                       <span className="font-bold" style={{ color: stage.color }}>{Math.round(mastery * 100)}%</span>
                     </div>
-                    <div className="w-full bg-white/60 rounded-full h-1.5">
-                      <div className="h-1.5 rounded-full transition-all" style={{ width: `${Math.round(mastery * 100)}%`, backgroundColor: stage.color }} />
+                    <div className="w-full bg-white/60 rounded-full h-2">
+                      <div className="h-2 rounded-full transition-all" style={{ width: `${Math.round(mastery * 100)}%`, backgroundColor: stage.color }} />
                     </div>
                   </div>
                 )}
 
                 {/* Strengths / weaknesses */}
                 {(strengths.length > 0 || weaknesses.length > 0) && (
-                  <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
+                  <div className="grid grid-cols-2 gap-3 text-xs mb-3">
                     {strengths.length > 0 && (
                       <div>
-                        <p className="text-emerald-600 font-semibold mb-0.5">Strengths</p>
-                        <ul className="text-gray-500 space-y-px">{strengths.slice(0, 3).map((s: string) => <li key={s}>· {s}</li>)}</ul>
+                        <p className="text-emerald-700 font-semibold mb-1">Strengths</p>
+                        <ul className="text-gray-600 space-y-0.5">{strengths.slice(0, 3).map((s: string) => <li key={s}>· {s}</li>)}</ul>
                       </div>
                     )}
                     {weaknesses.length > 0 && (
                       <div>
-                        <p className="text-orange-500 font-semibold mb-0.5">Focus Areas</p>
-                        <ul className="text-gray-500 space-y-px">{weaknesses.slice(0, 3).map((w: string) => <li key={w}>· {w}</li>)}</ul>
+                        <p className="text-orange-600 font-semibold mb-1">Focus Areas</p>
+                        <ul className="text-gray-600 space-y-0.5">{weaknesses.slice(0, 3).map((w: string) => <li key={w}>· {w}</li>)}</ul>
                       </div>
                     )}
                   </div>
@@ -193,13 +208,13 @@ function JourneyRoadmap({ studentId, stages, stageAnalytics, onViewAnalytics }: 
 
                 {/* Sparklines */}
                 {stageA && stageA.totalTests > 0 && (
-                  <div className="space-y-0.5 mb-2">
+                  <div className="space-y-1 mb-3">
                     {stage.subjects.map(({ key, label, color }) => {
                       const pts = (stageA.scoreTrend as any)[key] ?? [];
                       if (!pts.length) return null;
                       return (
                         <div key={key} className="flex items-center justify-between">
-                          <span className="text-[9px] font-semibold w-20 flex-shrink-0" style={{ color }}>{label}</span>
+                          <span className="text-xs font-semibold w-28 flex-shrink-0" style={{ color }}>{label}</span>
                           <SparkLine pts={pts} color={color} />
                         </div>
                       );
@@ -208,12 +223,12 @@ function JourneyRoadmap({ studentId, stages, stageAnalytics, onViewAnalytics }: 
                 )}
 
                 {(!stageA || stageA.totalTests === 0) && mastery == null && (
-                  <p className="text-[9px] text-gray-400 mb-2">No tests yet — complete a practice session to build this profile</p>
+                  <p className="text-xs text-gray-400 mb-3">No tests yet — complete a practice session to build this profile</p>
                 )}
 
                 {/* Analytics link */}
-                <button onClick={() => onViewAnalytics(stage.id)} className="flex items-center gap-1 text-[9px] font-semibold hover:underline" style={{ color: stage.color }}>
-                  <BarChart2 className="h-2.5 w-2.5" />View Analytics →
+                <button onClick={() => onViewAnalytics(stage.id)} className="flex items-center gap-1.5 text-xs font-semibold hover:underline" style={{ color: stage.color }}>
+                  <BarChart2 className="h-3.5 w-3.5" />View Analytics →
                 </button>
               </div>
             </div>
@@ -240,11 +255,11 @@ function JourneyRoadmap({ studentId, stages, stageAnalytics, onViewAnalytics }: 
                 className="w-full flex items-center justify-between group"
                 onClick={() => setExpanded(prev => ({ ...prev, [stage.id]: !prev[stage.id] }))}
               >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-semibold" style={{ color: isLocked ? '#9CA3AF' : stage.color }}>{stage.label}</span>
-                  <span className="text-[9px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded">{stage.sublabel}</span>
-                  {isCompleted && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Done</span>}
-                  {enrolled && !isCompleted && <span className="text-[8px] text-gray-400">Paused</span>}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold" style={{ color: isLocked ? '#9CA3AF' : stage.color }}>{stage.label}</span>
+                  <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{stage.sublabel}</span>
+                  {isCompleted && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Done</span>}
+                  {enrolled && !isCompleted && <span className="text-xs text-gray-400">Paused</span>}
                 </div>
                 <ChevronDown className={`h-3 w-3 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
               </button>
@@ -252,21 +267,21 @@ function JourneyRoadmap({ studentId, stages, stageAnalytics, onViewAnalytics }: 
               {/* Expanded details */}
               {isExpanded && (
                 <div className="mt-1.5 space-y-1.5">
-                  <p className="text-[9px] text-gray-400">{stage.targetExam}</p>
+                  <p className="text-xs text-gray-400">{stage.targetExam}</p>
 
-                  {isLocked && <p className="text-[9px] text-gray-400 leading-relaxed">{stage.description}</p>}
+                  {isLocked && <p className="text-xs text-gray-400 leading-relaxed">{stage.description}</p>}
 
                   {enrolled && (
                     <>
                       {enrolled.activated_at && (
-                        <p className="text-[9px] text-gray-400">
+                        <p className="text-xs text-gray-400">
                           Started {new Date(enrolled.activated_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })}
                           {enrolled.completed_at && ` · Completed ${new Date(enrolled.completed_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })}`}
                         </p>
                       )}
                       {mastery != null && (
                         <div>
-                          <div className="flex justify-between text-[9px] mb-0.5">
+                          <div className="flex justify-between text-xs mb-0.5">
                             <span className="text-gray-400">Stage Mastery</span>
                             <span className="font-bold" style={{ color: stage.color }}>{Math.round(mastery * 100)}%</span>
                           </div>
@@ -276,23 +291,23 @@ function JourneyRoadmap({ studentId, stages, stageAnalytics, onViewAnalytics }: 
                         </div>
                       )}
                       {(strengths.length > 0 || weaknesses.length > 0) && (
-                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
                           {strengths.length > 0 && (
                             <div>
-                              <p className="text-emerald-600 font-semibold mb-0.5">Strengths</p>
-                              <ul className="text-gray-500 space-y-px">{strengths.slice(0, 3).map((s: string) => <li key={s}>· {s}</li>)}</ul>
+                              <p className="text-emerald-700 font-semibold mb-0.5">Strengths</p>
+                              <ul className="text-gray-600 space-y-px">{strengths.slice(0, 3).map((s: string) => <li key={s}>· {s}</li>)}</ul>
                             </div>
                           )}
                           {weaknesses.length > 0 && (
                             <div>
-                              <p className="text-orange-500 font-semibold mb-0.5">Focus Areas</p>
-                              <ul className="text-gray-500 space-y-px">{weaknesses.slice(0, 3).map((w: string) => <li key={w}>· {w}</li>)}</ul>
+                              <p className="text-orange-600 font-semibold mb-0.5">Focus Areas</p>
+                              <ul className="text-gray-600 space-y-px">{weaknesses.slice(0, 3).map((w: string) => <li key={w}>· {w}</li>)}</ul>
                             </div>
                           )}
                         </div>
                       )}
-                      <button onClick={() => onViewAnalytics(stage.id)} className="flex items-center gap-1 text-[9px] font-semibold hover:underline" style={{ color: stage.color }}>
-                        <BarChart2 className="h-2.5 w-2.5" />View Analytics →
+                      <button onClick={() => onViewAnalytics(stage.id)} className="flex items-center gap-1.5 text-xs font-semibold hover:underline" style={{ color: stage.color }}>
+                        <BarChart2 className="h-3.5 w-3.5" />View Analytics →
                       </button>
                     </>
                   )}
@@ -558,7 +573,7 @@ export default function ParentDashboard() {
                               <button
                                 disabled={isActive || isActivating}
                                 onClick={() => handleActivateStage(student.id, stage.id)}
-                                className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 border transition-all hover:shadow-sm disabled:cursor-default"
+                                className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 border transition-all hover:shadow-sm disabled:cursor-default"
                                 style={{
                                   borderRadius: isActive ? '999px 0 0 999px' : '999px',
                                   borderRight: isActive ? 'none' : undefined,
@@ -604,16 +619,17 @@ export default function ParentDashboard() {
                       ];
                       return (
                         <div className="mb-4">
-                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: radarColor }}>
+                          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: radarColor, fontFamily: 'var(--font-heading)' }}>
                             {radarLabel}
                           </p>
-                          <div className="h-36">
+                          <div className="h-56">
                             <ResponsiveContainer width="100%" height="100%">
                               <RadarChart data={subjects.map(({ key, label }) => ({ subject: label, value: (radarData.learningDNA as any)[key] ?? 0 }))}>
-                                <PolarGrid stroke="#e5e7eb" />
-                                <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: '#6b7280' }} />
+                                <PolarGrid stroke={PARCHMENT_MID} />
+                                <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12, fill: NAVY }} />
                                 <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-                                <Radar dataKey="value" stroke={radarColor} fill={radarColor} fillOpacity={0.15} strokeWidth={2} isAnimationActive={false} />
+                                <Radar dataKey="value" stroke={radarColor} fill={radarColor} fillOpacity={0.2} strokeWidth={2} isAnimationActive={false} />
+                                <Tooltip {...RADAR_TOOLTIP} formatter={(v: number) => [`${v}%`, 'Score']} />
                               </RadarChart>
                             </ResponsiveContainer>
                           </div>
@@ -623,7 +639,7 @@ export default function ParentDashboard() {
 
                     {/* ── Inline Journey Roadmap ── */}
                     <div className="mb-4">
-                      <p className="text-[9px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--gold)', fontFamily: 'var(--font-body)' }}>Learning Journey</p>
+                      <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--gold)', fontFamily: 'var(--font-heading)' }}>Learning Journey</p>
                       {isLoading ? (
                         <div className="flex items-center gap-2 py-3 text-gray-400">
                           <Loader2 className="h-4 w-4 animate-spin" />

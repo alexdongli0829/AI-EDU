@@ -408,15 +408,14 @@ ALTER TABLE test_sessions
 -- SEED DATA
 -- ============================================================
 
--- OC Prep: the only active stage at v3 launch
+-- Stage definitions
 INSERT INTO stages (id, display_name, test_formats, sort_order, is_active)
-VALUES (
-    'oc_prep',
-    'OC Preparation',
-    '{"questionCount": 35, "durationSecs": 1800, "sections": ["reading", "mathematical_reasoning", "thinking_skills", "writing"]}',
-    1,
-    true
-) ON CONFLICT (id) DO NOTHING;
+VALUES
+    ('oc_prep',   'OC Preparation',       '{"practice":{"question_count":35,"time_limit_seconds":1800}}', 1, true),
+    ('selective', 'Selective High School', '{"practice":{"question_count":35,"time_limit_seconds":2400}}', 2, true),
+    ('hsc',       'HSC Preparation',       '{"practice":{"question_count":35,"time_limit_seconds":2700}}', 3, true),
+    ('lifelong',  'University & Beyond',   '{"practice":{"question_count":35,"time_limit_seconds":2700}}', 4, true)
+ON CONFLICT (id) DO NOTHING;
 
 -- OC skill taxonomy v1
 INSERT INTO skill_taxonomies (stage_id, version, categories)
@@ -476,3 +475,12 @@ VALUES (
     'admin',
     '$2a$10$placeholder'
 ) ON CONFLICT (email) DO NOTHING;
+
+-- Remove any model ID overrides from system_config so they always fall back to
+-- the BEDROCK_MODEL_ID Lambda environment variable, which CDK sets per-region:
+--   ap-* → anthropic.claude-3-5-sonnet-20241022-v2:0
+--   eu-* → eu.anthropic.claude-sonnet-4-20250514-v1:0
+--   us-* → us.anthropic.claude-sonnet-4-20250514-v1:0
+-- This prevents stale values surviving a cross-region migration.
+DELETE FROM system_config
+WHERE key IN ('aiInsightsModelId', 'aiParentChatModelId', 'aiStudentChatModelId', 'aiSummarizationModelId');

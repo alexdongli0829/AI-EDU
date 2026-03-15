@@ -35,6 +35,7 @@ export interface ApiRouteFunctions {
   endTestSessionFunction: lambda.Function;
   getResultsFunction: lambda.Function;
   getStudentSessionsFunction: lambda.Function;
+  getStudentAnalyticsFunction: lambda.Function;
   studentInsightsFunction: lambda.Function;
   // Conversation Engine
   parentChatCreateFunction: lambda.Function;
@@ -285,6 +286,14 @@ export class ApiGatewayStack extends cdk.Stack {
     sessionsResource.addResource('student')
       .addResource('{studentId}')
       .addMethod('GET', new apigateway.LambdaIntegration(fns.getStudentSessionsFunction));
+
+    // ----------------------------------------------------------
+    // Analytics  /analytics/student/{studentId}
+    // ----------------------------------------------------------
+    const analyticsRootResource = api.root.addResource('analytics');
+    analyticsRootResource.addResource('student')
+      .addResource('{studentId}')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.getStudentAnalyticsFunction));
 
     // ----------------------------------------------------------
     // Students  /students/{studentId}/...

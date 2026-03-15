@@ -25,6 +25,26 @@ import {
   Cell
 } from 'recharts';
 
+const NAVY = '#1C3557';
+const NAVY_MID = '#254773';
+const GOLD = '#B8860B';
+const GOLD_BRIGHT = '#D4A017';
+const PARCHMENT_MID = '#EDE7D9';
+
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: NAVY,
+    border: `1px solid ${GOLD}`,
+    borderRadius: '4px',
+    fontSize: 11,
+    color: GOLD_BRIGHT,
+    fontFamily: "'Source Sans 3', sans-serif",
+    padding: '4px 10px',
+  },
+  itemStyle: { color: GOLD_BRIGHT },
+  labelStyle: { color: '#e8edf4', fontWeight: 600 as const },
+};
+
 interface SkillErrorCorrelationProps {
   skillErrorMapping: SkillErrorMapping;
   errorPatterns: ErrorPattern[];
@@ -81,11 +101,11 @@ export function SkillErrorCorrelation({ skillErrorMapping, errorPatterns }: Skil
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Network className="h-5 w-5 text-purple-600" />
+        <CardTitle className="flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>
+          <Network className="h-5 w-5" style={{ color: GOLD }} />
           Skill-Error Correlation
         </CardTitle>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm" style={{ color: NAVY_MID, opacity: 0.65 }}>
           Which skills have the most errors and what types
         </p>
       </CardHeader>
@@ -102,7 +122,7 @@ export function SkillErrorCorrelation({ skillErrorMapping, errorPatterns }: Skil
           <div className="space-y-6">
             {/* Scatter Plot: Total Errors vs Error Diversity */}
             <div>
-              <h4 className="font-semibold mb-4 text-sm text-gray-700">
+              <h4 className="font-semibold mb-4 text-sm" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>
                 Error Frequency vs Diversity by Skill
               </h4>
               <div className="h-64">
@@ -111,24 +131,24 @@ export function SkillErrorCorrelation({ skillErrorMapping, errorPatterns }: Skil
                     margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
                     data={scatterData}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      type="number" 
-                      dataKey="x" 
+                    <CartesianGrid strokeDasharray="3 3" stroke={PARCHMENT_MID} />
+                    <XAxis
+                      type="number"
+                      dataKey="x"
                       name="Total Errors"
-                      tick={{ fontSize: 11 }}
-                      label={{ value: 'Total Errors', position: 'insideBottom', offset: -10, style: { fontSize: '11px' } }}
+                      tick={{ fontSize: 11, fill: NAVY_MID }}
+                      label={{ value: 'Total Errors', position: 'insideBottom', offset: -10, style: { fontSize: '11px', fill: NAVY_MID } }}
                     />
-                    <YAxis 
-                      type="number" 
-                      dataKey="y" 
+                    <YAxis
+                      type="number"
+                      dataKey="y"
                       name="Error Types"
-                      tick={{ fontSize: 11 }}
-                      label={{ value: 'Error Types', angle: -90, position: 'insideLeft', style: { fontSize: '11px' } }}
+                      tick={{ fontSize: 11, fill: NAVY_MID }}
+                      label={{ value: 'Error Types', angle: -90, position: 'insideLeft', style: { fontSize: '11px', fill: NAVY_MID } }}
                     />
-                    <Tooltip 
-                      cursor={{ strokeDasharray: '3 3' }}
-                      contentStyle={{ fontSize: '12px', borderRadius: '8px' }}
+                    <Tooltip
+                      cursor={{ strokeDasharray: '3 3', stroke: GOLD }}
+                      {...TOOLTIP_STYLE}
                       formatter={(value: number, name: string, props: any) => {
                         if (name === 'Total Errors') {
                           return [`${value} errors`, props.payload.skill];
@@ -155,7 +175,7 @@ export function SkillErrorCorrelation({ skillErrorMapping, errorPatterns }: Skil
 
             {/* Top Skills Analysis */}
             <div>
-              <h4 className="font-semibold mb-4 text-sm text-gray-700">
+              <h4 className="font-semibold mb-4 text-sm" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>
                 Skills Requiring Attention
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -164,7 +184,7 @@ export function SkillErrorCorrelation({ skillErrorMapping, errorPatterns }: Skil
                   const config = ERROR_TYPE_CONFIG[skillItem.mostCommonError as ErrorType];
                   
                   return (
-                    <div key={index} className="border rounded-lg p-3">
+                    <div key={index} className="rounded-lg p-3" style={{ border: `1px solid ${PARCHMENT_MID}`, backgroundColor: '#FDFBF7' }}>
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2 flex-1">
                           <BookOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
@@ -236,12 +256,12 @@ export function SkillErrorCorrelation({ skillErrorMapping, errorPatterns }: Skil
             </div>
 
             {/* Insights */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="rounded-lg p-4" style={{ backgroundColor: '#F5EDD0', borderLeft: `4px solid ${GOLD}` }}>
               <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: GOLD }} />
                 <div className="text-sm">
-                  <h5 className="font-semibold text-blue-900 mb-2">Key Insights</h5>
-                  <ul className="space-y-1 text-blue-800">
+                  <h5 className="font-semibold mb-2" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>Key Insights</h5>
+                  <ul className="space-y-1" style={{ color: NAVY_MID }}>
                     {skillData.length > 0 && (
                       <li>
                         • <strong>{skillData[0].skill}</strong> needs the most attention with {skillData[0].totalErrors} errors

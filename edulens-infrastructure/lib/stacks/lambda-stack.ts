@@ -55,6 +55,7 @@ export class LambdaStack extends cdk.Stack {
   public readonly getTestsFunction: lambda.Function;
   public readonly getResultsFunction: lambda.Function;
   public readonly getStudentSessionsFunction: lambda.Function;
+  public readonly getStudentAnalyticsFunction: lambda.Function;
   public readonly studentInsightsFunction: lambda.Function;
 
   // Conversation Engine
@@ -325,6 +326,19 @@ export class LambdaStack extends cdk.Stack {
       securityGroup: lambdaSecurityGroup,
       auroraSecret,
       redisEndpoint,
+    }).function;
+
+    this.getStudentAnalyticsFunction = new NodejsLambda(this, 'GetStudentAnalyticsLambda', {
+      config,
+      functionName: `edulens-get-student-analytics-${config.stage}`,
+      handler: 'dist/handlers/get-student-analytics.handler',
+      codePath: '../edulens-backend/services/test-engine',
+      description: 'Compute and return full student analytics for the dashboard',
+      vpc,
+      securityGroup: lambdaSecurityGroup,
+      auroraSecret,
+      redisEndpoint,
+      timeout: cdk.Duration.seconds(30),
     }).function;
 
     this.studentInsightsFunction = new NodejsLambda(this, 'StudentInsightsLambda', {

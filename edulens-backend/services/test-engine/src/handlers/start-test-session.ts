@@ -42,7 +42,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'Request body is required');
     }
 
-    const { testId, studentId, contestId, testFormat } = JSON.parse(event.body);
+    const { testId, studentId, contestId, testFormat, checkOnly } = JSON.parse(event.body);
     let stageId: string | undefined = JSON.parse(event.body).stageId;
     const subjectParam: string | undefined = JSON.parse(event.body).subject;
 
@@ -146,11 +146,13 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       contestQuestionIds = Array.isArray(rawIds) ? rawIds : [];
     }
 
-    // Cancel any existing active sessions for this student (allow fresh start)
-    await query(
-      `UPDATE test_sessions SET status = 'cancelled' WHERE student_id = $1::uuid AND status = 'active'`,
-      studentId
-    );
+    // checkOnly mode: just return availability without touching sessions
+    if (!checkOnly) {
+      await query(
+        `UPDATE test_sessions SET status = 'cancelled' WHERE student_id = $1::uuid AND status = 'active'`,
+        studentId
+      );
+    }
 
     // --- Count available questions ---
     let countQuery: string;
@@ -169,6 +171,24 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       }
       const countResult = await query(countQuery, ...countParams) as any[];
       availableCount = parseInt(countResult[0]?.cnt || '0');
+
+      // Fallback: no stage-tagged questions → query by the student's grade_level
+      if (availableCount === 0) {
+        const studentRows = await query(
+          `SELECT grade_level FROM students WHERE id = $1::uuid`,
+          studentId
+        ) as any[];
+        const gradeLevel = studentRows[0]?.grade_level;
+        if (gradeLevel) {
+          gradeLevelFilter = gradeLevel;
+          let fbQuery = `SELECT COUNT(*) as cnt FROM questions WHERE grade_level = $1 AND is_active = true`;
+          const fbParams: any[] = [gradeLevel];
+          if (subject) { fbQuery += ` AND subject = $2`; fbParams.push(subject); }
+          const fbResult = await query(fbQuery, ...fbParams) as any[];
+          availableCount = parseInt(fbResult[0]?.cnt || '0');
+          // Note: keep stageId so session is tagged; gradeLevelFilter is set for question fetch
+        }
+      }
     } else {
       countQuery = `SELECT COUNT(*) as cnt FROM questions WHERE grade_level = $1 AND is_active = true`;
       countParams = [gradeLevelFilter];
@@ -178,6 +198,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       }
       const countResult = await query(countQuery, ...countParams) as any[];
       availableCount = parseInt(countResult[0]?.cnt || '0');
+    }
+
+    // checkOnly: return availability result, no session created
+    if (checkOnly) {
+      return successResponse({ available: availableCount > 0, count: availableCount });
     }
 
     if (availableCount === 0) {
@@ -219,7 +244,8 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
                      FROM questions WHERE id = ANY($1::uuid[]) AND is_active = true
                      ORDER BY array_position($1::uuid[], id) LIMIT 1`;
       firstQParams = [contestQuestionIds];
-    } else if (stageId) {
+    } else if (stageId && !gradeLevelFilter) {
+      // Stage has its own questions
       firstQQuery = `SELECT id, type, text, options, difficulty, skill_tags
                      FROM questions WHERE stage_id = $1 AND is_active = true`;
       firstQParams = [stageId];

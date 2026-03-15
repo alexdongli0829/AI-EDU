@@ -102,6 +102,24 @@ export class ApiClient {
     return response.data;
   }
 
+  async checkSubjectAvailability(
+    studentId: string,
+    stageId: string,
+    subjects: string[]
+  ): Promise<Record<string, boolean>> {
+    const results = await Promise.all(
+      subjects.map(async (subject) => {
+        try {
+          const res = await this.client.post('/sessions', { studentId, stageId, subject, checkOnly: true });
+          return [subject, res.data?.available ?? false] as [string, boolean];
+        } catch {
+          return [subject, false] as [string, boolean];
+        }
+      })
+    );
+    return Object.fromEntries(results);
+  }
+
   async submitAnswer(sessionId: string, questionId: string, answer: string, timeSpent: number) {
     const response = await this.client.post(`/sessions/${sessionId}/answers`, {
       questionId,

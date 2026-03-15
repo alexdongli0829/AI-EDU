@@ -56,7 +56,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Verify session exists and is active
     const session = await query(
-      `SELECT ts.id, ts.test_id, ts.stage_id, ts.question_count, ts.contest_id,
+      `SELECT ts.id, ts.test_id, ts.stage_id, ts.question_count, ts.contest_id, ts.student_id,
               c.question_ids AS contest_question_ids
        FROM test_sessions ts
        LEFT JOIN contests c ON c.id = ts.contest_id
@@ -139,12 +139,39 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       // Stage-based session: use stored question_count and filter by stage_id + subject
       maxItems = parseInt(sessionData.question_count) || 20;
       const currentSubject = question.subject as string | null;
-      if (currentSubject) {
-        nextQFilter = `stage_id = $1 AND subject = $3 AND is_active = true`;
-        nextQParam = sessionData.stage_id;
+
+      // Check if any questions are actually tagged with this stage_id
+      const stageQCount = await query(
+        `SELECT COUNT(*) as cnt FROM questions WHERE stage_id = $1 AND is_active = true`,
+        sessionData.stage_id
+      ) as any[];
+      const hasStageQuestions = parseInt(stageQCount[0]?.cnt || '0') > 0;
+
+      if (hasStageQuestions) {
+        if (currentSubject) {
+          nextQFilter = `stage_id = $1 AND subject = $3 AND is_active = true`;
+          nextQParam = sessionData.stage_id;
+        } else {
+          nextQFilter = `stage_id = $1 AND is_active = true`;
+          nextQParam = sessionData.stage_id;
+        }
       } else {
-        nextQFilter = `stage_id = $1 AND is_active = true`;
-        nextQParam = sessionData.stage_id;
+        // Fallback: use student's grade_level when stage has no questions
+        const studentRows = await query(
+          `SELECT grade_level FROM students WHERE id = $1::uuid`,
+          sessionData.student_id
+        ) as any[];
+        const gradeLevel = studentRows[0]?.grade_level;
+        if (!gradeLevel) {
+          return errorResponse(500, 'No questions available for this stage');
+        }
+        if (currentSubject) {
+          nextQFilter = `grade_level = $1 AND subject = $3 AND is_active = true`;
+          nextQParam = gradeLevel;
+        } else {
+          nextQFilter = `grade_level = $1 AND is_active = true`;
+          nextQParam = gradeLevel;
+        }
       }
     } else {
       // Test-based session: look up test config

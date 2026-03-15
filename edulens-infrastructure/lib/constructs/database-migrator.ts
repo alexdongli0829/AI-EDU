@@ -12,6 +12,8 @@ import * as cr from 'aws-cdk-lib/custom-resources';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as crypto from 'crypto';
 
 export interface DatabaseMigratorProps {
   vpc: ec2.IVpc;
@@ -50,12 +52,19 @@ export class DatabaseMigrator extends Construct {
       logRetention: logs.RetentionDays.ONE_DAY,
     });
 
+    // Compute a hash of migration.sql so the custom resource re-runs
+    // automatically whenever the SQL content changes.
+    const sqlPath = path.join(props.migrationScriptPath, 'migration.sql');
+    const sqlHash = fs.existsSync(sqlPath)
+      ? crypto.createHash('sha256').update(fs.readFileSync(sqlPath)).digest('hex').slice(0, 12)
+      : '0';
+
     // Custom resource that triggers migration
     this.customResource = new cdk.CustomResource(this, 'MigrationResource', {
       serviceToken: provider.serviceToken,
       properties: {
-        // Change this version to trigger re-run of migrations
-        Version: '1.0.0',
+        // Auto-derived from migration.sql content — changes whenever SQL changes
+        Version: sqlHash,
       },
     });
   }

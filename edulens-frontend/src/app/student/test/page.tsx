@@ -48,13 +48,23 @@ export default function TestSelectPage() {
   const { user, student } = useAuthStore();
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [stageLoading, setStageLoading] = useState(true);
+  const [unavailableSubjects, setUnavailableSubjects] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (student?.id) {
       apiClient.listStudentStages(student.id)
-        .then((res: any) => {
+        .then(async (res: any) => {
           const active = res.success ? (res.stages ?? []).find((s: any) => s.status === 'active') : null;
-          setActiveStageId(active?.stage_id ?? null);
+          const sid = active?.stage_id ?? null;
+          setActiveStageId(sid);
+          if (sid) {
+            const subjectKeys = (STAGE_SUBJECTS[sid] ?? STAGE_SUBJECTS.oc_prep).map(s => s.key);
+            const availability = await apiClient.checkSubjectAvailability(student.id, sid, subjectKeys);
+            const unavailable = new Set<string>(
+              subjectKeys.filter(k => !availability[k])
+            );
+            setUnavailableSubjects(unavailable);
+          }
         })
         .catch(() => {})
         .finally(() => setStageLoading(false));
@@ -129,9 +139,16 @@ export default function TestSelectPage() {
                       </div>
                     </div>
                     <div className="ml-6 flex-shrink-0">
-                      <Button className={`${subject.button} text-white min-w-32`} onClick={() => handleStartTest(subject.key)}>
-                        Start Test <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
+                      {unavailableSubjects.has(subject.key) ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-2xl">🚧</span>
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Coming Soon</span>
+                        </div>
+                      ) : (
+                        <Button className={`${subject.button} text-white min-w-32`} onClick={() => handleStartTest(subject.key)}>
+                          Start Test <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>

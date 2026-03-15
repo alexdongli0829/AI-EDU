@@ -30,6 +30,26 @@ import {
   Legend
 } from 'recharts';
 
+const NAVY = '#1C3557';
+const NAVY_MID = '#254773';
+const GOLD = '#B8860B';
+const GOLD_BRIGHT = '#D4A017';
+const PARCHMENT_MID = '#EDE7D9';
+
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: NAVY,
+    border: `1px solid ${GOLD}`,
+    borderRadius: '4px',
+    fontSize: 11,
+    color: GOLD_BRIGHT,
+    fontFamily: "'Source Sans 3', sans-serif",
+    padding: '4px 10px',
+  },
+  itemStyle: { color: GOLD_BRIGHT },
+  labelStyle: { color: '#e8edf4', fontWeight: 600 as const },
+};
+
 interface ErrorPatternsOverviewProps {
   patterns: ErrorPattern[];
   timeAnalysis: {
@@ -71,11 +91,11 @@ export function ErrorPatternsOverview({ patterns, timeAnalysis }: ErrorPatternsO
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Brain className="h-5 w-5 text-teal-600" />
+        <CardTitle className="flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>
+          <Brain className="h-5 w-5" style={{ color: GOLD }} />
           Error Patterns Overview
         </CardTitle>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm" style={{ color: NAVY_MID, opacity: 0.65 }}>
           Comprehensive analysis of recurring error patterns
         </p>
       </CardHeader>
@@ -83,7 +103,7 @@ export function ErrorPatternsOverview({ patterns, timeAnalysis }: ErrorPatternsO
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Error Distribution Pie Chart */}
           <div className="lg:col-span-2">
-            <h4 className="font-semibold mb-4 text-sm text-gray-700">Error Type Distribution</h4>
+            <h4 className="font-semibold mb-4 text-sm" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>Error Type Distribution</h4>
             {patterns.length > 0 ? (
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -103,9 +123,7 @@ export function ErrorPatternsOverview({ patterns, timeAnalysis }: ErrorPatternsO
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      formatter={(value: number) => [`${value} errors`, 'Count']}
-                    />
+                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => [`${value} errors`, 'Count']} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -121,13 +139,13 @@ export function ErrorPatternsOverview({ patterns, timeAnalysis }: ErrorPatternsO
 
           {/* Pattern Details */}
           <div>
-            <h4 className="font-semibold mb-4 text-sm text-gray-700">Pattern Details</h4>
+            <h4 className="font-semibold mb-4 text-sm" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>Pattern Details</h4>
             <div className="space-y-3">
               {patterns.length > 0 ? (
                 patterns.slice(0, 5).map((pattern, index) => {
                   const config = ERROR_TYPE_CONFIG[pattern.errorType as ErrorType];
                   return (
-                    <div key={index} className="border rounded-lg p-3">
+                    <div key={index} className="rounded-lg p-3" style={{ border: `1px solid ${PARCHMENT_MID}`, backgroundColor: '#FDFBF7' }}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{config?.icon || '❓'}</span>
@@ -159,7 +177,7 @@ export function ErrorPatternsOverview({ patterns, timeAnalysis }: ErrorPatternsO
 
             {/* Time Analysis Summary */}
             <div className="mt-6">
-              <h4 className="font-semibold mb-3 text-sm text-gray-700">Time Analysis</h4>
+              <h4 className="font-semibold mb-3 text-sm" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>Time Analysis</h4>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Average per question:</span>
@@ -210,16 +228,14 @@ export function ErrorPatternsOverview({ patterns, timeAnalysis }: ErrorPatternsO
         {/* Severity Bar Chart */}
         {patterns.length > 0 && (
           <div className="mt-6">
-            <h4 className="font-semibold mb-4 text-sm text-gray-700">Error Severity Distribution</h4>
+            <h4 className="font-semibold mb-4 text-sm" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>Error Severity Distribution</h4>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={severityData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="severity" />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value} patterns`, 'Count']}
-                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke={PARCHMENT_MID} />
+                  <XAxis dataKey="severity" tick={{ fontSize: 11, fill: NAVY_MID }} />
+                  <YAxis tick={{ fontSize: 11, fill: NAVY_MID }} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => [`${value} patterns`, 'Count']} />
                   <Bar dataKey="count" fill="#8884d8">
                     {severityData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
