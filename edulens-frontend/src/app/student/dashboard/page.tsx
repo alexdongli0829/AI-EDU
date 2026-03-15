@@ -134,10 +134,10 @@ export default function StudentDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--parchment)' }}>
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-teal-600" />
-          <p className="text-sm text-gray-500">Loading your analytics…</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3" style={{ color: 'var(--oxford-navy)' }} />
+          <p className="text-sm" style={{ color: '#6b7280', fontFamily: 'var(--font-body)' }}>Loading your analytics…</p>
         </div>
       </div>
     );
@@ -145,14 +145,14 @@ export default function StudentDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--parchment)' }}>
         <Card className="w-80">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
             <p className="text-sm text-gray-600 mb-4">{error}</p>
             <div className="flex gap-2 justify-center">
               <Button onClick={loadAnalytics} variant="outline" size="sm">Try Again</Button>
-              <Button onClick={() => router.push('/student/test')} size="sm">Take Test</Button>
+              <Button onClick={() => router.push('/student/test')} size="sm" style={{ background: 'var(--oxford-navy)', color: '#fff' }}>Take Test</Button>
             </div>
           </CardContent>
         </Card>
@@ -163,18 +163,24 @@ export default function StudentDashboard() {
   // ─── Welcome state (no tests yet) ─────────────────────────────────────────
   if (!analytics || analytics.totalTests === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-teal-50/40 via-white to-white">
+      <div className="min-h-screen" style={{ background: 'var(--parchment)' }}>
         <div className="max-w-3xl mx-auto px-4 py-14 text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-teal-200/50">
-            <Target className="h-10 w-10 text-white" />
+          <div
+            className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg"
+            style={{ background: 'var(--oxford-navy)', border: '2px solid var(--gold)' }}
+          >
+            <Target className="h-10 w-10" style={{ color: 'var(--gold-bright)' }} />
           </div>
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.readyToLearn(user.name.split(' ')[0])}</h2>
-          <p className="text-gray-500 text-base mb-10 max-w-md mx-auto">
+          <h2 className="text-3xl font-bold mb-3" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{t.studentDash.readyToLearn(user.name.split(' ')[0])}</h2>
+          <p className="text-base mb-10 max-w-md mx-auto" style={{ color: '#6b7280', fontFamily: 'var(--font-serif)' }}>
             {t.studentDash.pickSubject}
           </p>
 
           {stageMeta && (
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full text-white mb-6" style={{ backgroundColor: stageMeta.color }}>
+            <div
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full mb-6"
+              style={{ background: 'var(--oxford-navy)', color: 'var(--gold-bright)', border: '1px solid var(--gold)', fontFamily: 'var(--font-body)', letterSpacing: '0.05em' }}
+            >
               {stageMeta.label}
             </div>
           )}
@@ -206,23 +212,29 @@ export default function StudentDashboard() {
 
   // ─── Main Dashboard ────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-b from-teal-50/40 via-white to-white">
+    <div className="min-h-screen" style={{ background: 'var(--parchment)' }}>
 
-      <div className="max-w-6xl mx-auto px-4 pt-6 pb-1">
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-extrabold text-gray-900" style={{ fontFamily: 'var(--font-heading)' }}>
-            {t.studentDash.myDashboard}
-          </h1>
-          {stageMeta && (
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full text-white" style={{ backgroundColor: stageMeta.color }}>
-              {stageMeta.label}
-            </span>
-          )}
+      {/* Page header strip */}
+      <div style={{ background: 'var(--oxford-navy)', borderBottom: '2px solid var(--gold)' }}>
+        <div className="max-w-6xl mx-auto px-5 py-5">
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: '#e8edf4' }}>
+              {t.studentDash.myDashboard}
+            </h1>
+            {stageMeta && (
+              <span
+                className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+                style={{ background: 'rgba(184,134,11,0.2)', color: 'var(--gold-bright)', border: '1px solid var(--gold)', fontFamily: 'var(--font-body)' }}
+              >
+                {stageMeta.label}
+              </span>
+            )}
+          </div>
+          <p className="text-sm" style={{ color: 'rgba(232,237,244,0.6)', fontFamily: 'var(--font-body)' }}>
+            Year {student.gradeLevel} · {analytics.totalTests} test{analytics.totalTests !== 1 ? 's' : ''} completed · Last activity: {analytics.lastTestDate}
+            {!stageMeta && <span className="ml-1" style={{ color: 'var(--gold)' }}>(all stages)</span>}
+          </p>
         </div>
-        <p className="text-sm text-gray-400">
-          Grade {student.gradeLevel} · {analytics.totalTests} test{analytics.totalTests !== 1 ? 's' : ''} completed · Last activity: {analytics.lastTestDate}
-          {!stageMeta && <span className="ml-1 text-amber-500">(all stages)</span>}
-        </p>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-4 space-y-6">
@@ -230,25 +242,35 @@ export default function StudentDashboard() {
         {/* ── Row 1: Summary stat chips ── */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: t.common.testsCompleted, value: analytics.totalTests, color: 'text-teal-600' },
-            { label: t.common.averageScore, value: `${analytics.averageScore}%`, color: analytics.averageScore >= 70 ? 'text-green-600' : analytics.averageScore >= 50 ? 'text-amber-600' : 'text-red-500' },
-            { label: t.common.lastActivity, value: analytics.lastTestDate, color: 'text-gray-800' },
-          ].map(({ label, value, color }) => (
-            <Card key={label} className="border border-gray-200/80 shadow-sm rounded-2xl overflow-hidden">
-              <CardContent className="p-5 text-center">
-                <p className={`text-2xl font-extrabold ${color}`} style={{ fontFamily: 'var(--font-heading)' }}>{value}</p>
-                <p className="text-xs text-gray-500 mt-1 font-medium">{label}</p>
-              </CardContent>
-            </Card>
-          ))}
+            { label: t.common.testsCompleted, value: analytics.totalTests, navyAccent: true },
+            { label: t.common.averageScore, value: `${analytics.averageScore}%`, navyAccent: false, scoreVal: analytics.averageScore },
+            { label: t.common.lastActivity, value: analytics.lastTestDate, navyAccent: false },
+          ].map(({ label, value, navyAccent, scoreVal }) => {
+            const scoreColor = scoreVal != null
+              ? (scoreVal >= 70 ? '#16a34a' : scoreVal >= 50 ? '#d97706' : '#dc2626')
+              : 'var(--oxford-navy)';
+            return (
+              <Card key={label} className="shadow-sm overflow-hidden" style={{ border: '1px solid var(--parchment-mid)', background: '#fff' }}>
+                <CardContent className="p-5 text-center">
+                  <p
+                    className="text-2xl font-bold"
+                    style={{ fontFamily: 'var(--font-heading)', color: navyAccent ? 'var(--oxford-navy)' : scoreColor }}
+                  >
+                    {value}
+                  </p>
+                  <p className="text-xs mt-1 font-medium" style={{ color: '#9ca3af', fontFamily: 'var(--font-body)' }}>{label}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* ── Score Trend by Subject ── */}
-        <Card className="border border-gray-200 shadow-sm">
-          <CardHeader className="pb-2">
+        <Card className="shadow-sm" style={{ border: '1px solid var(--parchment-mid)', background: '#fff' }}>
+          <CardHeader className="pb-2" style={{ borderBottom: '1px solid var(--parchment-mid)' }}>
             <div className="flex items-center gap-2">
-              <CardTitle className="text-base font-extrabold text-gray-800" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.scoreTrend}</CardTitle>
-              {stageMeta && <span className="text-xs font-medium text-gray-400">· {stageMeta.label}</span>}
+              <CardTitle className="text-base font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{t.studentDash.scoreTrend}</CardTitle>
+              {stageMeta && <span className="text-xs font-medium" style={{ color: '#9ca3af' }}>· {stageMeta.label}</span>}
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -296,7 +318,7 @@ export default function StudentDashboard() {
 
         {/* ── Take a Test ── */}
         <div>
-          <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.takeATest}</h2>
+          <h2 className="text-lg font-bold mb-3 heading-rule" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{t.studentDash.takeATest}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {subjects.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
               <button
@@ -324,8 +346,8 @@ export default function StudentDashboard() {
         {/* ── Previous Tests ── */}
         {analytics.recentResults.length > 0 && (
           <div>
-            <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.previousTests}</h2>
-            <Card className="border border-gray-200 shadow-sm">
+            <h2 className="text-lg font-bold mb-3 heading-rule" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{t.studentDash.previousTests}</h2>
+            <Card className="shadow-sm" style={{ border: '1px solid var(--parchment-mid)', background: '#fff' }}>
               <CardContent className="p-4">
                 <div className="space-y-2">
                   {analytics.recentResults.map((test, i) => (

@@ -162,24 +162,27 @@ export default function StudentContestsPage() {
   const stageMeta = activeStageId ? STAGE_META[activeStageId] : null;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#FAFAF9', fontFamily: "'Source Sans 3', system-ui, sans-serif" }}>
-      <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="min-h-screen" style={{ background: 'var(--parchment)', fontFamily: 'var(--font-body)' }}>
 
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Trophy className="h-5 w-5 text-amber-500" />
-            <h1 className="text-base font-bold text-gray-900">My Contests</h1>
+      {/* Page header strip */}
+      <div style={{ background: 'var(--oxford-navy)', borderBottom: '2px solid var(--gold)' }}>
+        <div className="max-w-2xl mx-auto px-5 py-5">
+          <div className="flex items-center gap-2.5 mb-1">
+            <Trophy className="h-5 w-5" style={{ color: 'var(--gold-bright)' }} />
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: '#e8edf4' }}>My Contests</h1>
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-sm" style={{ color: 'rgba(232,237,244,0.6)' }}>
             {stageMeta
-              ? <>Showing contests for <span className="font-semibold" style={{ color: stageMeta.color }}>{stageMeta.label}</span></>
+              ? <>Showing contests for <span className="font-semibold" style={{ color: 'var(--gold-bright)' }}>{stageMeta.label}</span></>
               : 'Contests across all stages'}
           </p>
         </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto px-5 py-6">
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
+          <div className="mb-5 p-3 rounded-lg text-sm flex items-center gap-2" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: 'var(--crimson)' }}>
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
             {error}
           </div>
@@ -187,32 +190,32 @@ export default function StudentContestsPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-7 w-7 animate-spin text-teal-600" />
+            <Loader2 className="h-7 w-7 animate-spin" style={{ color: 'var(--oxford-navy)' }} />
           </div>
         ) : (
           <div className="space-y-6">
 
             {/* ── Stats banner ────────────────────────────────────────────── */}
             {stats && stats.contestsParticipated > 0 && (
-              <div className="rounded-xl p-4 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                <p className="text-[10px] font-semibold text-teal-600 uppercase tracking-wider mb-2">Your Contest Performance</p>
+              <div className="rounded-xl p-4 border" style={{ background: 'var(--oxford-navy)', borderColor: 'var(--gold)', borderWidth: '1px' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--gold)', fontFamily: 'var(--font-body)' }}>Contest Performance</p>
                 <div className="flex items-center gap-6">
                   <div className="text-center">
-                    <p className="text-xl font-extrabold text-teal-700">{stats.contestsParticipated}</p>
-                    <p className="text-[10px] text-teal-600">Contests</p>
+                    <p className="text-xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--gold-bright)' }}>{stats.contestsParticipated}</p>
+                    <p className="text-[10px]" style={{ color: 'rgba(232,237,244,0.6)' }}>Contests</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xl font-extrabold text-teal-700">{Math.round(stats.avgPercentile)}th</p>
-                    <p className="text-[10px] text-teal-600">Avg Percentile</p>
+                    <p className="text-xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--gold-bright)' }}>{Math.round(stats.avgPercentile)}th</p>
+                    <p className="text-[10px]" style={{ color: 'rgba(232,237,244,0.6)' }}>Avg Percentile</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xl font-extrabold text-amber-600">{Math.round(stats.bestPercentile)}th</p>
-                    <p className="text-[10px] text-amber-600">Best</p>
+                    <p className="text-xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: '#fcd34d' }}>{Math.round(stats.bestPercentile)}th</p>
+                    <p className="text-[10px]" style={{ color: 'rgba(232,237,244,0.6)' }}>Best</p>
                   </div>
                   {stats.percentileTrend.length >= 2 && (
                     <div className="flex flex-col items-center gap-0.5">
                       <TrendLine pts={stats.percentileTrend} />
-                      <p className="text-[10px] text-gray-400">Trend</p>
+                      <p className="text-[10px]" style={{ color: 'rgba(232,237,244,0.5)' }}>Trend</p>
                     </div>
                   )}
                 </div>
@@ -221,7 +224,7 @@ export default function StudentContestsPage() {
 
             {/* ── Registered / Upcoming ───────────────────────────────────── */}
             <section>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', fontFamily: 'var(--font-body)' }}>
                 Registered Contests
               </p>
               {registered.length === 0 ? (
@@ -301,7 +304,7 @@ export default function StudentContestsPage() {
             {/* ── Finalized registered contests waiting for results ─────────── */}
             {finalizedRegistered.length > 0 && (
               <section>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: '#9ca3af', fontFamily: 'var(--font-body)' }}>
                   Awaiting Results
                 </p>
                 <div className="space-y-2">
@@ -326,7 +329,7 @@ export default function StudentContestsPage() {
 
             {/* ── Contest History ─────────────────────────────────────────── */}
             <section>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', fontFamily: 'var(--font-body)' }}>
                 Contest History
               </p>
               {history.length === 0 ? (
@@ -409,7 +412,7 @@ export default function StudentContestsPage() {
             {/* ── Other open contests (not registered) ────────────────────── */}
             {unregistered.length > 0 && (
               <section>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: '#9ca3af', fontFamily: 'var(--font-body)' }}>
                   Other Available Contests
                 </p>
                 <div className="space-y-2">

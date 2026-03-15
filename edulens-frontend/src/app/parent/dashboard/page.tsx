@@ -443,29 +443,36 @@ export default function ParentDashboard() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#FAFAF9', fontFamily: "'Source Sans 3', system-ui, sans-serif" }}>
-      <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="min-h-screen" style={{ background: 'var(--parchment)', fontFamily: 'var(--font-body)' }}>
 
-        {/* Page header */}
-        <div className="flex items-center justify-between mb-6">
+      {/* Page header strip */}
+      <div style={{ background: 'var(--oxford-navy)', borderBottom: '2px solid var(--gold)' }}>
+        <div className="max-w-6xl mx-auto px-5 py-5 flex items-center justify-between">
           <div>
-            <h1 className="text-base font-bold text-gray-900">Children's Overview</h1>
-            <p className="text-xs text-gray-400">
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: '#e8edf4' }}>
+              Children's Overview
+            </h1>
+            <p className="text-sm mt-0.5" style={{ color: 'rgba(232,237,244,0.6)', fontFamily: 'var(--font-body)' }}>
               {students.length} profile{students.length !== 1 ? 's' : ''} · OC, Selective & HSC preparation
             </p>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => router.push('/parent/chat')} className="bg-teal-600 hover:bg-teal-700">
+            <Button size="sm" onClick={() => router.push('/parent/chat')}
+              style={{ background: 'var(--gold)', color: 'var(--navy-dark)', fontWeight: 600 }}>
               <MessageCircle className="h-4 w-4 mr-1.5" />AI Advisor
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowCreateForm(true)}>
+            <Button size="sm" variant="outline" onClick={() => setShowCreateForm(true)}
+              style={{ borderColor: 'rgba(232,237,244,0.4)', color: '#e8edf4', background: 'transparent' }}>
               <Plus className="h-4 w-4 mr-1.5" />Add Child
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-5 py-6">
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex justify-between">
+          <div className="mb-5 p-3 rounded-lg text-sm flex justify-between" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: 'var(--crimson)' }}>
             {error}
             <button onClick={() => setError(null)} className="underline ml-4">Dismiss</button>
           </div>
@@ -473,15 +480,17 @@ export default function ParentDashboard() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+            <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--oxford-navy)' }} />
           </div>
         ) : students.length === 0 ? (
-          <Card className="border-dashed border-2">
+          <Card className="border-dashed border-2" style={{ borderColor: 'var(--parchment-mid)' }}>
             <CardContent className="py-16 text-center">
-              <GraduationCap className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-base font-semibold text-gray-700 mb-1">No student profiles yet</h3>
-              <p className="text-sm text-gray-400 mb-5">Create a profile for your child to start their learning journey.</p>
-              <Button onClick={() => setShowCreateForm(true)}><Plus className="h-4 w-4 mr-2" />Add First Child</Button>
+              <GraduationCap className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--gold)' }} />
+              <h3 className="text-base font-semibold mb-1" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>No student profiles yet</h3>
+              <p className="text-sm mb-5" style={{ color: '#6b7280', fontFamily: 'var(--font-body)' }}>Create a profile for your child to start their learning journey.</p>
+              <Button onClick={() => setShowCreateForm(true)} style={{ background: 'var(--oxford-navy)', color: '#fff' }}>
+                <Plus className="h-4 w-4 mr-2" />Add First Child
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -494,18 +503,21 @@ export default function ParentDashboard() {
               const age = calculateAge(student.dateOfBirth);
 
               return (
-                <Card key={student.id} className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                <Card key={student.id} className="shadow-sm hover:shadow-md transition-shadow" style={{ border: '1px solid var(--parchment-mid)', background: '#fff', borderTop: '3px solid var(--oxford-navy)' }}>
                   <CardContent className="p-5">
 
                     {/* ── Header ── */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+                          style={{ background: 'var(--oxford-navy)', color: 'var(--gold-bright)', fontFamily: 'var(--font-heading)' }}
+                        >
                           {student.name.charAt(0)}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-gray-900">{student.name}</p>
+                            <p className="font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>{student.name}</p>
                             {activeStage && (
                               <span
                                 className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full text-white"
@@ -611,7 +623,7 @@ export default function ParentDashboard() {
 
                     {/* ── Inline Journey Roadmap ── */}
                     <div className="mb-4">
-                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Learning Journey</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--gold)', fontFamily: 'var(--font-body)' }}>Learning Journey</p>
                       {isLoading ? (
                         <div className="flex items-center gap-2 py-3 text-gray-400">
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -636,62 +648,65 @@ export default function ParentDashboard() {
             })}
           </div>
         )}
-      </div>
+      </div>{/* end max-w-6xl */}
 
       {/* Create Student Modal */}
       {showCreateForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md shadow-2xl" style={{ border: '1px solid var(--parchment-mid)', borderTop: '3px solid var(--oxford-navy)' }}>
             <CardContent className="p-6">
-              <h2 className="text-base font-bold text-gray-900 mb-1">Add Child Profile</h2>
-              <p className="text-xs text-gray-400 mb-4">Create a profile for your child. They log in with username and password.</p>
+              <h2 className="text-lg font-bold mb-1" style={{ fontFamily: 'var(--font-heading)', color: 'var(--oxford-navy)' }}>Add Child Profile</h2>
+              <p className="text-xs mb-4" style={{ color: '#6b7280', fontFamily: 'var(--font-body)' }}>Create a profile for your child. They log in with username and password.</p>
               <form onSubmit={handleCreateStudent} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Student Name</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--navy-mid)', fontFamily: 'var(--font-body)' }}>Student Name</label>
                   <Input required placeholder="Full name" value={formData.name}
                     onChange={e => setFormData({ ...formData, name: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium mb-1.5">Grade</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--navy-mid)', fontFamily: 'var(--font-body)' }}>Year</label>
                     <select value={formData.gradeLevel}
                       onChange={e => setFormData({ ...formData, gradeLevel: parseInt(e.target.value) })}
-                      className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent">
-                      {[...Array(12)].map((_, i) => <option key={i + 1} value={i + 1}>Grade {i + 1}</option>)}
+                      className="w-full p-2 border rounded-md text-sm"
+                      style={{ borderColor: 'var(--parchment-mid)', fontFamily: 'var(--font-body)' }}>
+                      {[...Array(12)].map((_, i) => <option key={i + 1} value={i + 1}>Year {i + 1}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--navy-mid)', fontFamily: 'var(--font-body)' }}>Date of Birth</label>
                     <Input type="date" required value={formData.dateOfBirth}
                       onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })} />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Current Stage</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--navy-mid)', fontFamily: 'var(--font-body)' }}>Current Stage</label>
                   <select value={formData.initialStage}
                     onChange={e => setFormData({ ...formData, initialStage: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                    className="w-full p-2 border rounded-md text-sm"
+                    style={{ borderColor: 'var(--parchment-mid)', fontFamily: 'var(--font-body)' }}>
                     <option value="oc_prep">OC Prep (Year 4–5)</option>
                     <option value="selective">Selective (Year 6–7)</option>
                     <option value="hsc">HSC (Year 11–12)</option>
                     <option value="lifelong">Lifelong Learning</option>
                   </select>
-                  <p className="text-[10px] text-gray-400 mt-1">Which stage is your child currently preparing for?</p>
+                  <p className="text-[10px] mt-1" style={{ color: '#9ca3af' }}>Which stage is your child currently preparing for?</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Username</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--navy-mid)', fontFamily: 'var(--font-body)' }}>Username</label>
                   <Input required placeholder="Student login username" value={formData.username}
                     onChange={e => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/\s/g, '') })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Password</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--navy-mid)', fontFamily: 'var(--font-body)' }}>Password</label>
                   <Input type="password" required placeholder="Student password" value={formData.password}
                     onChange={e => setFormData({ ...formData, password: e.target.value })} />
                 </div>
                 <div className="flex gap-2 pt-1">
                   <Button type="button" variant="outline" className="flex-1"
                     onClick={() => { setShowCreateForm(false); setError(null); }}>Cancel</Button>
-                  <Button type="submit" className="flex-1" disabled={creating}>
+                  <Button type="submit" className="flex-1" disabled={creating}
+                    style={{ background: 'var(--oxford-navy)', color: '#fff' }}>
                     {creating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating…</> : 'Create Profile'}
                   </Button>
                 </div>

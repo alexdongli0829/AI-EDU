@@ -7,17 +7,17 @@ import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { useI18n, Lang } from '@/lib/i18n';
 import {
-  Home, LayoutDashboard, ClipboardList, Users, LogOut, Trophy,
-  ChevronDown, GraduationCap, UserCheck, Sparkles, Newspaper, Globe,
+  LayoutDashboard, ClipboardList, Users, LogOut, Trophy,
+  ChevronDown, UserCheck, Newspaper, Globe,
 } from 'lucide-react';
 
 type NavItem = { labelKey: string; href: string; icon: React.ElementType; exact?: boolean };
 
 const STUDENT_ITEMS: NavItem[] = [
-  { labelKey: 'dashboard',      href: '/student/dashboard', icon: LayoutDashboard, exact: true },
-  { labelKey: 'practiceTests',  href: '/student/test',      icon: ClipboardList },
-  { labelKey: 'contests',       href: '/student/contests',  icon: Trophy },
-  { labelKey: 'news',           href: '/news',              icon: Newspaper },
+  { labelKey: 'dashboard',     href: '/student/dashboard', icon: LayoutDashboard, exact: true },
+  { labelKey: 'practiceTests', href: '/student/test',      icon: ClipboardList },
+  { labelKey: 'contests',      href: '/student/contests',  icon: Trophy },
+  { labelKey: 'news',          href: '/news',              icon: Newspaper },
 ];
 
 const PARENT_ITEMS: NavItem[] = [
@@ -28,13 +28,37 @@ const PARENT_ITEMS: NavItem[] = [
 
 interface ChildProfile { id: string; name: string; gradeLevel: number; }
 
+/* Academic crest SVG — shield with mortarboard silhouette */
+function AcademicCrest({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      {/* Shield body */}
+      <path
+        d="M18 2L4 8v10c0 8 6.5 13.5 14 15 7.5-1.5 14-7 14-15V8L18 2z"
+        fill="#B8860B" fillOpacity="0.15" stroke="#B8860B" strokeWidth="1.5"
+      />
+      {/* Mortarboard cap */}
+      <polygon points="18,9 10,13 18,17 26,13" fill="#B8860B" />
+      <rect x="17.2" y="17" width="1.6" height="5" fill="#B8860B" />
+      <circle cx="18" cy="22.5" r="1.5" fill="#B8860B" />
+      {/* Horizontal divider */}
+      <line x1="9" y1="20" x2="27" y2="20" stroke="#B8860B" strokeWidth="0.8" strokeOpacity="0.5" />
+      {/* Laurel dots */}
+      <circle cx="11" cy="24" r="1" fill="#B8860B" fillOpacity="0.6" />
+      <circle cx="14" cy="26" r="1" fill="#B8860B" fillOpacity="0.6" />
+      <circle cx="25" cy="24" r="1" fill="#B8860B" fillOpacity="0.6" />
+      <circle cx="22" cy="26" r="1" fill="#B8860B" fillOpacity="0.6" />
+    </svg>
+  );
+}
+
 export default function AppNav() {
   const pathname   = usePathname();
   const router     = useRouter();
   const { user, student, setStudent, logout } = useAuthStore();
   const { lang, setLang, t } = useI18n();
 
-  const [children, setChildren]       = useState<ChildProfile[]>([]);
+  const [children, setChildren]         = useState<ChildProfile[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -84,107 +108,144 @@ export default function AppNav() {
   const displaySub  = activeIsParent
     ? 'Parent'
     : student
-      ? `Grade ${(student as any).gradeLevel}`
+      ? `Year ${(student as any).gradeLevel}`
       : '';
 
   const showSwitcher = role === 'parent';
 
   return (
-    <nav className="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-      <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
+    <nav
+      className="sticky top-0 z-50"
+      style={{ background: 'var(--oxford-navy)', borderBottom: '2px solid var(--gold)' }}
+    >
+      <div className="max-w-7xl mx-auto px-5 flex items-center justify-between h-16">
 
-        {/* Brand */}
-        <div className="flex items-center gap-5">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <Sparkles className="h-4.5 w-4.5 text-white" />
+        {/* ── Brand ────────────────────────────────────────────── */}
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex items-center gap-3 group flex-shrink-0">
+            <AcademicCrest size={38} />
+            <div className="leading-tight">
+              <span
+                className="block text-xl font-bold tracking-wide"
+                style={{ fontFamily: 'var(--font-heading)', color: 'var(--gold-bright)' }}
+              >
+                EduLens
+              </span>
+              <span
+                className="block text-[10px] uppercase tracking-[0.18em] opacity-70"
+                style={{ color: '#d4c48a', fontFamily: 'var(--font-body)' }}
+              >
+                Academic Excellence
+              </span>
             </div>
-            <span className="text-lg font-extrabold tracking-tight text-gray-900 group-hover:text-teal-600 transition-colors" style={{ fontFamily: 'var(--font-heading)' }}>
-              Edu<span className="text-teal-600 group-hover:text-teal-700">Lens</span>
-            </span>
           </Link>
 
-          <div className="h-5 w-px bg-gray-200" />
+          {/* Vertical rule */}
+          <div className="h-8 w-px opacity-30" style={{ background: 'var(--gold)' }} />
 
-          <div className="flex items-center gap-1">
-            {navItems.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  isActive(item)
-                    ? 'bg-teal-50 text-teal-700 shadow-sm shadow-teal-100'
-                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-                }`}
-              >
-                <item.icon className="h-4 w-4 flex-shrink-0" />
-                {(t.nav as any)[item.labelKey] || item.labelKey}
-              </Link>
-            ))}
+          {/* Nav links */}
+          <div className="flex items-center gap-0.5">
+            {navItems.map(item => {
+              const active = isActive(item);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="relative flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors"
+                  style={{
+                    fontFamily: 'var(--font-body)',
+                    color: active ? 'var(--gold-bright)' : 'rgba(232,237,244,0.82)',
+                  }}
+                >
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  {(t.nav as any)[item.labelKey] || item.labelKey}
+                  {/* Gold underline for active */}
+                  {active && (
+                    <span
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                      style={{ background: 'var(--gold-bright)' }}
+                    />
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </div>
 
-        {/* Right: profile + logout */}
-        <div className="flex items-center gap-2">
+        {/* ── Right side ───────────────────────────────────────── */}
+        <div className="flex items-center gap-1">
 
           {showSwitcher ? (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(v => !v)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-md transition-colors"
+                style={{ background: dropdownOpen ? 'rgba(184,134,11,0.15)' : 'transparent' }}
               >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm ${
-                  activeIsParent ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'
-                }`}>
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                  style={{
+                    background: activeIsParent ? '#6b4fa0' : 'var(--forest)',
+                    color: '#fff',
+                    fontFamily: 'var(--font-heading)',
+                  }}
+                >
                   {displayName?.charAt(0) ?? '?'}
                 </div>
                 <div className="hidden sm:block leading-tight text-left">
-                  <p className="text-sm font-semibold text-gray-800 max-w-[100px] truncate">{displayName}</p>
-                  {displaySub && <p className="text-[11px] text-gray-400">{displaySub}</p>}
+                  <p className="text-sm font-semibold max-w-[110px] truncate" style={{ color: '#e8edf4', fontFamily: 'var(--font-body)' }}>{displayName}</p>
+                  {displaySub && <p className="text-[11px] opacity-60" style={{ color: '#d4c48a' }}>{displaySub}</p>}
                 </div>
-                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 opacity-60 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#d4c48a' }} />
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div
+                  className="absolute right-0 top-full mt-2 w-60 rounded-lg shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150 border"
+                  style={{ background: '#fff', borderColor: 'var(--parchment-mid)' }}
+                >
+                  {/* Parent row */}
                   <button
                     onClick={switchToParent}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left ${
-                      activeIsParent ? 'bg-purple-50/60' : ''
-                    }`}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
+                    style={{ background: activeIsParent ? '#f5f0ff' : undefined }}
                   >
-                    <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                         style={{ background: '#ede9f7', color: '#6b4fa0', fontFamily: 'var(--font-heading)' }}>
                       {user?.name?.charAt(0) ?? 'P'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-800 truncate">{user?.name}</p>
                       <p className="text-[11px] text-gray-400">{t.common.parent}</p>
                     </div>
-                    {activeIsParent && <UserCheck className="h-4 w-4 text-purple-500 flex-shrink-0" />}
+                    {activeIsParent && <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: '#6b4fa0' }} />}
                   </button>
 
                   {children.length > 0 && (
                     <>
-                      <div className="border-t border-gray-100 mx-3 my-1" />
-                      <p className="px-3.5 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{t.common.children}</p>
+                      <div className="border-t border-gray-100 mx-3 my-1.5" />
+                      <p className="px-4 pt-0.5 pb-1 text-[10px] uppercase tracking-widest text-gray-400 font-semibold"
+                         style={{ fontFamily: 'var(--font-body)' }}>
+                        {t.common.children}
+                      </p>
                       {children.map(child => {
                         const active = student?.id === child.id;
                         return (
                           <button
                             key={child.id}
                             onClick={() => switchToChild(child)}
-                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left ${
-                              active ? 'bg-teal-50/60' : ''
-                            }`}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
+                            style={{ background: active ? '#f0faf8' : undefined }}
                           >
-                            <div className="w-7 h-7 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                                 style={{ background: '#d8f0ea', color: 'var(--forest)', fontFamily: 'var(--font-heading)' }}>
                               {child.name.charAt(0)}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-gray-800 truncate">{child.name}</p>
-                              <p className="text-[11px] text-gray-400">Grade {child.gradeLevel}</p>
+                              <p className="text-[11px] text-gray-400">Year {child.gradeLevel}</p>
                             </div>
-                            {active && <UserCheck className="h-4 w-4 text-teal-500 flex-shrink-0" />}
+                            {active && <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--forest)' }} />}
                           </button>
                         );
                       })}
@@ -195,12 +256,15 @@ export default function AppNav() {
             </div>
           ) : (
             <div className="flex items-center gap-2.5 px-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                style={{ background: 'var(--forest)', color: '#fff', fontFamily: 'var(--font-heading)' }}
+              >
                 {displayName?.charAt(0) ?? '?'}
               </div>
               <div className="hidden sm:block leading-tight">
-                <p className="text-sm font-semibold text-gray-800 max-w-[120px] truncate">{displayName}</p>
-                {displaySub && <p className="text-[11px] text-gray-400">{displaySub}</p>}
+                <p className="text-sm font-semibold max-w-[120px] truncate" style={{ color: '#e8edf4' }}>{displayName}</p>
+                {displaySub && <p className="text-[11px] opacity-60" style={{ color: '#d4c48a' }}>{displaySub}</p>}
               </div>
             </div>
           )}
@@ -208,19 +272,22 @@ export default function AppNav() {
           {/* Language switcher */}
           <button
             onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors px-2 py-2 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1 text-xs font-medium px-2.5 py-2 rounded-md transition-colors hover:bg-white/10"
+            style={{ color: 'rgba(212,196,138,0.8)' }}
             title={lang === 'en' ? '切换中文' : 'Switch to English'}
           >
             <Globe className="h-4 w-4" />
-            <span className="font-medium">{lang === 'en' ? '中文' : 'EN'}</span>
+            <span>{lang === 'en' ? '中文' : 'EN'}</span>
           </button>
 
+          {/* Logout */}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors px-2.5 py-2 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-2 rounded-md transition-colors hover:bg-white/10"
+            style={{ color: 'rgba(232,237,244,0.6)' }}
           >
             <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline font-medium">{t.common.logout}</span>
+            <span className="hidden sm:inline">{t.common.logout}</span>
           </button>
         </div>
 
