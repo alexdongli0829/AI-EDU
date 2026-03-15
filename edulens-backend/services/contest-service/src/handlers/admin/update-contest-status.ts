@@ -11,7 +11,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../../lib/database';
+import { getDb, query } from '../../lib/database';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   draft:   ['open'],
@@ -29,9 +29,9 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const { status: newStatus } = JSON.parse(event.body);
     if (!newStatus) return err(400, 'status is required');
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
-    const contests = await prisma.$queryRawUnsafe(
+    const contests = await query(
       `SELECT id, status FROM contests WHERE id = $1::uuid`,
       contestId
     ) as any[];
@@ -45,7 +45,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return err(409, `Cannot transition from '${current}' to '${newStatus}'. Allowed: ${allowed.join(', ') || 'none'}`);
     }
 
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE contests SET status = $1, updated_at = NOW() WHERE id = $2::uuid`,
       newStatus,
       contestId

@@ -24,6 +24,12 @@ interface ContestHistoryRow {
 }
 
 interface Student { id: string; name: string; }
+interface StageEnrollment { stage_id: string; status: string; display_name: string; }
+
+const STAGE_LABEL: Record<string, string> = {
+  oc_prep: 'OC Preparation', selective: 'Selective High School',
+  hsc: 'HSC Preparation', lifelong: 'University & Beyond',
+};
 
 type Tab = 'upcoming' | 'history';
 
@@ -93,6 +99,7 @@ function ContestsPageInner() {
   const [registeredMap, setRegisteredMap] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [activeStageId, setActiveStageId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -101,24 +108,49 @@ function ContestsPageInner() {
   }, [user]);
 
   useEffect(() => {
-    if (selectedStudentId) loadHistory(selectedStudentId);
+    if (selectedStudentId) {
+      loadHistory(selectedStudentId);
+      loadStudentStage(selectedStudentId);
+    }
   }, [selectedStudentId]);
+
+  useEffect(() => {
+    if (activeStageId !== undefined) loadContests(activeStageId);
+  }, [activeStageId]);
+
+  const loadStudentStage = async (studentId: string) => {
+    try {
+      const res = await apiClient.listStudentStages(studentId);
+      const stages: StageEnrollment[] = res.stages || [];
+      const active = stages.find(s => s.status === 'active');
+      setActiveStageId(active?.stage_id ?? null);
+    } catch {
+      setActiveStageId(null);
+    }
+  };
+
+  const loadContests = async (stageId: string | null) => {
+    try {
+      const res = await apiClient.listContests({
+        status: 'open,active,scoring,finalized',
+        ...(stageId ? { stageId } : {}),
+      });
+      if (res.success) setContests(res.contests || []);
+    } catch {}
+  };
 
   const loadData = async (preselectStudentId?: string) => {
     try {
       setError(null);
-      const [contestsRes, studentsRes] = await Promise.all([
-        apiClient.listContests({ status: 'open,active,finalized,scoring' }),
-        user?.id ? apiClient.listStudents(user.id) : Promise.resolve({ success: false }),
-      ]);
-      if (contestsRes.success) setContests(contestsRes.contests || []);
+      const studentsRes = user?.id ? await apiClient.listStudents(user.id) : { success: false };
       if (studentsRes.success) {
         const list = studentsRes.students || [];
         setStudents(list);
         const sid = preselectStudentId || list[0]?.id || '';
         setSelectedStudentId(sid);
+        // Stage + contests will be loaded by the selectedStudentId effect
       }
-    } catch { setError('Failed to load contests'); }
+    } catch { setError('Failed to load data'); }
     finally { setLoading(false); }
   };
 
@@ -216,6 +248,21 @@ function ContestsPageInner() {
           </div>
         )}
 
+        {/* Active stage filter badge */}
+        {activeStageId ? (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-teal-50 border border-teal-100 rounded-lg">
+            <Trophy className="h-3.5 w-3.5 text-teal-600 flex-shrink-0" />
+            <p className="text-xs text-teal-700 font-medium flex-1">
+              Showing contests for <span className="font-bold">{STAGE_LABEL[activeStageId] ?? activeStageId}</span>
+            </p>
+          </div>
+        ) : !loading && (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 border border-amber-100 rounded-lg">
+            <Trophy className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+            <p className="text-xs text-amber-700">No active stage found. Showing all available contests.</p>
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
         )}
@@ -264,7 +311,7 @@ function ContestsPageInner() {
                               <p className="font-semibold text-sm text-gray-900">{contest.title}</p>
                               <StatusBadge status={contest.status} />
                             </div>
-                            <p className="text-[10px] text-gray-400">{contest.series_name} · {contest.stage_id}</p>
+                            <p className="text-[10px] text-gray-400">{contest.series_name} · {STAGE_LABEL[contest.stage_id] ?? contest.stage_id}</p>
                           </div>
                         </div>
 

@@ -42,13 +42,28 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'Request body is required');
     }
 
-    const { testId, studentId, stageId, contestId, testFormat } = JSON.parse(event.body);
+    const { testId, studentId, contestId, testFormat } = JSON.parse(event.body);
+    let stageId: string | undefined = JSON.parse(event.body).stageId;
+    const subjectParam: string | undefined = JSON.parse(event.body).subject;
 
     if (!studentId) {
       return errorResponse(400, 'studentId is required');
     }
-    if (!testId && !stageId) {
-      return errorResponse(400, 'Either testId or stageId is required');
+    if (!testId && !stageId && !contestId) {
+      return errorResponse(400, 'Either testId, stageId, or contestId is required');
+    }
+
+    // Auto-resolve active stage when only testId is provided.
+    // This ensures every session is tagged with stage_id so analytics
+    // can correctly filter tests by stage.
+    if (testId && !stageId) {
+      const activeStageRows = await query(
+        `SELECT stage_id FROM student_stages WHERE student_id = $1::uuid AND status = 'active' LIMIT 1`,
+        studentId
+      ) as any[];
+      if (activeStageRows.length) {
+        stageId = activeStageRows[0].stage_id;
+      }
     }
 
     const [, sysConfig] = await Promise.all([getDb(), getSystemConfig()]);
@@ -56,7 +71,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // --- Resolve test config ---
     // Start with system-config defaults; override from test record or stage test_formats
     let testTitle = 'Practice Test';
-    let subject: string | null = null;
+    let subject: string | null = subjectParam || null;
     let questionCount = cfgInt(sysConfig, 'testDefaultQuestionCount');
     let timeRemaining = cfgInt(sysConfig, 'testDefaultTimeLimitSeconds');
     let gradeLevelFilter: string | null = null;
@@ -96,7 +111,8 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       const fmt = formats[testFormat || 'practice'] || {};
       if (fmt.question_count) questionCount = fmt.question_count;
       if (fmt.time_limit_seconds) timeRemaining = fmt.time_limit_seconds;
-      if (!testTitle || testTitle === 'Practice Test') testTitle = `${stage.display_name} — ${testFormat || 'Practice'}`;
+      const subjectLabel = subject ? subject.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : (testFormat || 'Practice');
+      if (!testTitle || testTitle === 'Practice Test') testTitle = `${stage.display_name} — ${subjectLabel}`;
 
       // Resolve the student_stage enrollment id
       const ssRows = await query(
@@ -109,10 +125,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       }
     }
 
-    // --- Validate contest if provided ---
+    // --- Resolve contest: auto-set stageId and use contest's question_ids ---
+    let contestQuestionIds: string[] | null = null;
     if (contestId) {
       const contestRows = await query(
-        `SELECT id, status FROM contests WHERE id = $1::uuid`,
+        `SELECT id, status, stage_id, question_ids FROM contests WHERE id = $1::uuid`,
         contestId
       ) as any[];
 
@@ -122,6 +139,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       if (contestRows[0].status !== 'active') {
         return errorResponse(409, `Contest is not currently active (status: ${contestRows[0].status})`);
       }
+
+      // Auto-set stageId from contest and use its pinned question list
+      if (!stageId) stageId = contestRows[0].stage_id;
+      const rawIds = contestRows[0].question_ids;
+      contestQuestionIds = Array.isArray(rawIds) ? rawIds : [];
     }
 
     // Cancel any existing active sessions for this student (allow fresh start)
@@ -133,10 +155,20 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // --- Count available questions ---
     let countQuery: string;
     let countParams: any[];
+    let availableCount: number;
 
-    if (stageId) {
+    if (contestQuestionIds && contestQuestionIds.length > 0) {
+      // Contest: use pinned question list — count is exactly the contest's questions
+      availableCount = contestQuestionIds.length;
+    } else if (stageId) {
       countQuery = `SELECT COUNT(*) as cnt FROM questions WHERE stage_id = $1 AND is_active = true`;
       countParams = [stageId];
+      if (subject) {
+        countQuery += ` AND subject = $2`;
+        countParams.push(subject);
+      }
+      const countResult = await query(countQuery, ...countParams) as any[];
+      availableCount = parseInt(countResult[0]?.cnt || '0');
     } else {
       countQuery = `SELECT COUNT(*) as cnt FROM questions WHERE grade_level = $1 AND is_active = true`;
       countParams = [gradeLevelFilter];
@@ -144,10 +176,9 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
         countQuery += ` AND subject = $2`;
         countParams.push(subject);
       }
+      const countResult = await query(countQuery, ...countParams) as any[];
+      availableCount = parseInt(countResult[0]?.cnt || '0');
     }
-
-    const countResult = await query(countQuery, ...countParams) as any[];
-    const availableCount = parseInt(countResult[0]?.cnt || '0');
 
     if (availableCount === 0) {
       return errorResponse(500, 'No questions available for this test');
@@ -155,7 +186,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const minQ = cfgInt(sysConfig, 'testMinQuestions');
     const maxQ = cfgInt(sysConfig, 'testMaxQuestions');
-    const totalQuestions = Math.max(minQ, Math.min(maxQ, Math.min(questionCount, availableCount)));
+    // For contests use exact question count (no min/max clamp)
+    const totalQuestions = contestQuestionIds
+      ? availableCount
+      : Math.max(minQ, Math.min(maxQ, Math.min(questionCount, availableCount)));
 
     // --- Create test session ---
     const sessionId = uuidv4();
@@ -179,11 +213,21 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     let firstQQuery: string;
     let firstQParams: any[];
 
-    if (stageId) {
+    if (contestQuestionIds && contestQuestionIds.length > 0) {
+      // Contest: fetch first question from the pinned list (maintain order by array position)
       firstQQuery = `SELECT id, type, text, options, difficulty, skill_tags
-                     FROM questions WHERE stage_id = $1 AND is_active = true
-                     ORDER BY difficulty ASC, id ASC LIMIT 1`;
+                     FROM questions WHERE id = ANY($1::uuid[]) AND is_active = true
+                     ORDER BY array_position($1::uuid[], id) LIMIT 1`;
+      firstQParams = [contestQuestionIds];
+    } else if (stageId) {
+      firstQQuery = `SELECT id, type, text, options, difficulty, skill_tags
+                     FROM questions WHERE stage_id = $1 AND is_active = true`;
       firstQParams = [stageId];
+      if (subject) {
+        firstQQuery += ` AND subject = $2`;
+        firstQParams.push(subject);
+      }
+      firstQQuery += ` ORDER BY difficulty ASC, id ASC LIMIT 1`;
     } else {
       firstQQuery = `SELECT id, type, text, options, difficulty, skill_tags
                      FROM questions WHERE grade_level = $1 AND is_active = true`;

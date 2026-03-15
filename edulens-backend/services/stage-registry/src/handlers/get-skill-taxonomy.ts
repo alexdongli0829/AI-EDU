@@ -4,7 +4,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
@@ -17,10 +17,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       };
     }
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Return the latest version for this stage
-    const rows = await prisma.$queryRawUnsafe(`
+    const rows = await query(`
       SELECT id, stage_id, version, categories, extends_id, created_at
       FROM skill_taxonomies
       WHERE stage_id = $1

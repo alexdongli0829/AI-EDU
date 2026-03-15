@@ -6,13 +6,10 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../lib/database';
+import { getDb } from '../lib/database';
 import { hashPassword, validatePasswordStrength } from '../lib/password';
 import { RegisterRequest, RegisterResponse, ErrorResponse } from '../types';
 
-/**
- * Create success response
- */
 function successResponse(data: RegisterResponse): APIGatewayProxyResult {
   return {
     statusCode: 201,
@@ -25,16 +22,8 @@ function successResponse(data: RegisterResponse): APIGatewayProxyResult {
   };
 }
 
-/**
- * Create error response
- */
 function errorResponse(statusCode: number, message: string): APIGatewayProxyResult {
-  const response: ErrorResponse = {
-    success: false,
-    error: message,
-    statusCode,
-  };
-
+  const response: ErrorResponse = { success: false, error: message, statusCode };
   return {
     statusCode,
     headers: {
@@ -46,116 +35,81 @@ function errorResponse(statusCode: number, message: string): APIGatewayProxyResu
   };
 }
 
-/**
- * Validate email format
- */
 function validateEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
 
-/**
- * Lambda handler
- */
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   console.log('Register request:', { path: event.path, method: event.httpMethod });
 
   try {
-    // Parse request body
     if (!event.body) {
       return errorResponse(400, 'Request body is required');
     }
 
     const request: RegisterRequest = JSON.parse(event.body);
 
-    // Validate required fields
     if (!request.email || !request.password || !request.name || !request.role) {
       return errorResponse(400, 'Email, password, name, and role are required');
     }
 
-    // Validate email format
     if (!validateEmail(request.email)) {
       return errorResponse(400, 'Invalid email format');
     }
 
-    // Validate password strength
     const passwordValidation = validatePasswordStrength(request.password);
     if (!passwordValidation.valid) {
       return errorResponse(400, passwordValidation.message || 'Invalid password');
     }
 
-    // Validate role
     if (!['student', 'parent'].includes(request.role)) {
       return errorResponse(400, 'Role must be either student or parent');
     }
 
-    // For students, gradeLevel and dateOfBirth are required
     if (request.role === 'student') {
       if (!request.gradeLevel || !request.dateOfBirth) {
         return errorResponse(400, 'Grade level and date of birth are required for students');
       }
-
       if (request.gradeLevel < 1 || request.gradeLevel > 12) {
         return errorResponse(400, 'Grade level must be between 1 and 12');
       }
     }
 
-    // Get Prisma client
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: request.email },
-    });
-
-    if (existingUser) {
+    const existing = await db`SELECT id FROM users WHERE email = ${request.email} LIMIT 1`;
+    if (existing.length > 0) {
       return errorResponse(409, 'User with this email already exists');
     }
 
-    // Hash password
     const passwordHash = await hashPassword(request.password);
-
-    // Create user
     const userId = uuidv4();
 
-    const user = await prisma.user.create({
-      data: {
-        id: userId,
-        email: request.email,
-        name: request.name,
-        role: request.role,
-        passwordHash,
-      },
-    });
+    await db`
+      INSERT INTO users (id, email, name, role, password_hash, created_at, updated_at)
+      VALUES (${userId}, ${request.email}, ${request.name}, ${request.role}, ${passwordHash}, NOW(), NOW())
+    `;
 
-    // Create student profile if role is student
     if (request.role === 'student' && request.gradeLevel && request.dateOfBirth) {
-      await prisma.student.create({
-        data: {
-          id: uuidv4(),
-          userId: user.id,
-          gradeLevel: request.gradeLevel,
-          dateOfBirth: new Date(request.dateOfBirth),
-          parentId: user.id, // Self-registered students; parent-created students use create-student handler
-        },
-      });
+      await db`
+        INSERT INTO students (id, user_id, grade_level, date_of_birth, parent_id, created_at, updated_at)
+        VALUES (${uuidv4()}, ${userId}, ${request.gradeLevel}, ${request.dateOfBirth}::date, ${userId}, NOW(), NOW())
+      `;
     }
 
-    // Prepare response
     const response: RegisterResponse = {
       success: true,
       message: 'User registered successfully. Please log in.',
-      userId: user.id,
+      userId,
     };
 
-    console.log('Registration successful:', { userId: user.id, role: user.role });
-
+    console.log('Registration successful:', { userId, role: request.role });
     return successResponse(response);
   } catch (error) {
     console.error('Registration error:', error);
 
-    // Handle Prisma unique constraint violations
-    if (error instanceof Error && error.message.includes('Unique constraint')) {
+    if (error instanceof Error && error.message.includes('unique')) {
       return errorResponse(409, 'User with this email already exists');
     }
 

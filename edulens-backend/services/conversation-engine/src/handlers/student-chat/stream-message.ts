@@ -7,7 +7,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { getDb, query } from '../../lib/database';
+import { query } from '../../lib/database';
 import { streamChatCompletion, Message } from '../../lib/bedrock';
 import { getSystemConfig, cfgInt, cfgStr, cfgNum } from '../../lib/system-config';
 
@@ -47,7 +47,7 @@ export const handler = awslambda.streamifyResponse(
         return;
       }
 
-      const [prisma, sysConfig] = await Promise.all([getDb(), getSystemConfig()]);
+      const sysConfig = await getSystemConfig();
       const maxHistoryTurns = cfgInt(sysConfig, 'chatMaxHistoryTurns');
       const bedrockOptions = {
         modelId:     cfgStr(sysConfig, 'aiStudentChatModelId'),
@@ -56,11 +56,11 @@ export const handler = awslambda.streamifyResponse(
       };
 
       // Verify session
-      const sessions = await db.unsafe<any[]>(
+      const sessions = await query(
         `SELECT id, student_id, role, status, agent_state
          FROM chat_sessions WHERE id = $1::uuid AND status = 'active'`,
         sessionId
-      );
+      ) as any[];
       if (!sessions?.length) {
         writeSSE({ type: 'error', error: 'Student chat session not found or inactive' });
         stream.end();
@@ -82,9 +82,9 @@ export const handler = awslambda.streamifyResponse(
       );
 
       const [questionContext, profile, rawHistory] = await Promise.all([
-        loadQuestionContext(prisma, sessionId),
-        loadStudentProfile(prisma, studentId),
-        loadMessageHistory(prisma, sessionId, maxHistoryTurns * 2),
+        loadQuestionContext(sessionId),
+        loadStudentProfile(studentId),
+        loadMessageHistory(sessionId, maxHistoryTurns * 2),
       ]);
 
       const systemPrompt = buildSocraticPrompt(questionContext, profile);
@@ -137,14 +137,14 @@ export const handler = awslambda.streamifyResponse(
 // Context loaders
 // ---------------------------------------------------------------------------
 
-async function loadQuestionContext(prisma: any, sessionId: string): Promise<any | null> {
+async function loadQuestionContext(sessionId: string): Promise<any | null> {
   try {
-    const rows = await db.unsafe<any[]>(
+    const rows = await query(
       `SELECT content FROM chat_messages
        WHERE session_id = $1::uuid AND role = 'system'
        ORDER BY timestamp ASC LIMIT 1`,
       sessionId
-    );
+    ) as any[];
     if (!rows?.length) return null;
 
     const meta = JSON.parse(rows[0].content);
@@ -152,16 +152,16 @@ async function loadQuestionContext(prisma: any, sessionId: string): Promise<any 
     if (!questionId) return null;
 
     const [questionRows, responseRows] = await Promise.all([
-      db.unsafe<any[]>(
+      query(
         `SELECT text, options, correct_answer, skill_tags, difficulty, estimated_time
          FROM questions WHERE id = $1::uuid`,
         questionId
-      ),
+      ) as Promise<any[]>,
       sessionResponseId
-        ? db.unsafe<any[]>(
+        ? query(
             `SELECT student_answer, time_spent FROM session_responses WHERE id = $1::uuid`,
             sessionResponseId
-          )
+          ) as Promise<any[]>
         : Promise.resolve([]),
     ]);
 
@@ -174,26 +174,26 @@ async function loadQuestionContext(prisma: any, sessionId: string): Promise<any 
   }
 }
 
-async function loadStudentProfile(prisma: any, studentId: string): Promise<any | null> {
+async function loadStudentProfile(studentId: string): Promise<any | null> {
   try {
-    const rows = await db.unsafe<any[]>(
+    const rows = await query(
       `SELECT skill_graph, error_patterns, overall_mastery, weaknesses
        FROM student_profiles WHERE student_id = $1::uuid`,
       studentId
-    );
+    ) as any[];
     return rows?.[0] ?? null;
   } catch {
     return null;
   }
 }
 
-async function loadMessageHistory(prisma: any, sessionId: string, limit: number): Promise<any[]> {
-  return db.unsafe<any[]>(
+async function loadMessageHistory(sessionId: string, limit: number): Promise<any[]> {
+  return query(
     `SELECT role, content FROM chat_messages
      WHERE session_id = $1::uuid
      ORDER BY timestamp ASC LIMIT $2`,
     sessionId, limit
-  );
+  ) as Promise<any[]>;
 }
 
 // ---------------------------------------------------------------------------

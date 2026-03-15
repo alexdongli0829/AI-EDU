@@ -2,7 +2,7 @@
  * News CRUD — GET /news (public list), POST/PUT/DELETE /news/:id (admin)
  */
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 function resp(statusCode: number, body: object): APIGatewayProxyResult {
   return {
@@ -16,7 +16,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   try {
     const method = event.httpMethod;
     const newsId = event.pathParameters?.newsId;
-    const db = await getPrismaClient();
+    const db = await getDb();
 
     // GET /news — public list
     if (method === 'GET' && !newsId) {
@@ -28,7 +28,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       const params: any[] = [];
       if (category) { params.push(category); where += ` AND category = $${params.length}`; }
 
-      const posts = await db.$queryRawUnsafe<any[]>(
+      const posts = await query(
         `SELECT id, title, summary, content, category, image_url, published_at, created_at
          FROM news_posts ${where}
          ORDER BY published_at DESC
@@ -36,7 +36,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
         ...params
       );
 
-      const countResult = await db.$queryRawUnsafe<any[]>(
+      const countResult = await query(
         `SELECT COUNT(*)::int as count FROM news_posts ${where}`,
         ...params
       );
@@ -46,7 +46,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // GET /news/:id — single post
     if (method === 'GET' && newsId) {
-      const rows = await db.$queryRawUnsafe<any[]>(
+      const rows = await query(
         `SELECT * FROM news_posts WHERE id = $1::uuid`, newsId
       );
       if (!rows.length) return resp(404, { success: false, error: 'Post not found' });
@@ -56,7 +56,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // POST /news — create
     if (method === 'POST') {
       const body = JSON.parse(event.body || '{}');
-      const result = await db.$queryRawUnsafe<any[]>(
+      const result = await query(
         `INSERT INTO news_posts (title, summary, content, category, image_url, is_published, published_at)
          VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz, NOW()))
          RETURNING id`,
@@ -70,7 +70,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // PUT /news/:id — update
     if (method === 'PUT' && newsId) {
       const body = JSON.parse(event.body || '{}');
-      await db.$queryRawUnsafe(
+      await query(
         `UPDATE news_posts SET
           title = COALESCE($2, title),
           summary = COALESCE($3, summary),
@@ -88,7 +88,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // DELETE /news/:id
     if (method === 'DELETE' && newsId) {
-      await db.$queryRawUnsafe(`DELETE FROM news_posts WHERE id = $1::uuid`, newsId);
+      await query(`DELETE FROM news_posts WHERE id = $1::uuid`, newsId);
       return resp(200, { success: true });
     }
 

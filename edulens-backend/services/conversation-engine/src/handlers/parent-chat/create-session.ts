@@ -4,7 +4,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../../lib/database';
+import { query } from '../../lib/database';
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -47,12 +47,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'parentId is required');
     }
 
-    const prisma = await getPrismaClient();
-
     // Create chat session
     const sessionId = uuidv4();
 
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO chat_sessions (id, student_id, role, agent_state, turn_count, started_at, stage_id, metadata)
        VALUES ($1::uuid, $2::uuid, $3, $4, 0, NOW(), $5, $6::jsonb)`,
       sessionId,

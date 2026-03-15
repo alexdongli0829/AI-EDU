@@ -10,7 +10,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../../lib/database';
+import { query } from '../../lib/database';
 import { streamChatCompletion, Message } from '../../lib/bedrock';
 import { getSystemConfig, cfgInt, cfgStr, cfgNum } from '../../lib/system-config';
 
@@ -55,7 +55,7 @@ export const handler = awslambda.streamifyResponse(
         return;
       }
 
-      const [prisma, sysConfig] = await Promise.all([getPrismaClient(), getSystemConfig()]);
+      const sysConfig = await getSystemConfig();
       const maxHistoryTurns  = cfgInt(sysConfig, 'chatMaxHistoryTurns');
       const maxMemorySummaries = cfgInt(sysConfig, 'chatMaxMemorySummaries');
       const bedrockOptions = {
@@ -65,11 +65,11 @@ export const handler = awslambda.streamifyResponse(
       };
 
       // Verify session
-      const sessions = await prisma.$queryRawUnsafe<any[]>(
+      const sessions = await query(
         `SELECT id, user_id, student_id, agent_type, status, stage_id
          FROM chat_sessions WHERE id = $1 AND status = 'active'`,
         sessionId
-      );
+      ) as any[];
       if (!sessions?.length) {
         writeSSE({ type: 'error', error: 'Chat session not found or inactive' });
         stream.end();
@@ -81,14 +81,14 @@ export const handler = awslambda.streamifyResponse(
       const stageId: string | null = session.stage_id ?? null;
 
       // Transition: IDLE → PROCESSING
-      await prisma.$executeRawUnsafe(
+      await query(
         `UPDATE chat_sessions SET agent_state = 'processing' WHERE id = $1`,
         sessionId
       );
 
       // Persist user message
       const userMessageId = uuidv4();
-      await prisma.$executeRawUnsafe(
+      await query(
         `INSERT INTO chat_messages (id, session_id, role, content, timestamp)
          VALUES ($1, $2, 'user', $3, NOW())`,
         userMessageId, sessionId, message
@@ -96,11 +96,11 @@ export const handler = awslambda.streamifyResponse(
 
       // Load context (profile + stage layers + memories + history in parallel)
       const [profile, coreProfile, stageContext, memories, rawHistory] = await Promise.all([
-        loadStudentProfile(prisma, studentId),
-        loadCoreProfile(prisma, studentId),
-        loadStageContext(prisma, studentId, stageId),
-        loadConversationMemories(prisma, studentId, maxMemorySummaries),
-        loadMessageHistory(prisma, sessionId, maxHistoryTurns * 2),
+        loadStudentProfile(studentId),
+        loadCoreProfile(studentId),
+        loadStageContext(studentId, stageId),
+        loadConversationMemories(studentId, maxMemorySummaries),
+        loadMessageHistory(sessionId, maxHistoryTurns * 2),
       ]);
 
       const systemPrompt = buildSystemPrompt(profile, coreProfile, stageContext, memories);
@@ -113,7 +113,7 @@ export const handler = awslambda.streamifyResponse(
       writeSSE({ type: 'start', userMessageId });
 
       // Transition: PROCESSING → RESPONDING
-      await prisma.$executeRawUnsafe(
+      await query(
         `UPDATE chat_sessions SET agent_state = 'responding' WHERE id = $1`,
         sessionId
       );
@@ -133,14 +133,14 @@ export const handler = awslambda.streamifyResponse(
 
       // Persist the complete assistant message
       const assistantMessageId = uuidv4();
-      await prisma.$executeRawUnsafe(
+      await query(
         `INSERT INTO chat_messages (id, session_id, role, content, timestamp)
          VALUES ($1, $2, 'assistant', $3, NOW())`,
         assistantMessageId, sessionId, fullResponse
       );
 
       // Transition: RESPONDING → WAITING_FEEDBACK
-      await prisma.$executeRawUnsafe(
+      await query(
         `UPDATE chat_sessions SET agent_state = 'waiting_feedback' WHERE id = $1`,
         sessionId
       );
@@ -164,27 +164,27 @@ export const handler = awslambda.streamifyResponse(
 // Context loaders (shared with send-message.ts)
 // ---------------------------------------------------------------------------
 
-async function loadStudentProfile(prisma: any, studentId: string | null): Promise<any | null> {
+async function loadStudentProfile(studentId: string | null): Promise<any | null> {
   if (!studentId) return null;
   try {
-    const rows = await prisma.$queryRawUnsafe<any[]>(
+    const rows = await query(
       `SELECT skill_graph, error_patterns, time_behavior, overall_mastery, strengths, weaknesses
        FROM student_profiles WHERE student_id = $1`,
       studentId
-    );
+    ) as any[];
     return rows?.[0] ?? null;
   } catch {
     return null;
   }
 }
 
-async function loadCoreProfile(prisma: any, studentId: string | null): Promise<any | null> {
+async function loadCoreProfile(studentId: string | null): Promise<any | null> {
   if (!studentId) return null;
   try {
-    const rows = await prisma.$queryRawUnsafe<any[]>(
+    const rows = await query(
       `SELECT core_profile FROM students WHERE id = $1::uuid`,
       studentId
-    );
+    ) as any[];
     return rows?.[0]?.core_profile ?? null;
   } catch {
     return null;
@@ -192,19 +192,18 @@ async function loadCoreProfile(prisma: any, studentId: string | null): Promise<a
 }
 
 async function loadStageContext(
-  prisma: any,
   studentId: string | null,
   stageId: string | null
 ): Promise<{ stageName: string; stageProfile: any; stageSystemPrompt: string | null } | null> {
   if (!studentId || !stageId) return null;
   try {
-    const rows = await prisma.$queryRawUnsafe<any[]>(
+    const rows = await query(
       `SELECT s.display_name, s.system_prompts, ss.stage_profile
        FROM student_stages ss
        JOIN stages s ON ss.stage_id = s.id
        WHERE ss.student_id = $1 AND ss.stage_id = $2`,
       studentId, stageId
-    );
+    ) as any[];
     if (!rows?.length) return null;
     const row = rows[0];
     return {
@@ -217,30 +216,30 @@ async function loadStageContext(
   }
 }
 
-async function loadConversationMemories(prisma: any, studentId: string | null, limit: number): Promise<any[]> {
+async function loadConversationMemories(studentId: string | null, limit: number): Promise<any[]> {
   if (!studentId) return [];
   try {
-    return await prisma.$queryRawUnsafe<any[]>(
+    return await query(
       `SELECT summary, key_topics, insights_extracted, created_at
        FROM conversation_memory
        WHERE student_id = $1
        ORDER BY created_at DESC
        LIMIT $2`,
       studentId, limit
-    );
+    ) as any[];
   } catch {
     return [];
   }
 }
 
-async function loadMessageHistory(prisma: any, sessionId: string, limit: number): Promise<any[]> {
-  return prisma.$queryRawUnsafe<any[]>(
+async function loadMessageHistory(sessionId: string, limit: number): Promise<any[]> {
+  return query(
     `SELECT role, content FROM chat_messages
      WHERE session_id = $1
      ORDER BY timestamp ASC
      LIMIT $2`,
     sessionId, limit
-  );
+  ) as Promise<any[]>;
 }
 
 // ---------------------------------------------------------------------------

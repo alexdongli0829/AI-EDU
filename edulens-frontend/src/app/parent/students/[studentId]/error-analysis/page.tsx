@@ -1,20 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Loader2, 
-  RefreshCw, 
-  AlertTriangle, 
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Loader2,
+  RefreshCw,
+  AlertTriangle,
   TrendingUp,
   TrendingDown,
   Minus,
   Calendar,
-  Target
+  Target,
+  ChevronDown,
 } from 'lucide-react';
 
 import { ErrorPatternAnalytics, ErrorTrendData } from '@/types/error-analysis';
@@ -30,48 +31,74 @@ interface StudentInfo {
   username: string;
 }
 
-export default function ErrorAnalysisPage() {
+interface EnrolledStage {
+  stage_id: string;
+  display_name: string;
+  status: 'active' | 'completed' | 'paused';
+}
+
+const STAGE_COLORS: Record<string, string> = {
+  oc_prep: '#2563EB',
+  selective: '#7C3AED',
+  hsc: '#0D9488',
+  lifelong: '#D97706',
+};
+
+function ErrorAnalysisInner() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const studentId = params.studentId as string;
   const { user } = useAuthStore();
 
   const [student, setStudent] = useState<StudentInfo | null>(null);
+  const [enrolledStages, setEnrolledStages] = useState<EnrolledStage[]>([]);
   const [analytics, setAnalytics] = useState<ErrorPatternAnalytics | null>(null);
   const [trendData, setTrendData] = useState<ErrorTrendData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState(30); // days
-  const [stageMode, setStageMode] = useState<'active' | 'all'>('active');
+  const [timeRange, setTimeRange] = useState(30);
+  // 'active' | 'all' | specific stageId
+  const [stageFilter, setStageFilter] = useState<string>(() => searchParams.get('stage') ?? 'active');
   const [error, setError] = useState<string | null>(null);
+  const [stageDropdownOpen, setStageDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    // Load enrolled stages for the stage picker
+    const loadStages = async () => {
+      try {
+        const res = await apiClient.listStudentStages(studentId);
+        if (res.success) setEnrolledStages(res.stages ?? []);
+      } catch {}
+    };
+    loadStages();
+  }, [studentId]);
 
   useEffect(() => {
     loadData();
-  }, [studentId, timeRange, stageMode]);
+  }, [studentId, timeRange, stageFilter]);
 
   const loadData = async () => {
     try {
       setError(null);
-
-      // Load student info
       if (user?.id) {
         const response = await apiClient.listStudents(user.id);
         if (response.success) {
-          const foundStudent = response.students.find((s: any) => s.id === studentId);
-          if (!foundStudent) {
-            router.push('/parent/dashboard');
-            return;
-          }
-          setStudent(foundStudent);
+          const found = response.students.find((s: any) => s.id === studentId);
+          if (!found) { router.push('/parent/dashboard'); return; }
+          setStudent(found);
         }
       }
 
-      const stageId = stageMode === 'active' ? 'active' : undefined;
+      // Resolve the stageId to pass to the API
+      // 'active' → pass 'active' (backend resolves to current active stage)
+      // 'all' → pass undefined
+      // specific id → pass that id
+      const stageId = stageFilter === 'all' ? undefined : stageFilter;
 
-      // Load error pattern analytics
       const [analyticsData, trendsData] = await Promise.all([
         apiClient.getErrorPatternsAggregate(studentId, timeRange, stageId),
-        apiClient.getErrorPatternsTrends(studentId, Math.max(timeRange * 2, 90), 'weekly', stageId)
+        apiClient.getErrorPatternsTrends(studentId, Math.max(timeRange * 2, 90), 'weekly', stageId),
       ]);
 
       if (analyticsData.success) {
@@ -83,12 +110,9 @@ export default function ErrorAnalysisPage() {
       if (trendsData.success) {
         setTrendData(trendsData.data);
       } else {
-        console.warn('Failed to load trends data:', trendsData.error);
         setTrendData(null);
       }
-
     } catch (err: any) {
-      console.error('Error loading error analysis:', err);
       setError(err.message || 'Failed to load error analysis data');
     } finally {
       setLoading(false);
@@ -96,112 +120,139 @@ export default function ErrorAnalysisPage() {
     }
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadData();
-  };
-
-  const handleTimeRangeChange = (days: number) => {
-    setTimeRange(days);
+  const handleRefresh = () => { setRefreshing(true); loadData(); };
+  const handleTimeRangeChange = (days: number) => { setTimeRange(days); setLoading(true); };
+  const handleStageChange = (filter: string) => {
+    setStageFilter(filter);
     setLoading(true);
+    setStageDropdownOpen(false);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-teal-600" />
-          <h3 className="text-lg font-semibold mb-2">Loading Error Analysis</h3>
-          <p className="text-muted-foreground">Analyzing error patterns...</p>
-        </div>
-      </div>
-    );
-  }
+  const stageFilterLabel = () => {
+    if (stageFilter === 'active') return 'Active Stage';
+    if (stageFilter === 'all') return 'All Stages';
+    const found = enrolledStages.find(s => s.stage_id === stageFilter);
+    return found?.display_name ?? stageFilter;
+  };
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-          <h3 className="text-lg font-semibold mb-2 text-red-600">Error Loading Data</h3>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={handleRefresh} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Try Again
-          </Button>
-        </div>
+  const activeStage = enrolledStages.find(s => s.status === 'active');
+
+  if (loading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-teal-600" />
+        <h3 className="text-lg font-semibold mb-2">Loading Error Analysis</h3>
+        <p className="text-muted-foreground">Analyzing error patterns…</p>
       </div>
-    );
-  }
+    </div>
+  );
+
+  if (error) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+        <h3 className="text-lg font-semibold mb-2 text-red-600">Error Loading Data</h3>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <Button onClick={handleRefresh} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" /> Try Again
+        </Button>
+      </div>
+    </div>
+  );
 
   if (!student || !analytics) return null;
 
   return (
-    <div 
+    <div
       className="min-h-screen bg-gray-50"
-      style={{
-        backgroundColor: '#FAFAF9',
-        fontFamily: "'Source Sans 3', 'Segoe UI', system-ui, -apple-system, sans-serif",
-      }}
+      style={{ backgroundColor: '#FAFAF9', fontFamily: "'Source Sans 3', 'Segoe UI', system-ui, -apple-system, sans-serif" }}
     >
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 pt-5 pb-1">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
               {student.name.charAt(0)}
             </div>
             <div>
-              <h1 className="text-base font-bold text-gray-900">
-                Error Pattern Analysis - {student.name}
-              </h1>
+              <h1 className="text-base font-bold text-gray-900">Error Pattern Analysis — {student.name}</h1>
               <p className="text-xs text-gray-500">
-                Grade {student.gradeLevel} • Comprehensive Error Dashboard
+                Grade {student.gradeLevel}
+                {activeStage && stageFilter === 'active' && (
+                  <span className="ml-1">· {activeStage.display_name} (active)</span>
+                )}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Stage Scope Selector */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border p-1">
-              {(['active', 'all'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => { setStageMode(mode); setLoading(true); }}
-                  className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                    stageMode === mode
-                      ? 'bg-violet-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {mode === 'active' ? 'Current Stage' : 'All Stages'}
-                </button>
-              ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Stage selector dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setStageDropdownOpen(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border rounded-lg hover:bg-gray-50 transition-colors"
+                style={stageFilter !== 'active' && stageFilter !== 'all'
+                  ? { borderColor: STAGE_COLORS[stageFilter] ?? '#6B7280', color: STAGE_COLORS[stageFilter] ?? '#6B7280' }
+                  : { borderColor: '#E5E7EB', color: '#374151' }
+                }
+              >
+                <span>{stageFilterLabel()}</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              {stageDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                  <button
+                    onClick={() => handleStageChange('active')}
+                    className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${stageFilter === 'active' ? 'font-semibold text-teal-700' : 'text-gray-700'}`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-teal-500" />
+                    Active Stage
+                    {activeStage && <span className="text-gray-400 ml-auto">{activeStage.display_name}</span>}
+                  </button>
+                  {enrolledStages.map(s => (
+                    <button
+                      key={s.stage_id}
+                      onClick={() => handleStageChange(s.stage_id)}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${stageFilter === s.stage_id ? 'font-semibold' : 'text-gray-700'}`}
+                      style={stageFilter === s.stage_id ? { color: STAGE_COLORS[s.stage_id] ?? '#6B7280' } : {}}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: STAGE_COLORS[s.stage_id] ?? '#6B7280' }}
+                      />
+                      {s.display_name}
+                      {s.status === 'active' && <span className="ml-auto text-[9px] text-teal-600 font-semibold">Active</span>}
+                    </button>
+                  ))}
+                  <div className="border-t border-gray-100 mt-1 pt-1">
+                    <button
+                      onClick={() => handleStageChange('all')}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${stageFilter === 'all' ? 'font-semibold text-purple-700' : 'text-gray-700'}`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-purple-400" />
+                      All Stages Combined
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Time Range Selector */}
-            <div className="flex items-center gap-2 bg-white rounded-lg border p-1">
-              {[7, 30, 90].map((days) => (
+            {/* Time range */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border p-1">
+              {[7, 30, 90].map(days => (
                 <button
                   key={days}
                   onClick={() => handleTimeRangeChange(days)}
                   className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                    timeRange === days
-                      ? 'bg-teal-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-100'
+                    timeRange === days ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  {days} days
+                  {days}d
                 </button>
               ))}
             </div>
 
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={refreshing}
-            >
+            <Button size="sm" variant="outline" onClick={handleRefresh} disabled={refreshing}>
               <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
@@ -220,7 +271,6 @@ export default function ErrorAnalysisPage() {
             Performance Overview
           </button>
           <button
-            onClick={() => router.push(`/parent/students/${studentId}/error-analysis`)}
             className="px-4 py-2 text-sm font-medium rounded-md bg-orange-600 text-white transition-colors"
           >
             <AlertTriangle className="h-4 w-4 inline mr-2" />
@@ -229,15 +279,32 @@ export default function ErrorAnalysisPage() {
         </div>
       </div>
 
+      {/* Scope banner */}
+      {stageFilter !== 'all' && (
+        <div className="max-w-7xl mx-auto px-4 mb-2">
+          <div
+            className="text-xs px-3 py-1.5 rounded-lg border inline-flex items-center gap-1.5"
+            style={stageFilter !== 'active'
+              ? { backgroundColor: `${STAGE_COLORS[stageFilter]}10`, borderColor: `${STAGE_COLORS[stageFilter]}30`, color: STAGE_COLORS[stageFilter] ?? '#374151' }
+              : { backgroundColor: '#F0FDFA', borderColor: '#99F6E4', color: '#0D9488' }
+            }
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            Showing errors for: <strong className="ml-0.5">{stageFilterLabel()}</strong>
+            <button className="ml-2 opacity-60 hover:opacity-100" onClick={() => handleStageChange('all')}>
+              (show all)
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Summary Stats */}
       <div className="max-w-7xl mx-auto px-4 pb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardContent className="p-4 text-center">
               <Target className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-              <div className="text-2xl font-bold text-gray-900">
-                {analytics.totalResponses}
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{analytics.totalResponses}</div>
               <p className="text-sm text-gray-500">Total Responses</p>
             </CardContent>
           </Card>
@@ -245,15 +312,12 @@ export default function ErrorAnalysisPage() {
           <Card>
             <CardContent className="p-4 text-center">
               <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-600" />
-              <div className="text-2xl font-bold text-gray-900">
-                {analytics.incorrectResponses}
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{analytics.incorrectResponses}</div>
               <p className="text-sm text-gray-500">Incorrect Answers</p>
               <p className="text-xs text-gray-400 mt-1">
-                {analytics.totalResponses > 0 
+                {analytics.totalResponses > 0
                   ? Math.round((analytics.incorrectResponses / analytics.totalResponses) * 100)
-                  : 0
-                }% error rate
+                  : 0}% error rate
               </p>
             </CardContent>
           </Card>
@@ -261,9 +325,7 @@ export default function ErrorAnalysisPage() {
           <Card>
             <CardContent className="p-4 text-center">
               <Calendar className="h-8 w-8 mx-auto mb-2 text-green-600" />
-              <div className="text-2xl font-bold text-gray-900">
-                {analytics.errorPatterns.length}
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{analytics.errorPatterns.length}</div>
               <p className="text-sm text-gray-500">Error Patterns</p>
               <p className="text-xs text-gray-400 mt-1">
                 {analytics.errorPatterns.filter(p => p.severity === 'high').length} high priority
@@ -293,30 +355,17 @@ export default function ErrorAnalysisPage() {
 
         {/* Main Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Error Patterns Overview */}
           <div className="lg:col-span-2">
-            <ErrorPatternsOverview 
-              patterns={analytics.errorPatterns}
-              timeAnalysis={analytics.timeAnalysis}
-            />
+            <ErrorPatternsOverview patterns={analytics.errorPatterns} timeAnalysis={analytics.timeAnalysis} />
           </div>
-
-          {/* Timeline Analysis */}
           <div className="lg:col-span-2">
-            <ErrorTimelineAnalysis 
-              trendData={trendData}
-              dateRange={analytics.dateRange}
-            />
+            <ErrorTimelineAnalysis trendData={trendData} dateRange={analytics.dateRange} />
           </div>
-
-          {/* Skill-Error Correlation */}
-          <SkillErrorCorrelation 
+          <SkillErrorCorrelation
             skillErrorMapping={analytics.skillErrorMapping}
             errorPatterns={analytics.errorPatterns}
           />
-
-          {/* Actionable Insights */}
-          <ActionableInsights 
+          <ActionableInsights
             recommendations={analytics.recommendations}
             improvementIndicators={trendData?.improvement_indicators || []}
             studentId={studentId}
@@ -324,5 +373,17 @@ export default function ErrorAnalysisPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ErrorAnalysisPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+      </div>
+    }>
+      <ErrorAnalysisInner />
+    </Suspense>
   );
 }

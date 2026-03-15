@@ -10,6 +10,182 @@ import json
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
+# ---------------------------------------------------------------------------
+# NSW Stage-aware skill taxonomies (mirrors frontend STAGE_SKILLS)
+# ---------------------------------------------------------------------------
+
+STAGE_SKILLS: Dict[str, Dict[str, List[str]]] = {
+    "oc_prep": {
+        "math":            ["Number & Algebra", "Fractions & Decimals", "Measurement & Geometry", "Statistics & Probability", "Problem Solving", "Working Mathematically"],
+        "general_ability": ["Logical Reasoning", "Pattern Recognition", "Spatial Reasoning", "Verbal Reasoning", "Abstract Reasoning", "Critical Thinking"],
+        "english":         ["Reading Comprehension", "Vocabulary", "Inference & Interpretation", "Grammar & Language", "Text Structure", "Language & Expression"],
+    },
+    "selective": {
+        # Mathematical Reasoning — 35q / 40min / no calculator
+        "math":            ["Number & Algebra", "Measurement & Space", "Statistics & Probability", "Working Mathematically", "Problem Solving", "Financial Maths"],
+        # Thinking Skills — 40q / 40min / no prior knowledge
+        "general_ability": ["Abstract Reasoning", "Logical Deduction", "Pattern Recognition", "Spatial Reasoning", "Verbal Reasoning", "Critical Analysis"],
+        # Reading — 17 questions (38 answers) / 45min
+        "english":         ["Reading Comprehension", "Inference & Interpretation", "Vocabulary in Context", "Text Analysis", "Literary Techniques", "Author's Purpose"],
+        # Writing — 1 open-response task / 30min
+        "writing":         ["Ideas & Content", "Text Structure", "Language Features", "Grammar & Punctuation", "Vocabulary", "Writing for Audience"],
+    },
+    "hsc": {
+        "math":            ["Functions & Graphs", "Calculus", "Financial Maths", "Statistics & Data", "Algebra & Equations", "Measurement & Geometry"],
+        "general_ability": ["Scientific Reasoning", "Data Analysis", "Experiment Design", "Chemical Concepts", "Physical Concepts", "Biological Concepts"],
+        "english":         ["Textual Analysis", "Essay Writing", "Creative Writing", "Vocabulary & Language", "Literary Techniques", "Text & Context"],
+    },
+    "lifelong": {
+        "math":            ["Statistical Analysis", "Mathematical Modelling", "Logical Reasoning", "Financial Literacy", "Data Interpretation", "Quantitative Analysis"],
+        "general_ability": ["Argumentation", "Evidence Evaluation", "Logical Fallacies", "Analytical Reasoning", "Synthesis & Inference", "Problem Framing"],
+        "english":         ["Academic Reading", "Academic Writing", "Rhetorical Analysis", "Vocabulary & Register", "Text Critique", "Communication"],
+    },
+}
+
+STAGE_SKILL_KEYWORDS: Dict[str, Dict[str, Dict[str, List[str]]]] = {
+    "oc_prep": {
+        "math": {
+            "Number & Algebra":         ["number", "algebra", "equation", "integer", "arithmetic", "numeral", "digit"],
+            "Fractions & Decimals":     ["fraction", "decimal", "percent", "ratio", "proportion", "percentage"],
+            "Measurement & Geometry":   ["measure", "geometry", "shape", "area", "perimeter", "volume", "angle", "length", "weight", "mass"],
+            "Statistics & Probability": ["statistic", "probability", "data", "graph", "chart", "average", "mean", "median", "chance"],
+            "Problem Solving":          ["problem", "word problem", "application", "real-world", "reasoning"],
+            "Working Mathematically":   ["pattern", "strategy", "working", "process", "communicate", "generalise"],
+        },
+        "general_ability": {
+            "Logical Reasoning":   ["logic", "logical", "deduction", "induction", "argument", "conclusion", "premise"],
+            "Pattern Recognition": ["pattern", "sequence", "series", "next", "continue", "rule"],
+            "Spatial Reasoning":   ["spatial", "space", "rotation", "reflection", "fold", "net", "shape", "3d", "visual"],
+            "Verbal Reasoning":    ["verbal", "word", "analogy", "synonym", "antonym", "vocabulary", "language"],
+            "Abstract Reasoning":  ["abstract", "matrix", "figure", "diagram", "symbol", "non-verbal"],
+            "Critical Thinking":   ["critical", "evaluate", "analyse", "assess", "judge", "inference"],
+        },
+        "english": {
+            "Reading Comprehension":      ["comprehension", "passage", "read", "understand", "main idea", "purpose"],
+            "Vocabulary":                 ["vocabulary", "word", "meaning", "definition", "context clue", "synonym"],
+            "Inference & Interpretation": ["inference", "infer", "interpret", "imply", "suggest", "deduce"],
+            "Grammar & Language":         ["grammar", "punctuation", "spelling", "sentence", "verb", "noun", "tense"],
+            "Text Structure":             ["structure", "text type", "genre", "feature", "paragraph", "author purpose"],
+            "Language & Expression":      ["expression", "figurative", "metaphor", "simile", "language feature", "technique"],
+        },
+    },
+    "selective": {
+        "math": {
+            "Number & Algebra":         ["number", "algebra", "equation", "integer", "arithmetic", "index", "surds", "numeral"],
+            "Measurement & Space":      ["measure", "space", "geometry", "shape", "area", "perimeter", "volume", "angle", "coordinate", "length"],
+            "Statistics & Probability": ["statistic", "probability", "data", "graph", "chart", "average", "mean", "median", "chance"],
+            "Working Mathematically":   ["working", "strategy", "process", "communicate", "generalise", "justify", "explain"],
+            "Problem Solving":          ["problem", "word problem", "application", "multi-step", "real-world"],
+            "Financial Maths":          ["financial", "money", "profit", "loss", "interest", "tax", "budget", "cost", "price"],
+        },
+        "general_ability": {
+            "Abstract Reasoning":  ["abstract", "matrix", "figure", "diagram", "symbol", "non-verbal", "pattern set"],
+            "Logical Deduction":   ["logic", "deduction", "syllogism", "if then", "conclusion", "argument", "valid"],
+            "Pattern Recognition": ["pattern", "sequence", "series", "next term", "continue", "rule"],
+            "Spatial Reasoning":   ["spatial", "rotation", "reflection", "fold", "net", "3d", "visual", "mirror"],
+            "Verbal Reasoning":    ["verbal", "analogy", "synonym", "antonym", "word relationship", "odd one out"],
+            "Critical Analysis":   ["critical", "analyse", "evaluate", "assess", "flaw", "assumption", "strengthen"],
+        },
+        "english": {
+            "Reading Comprehension":      ["comprehension", "passage", "read", "understand", "main idea", "summary"],
+            "Inference & Interpretation": ["inference", "infer", "interpret", "imply", "suggest", "deduce"],
+            "Vocabulary in Context":      ["vocabulary", "context", "meaning", "definition", "connotation", "denotation"],
+            "Text Analysis":              ["analyse text", "structure", "genre", "text type", "purpose", "form"],
+            "Literary Techniques":        ["technique", "figurative", "metaphor", "simile", "imagery", "alliteration", "personification"],
+            "Author's Purpose":           ["purpose", "intent", "audience", "perspective", "point of view", "bias"],
+        },
+        "writing": {
+            "Ideas & Content":       ["idea", "content", "creativity", "originality", "detail", "development", "elaborate"],
+            "Text Structure":        ["structure", "paragraph", "introduction", "conclusion", "organisation", "cohesion"],
+            "Language Features":     ["language", "technique", "figurative", "metaphor", "simile", "imagery", "tone", "style"],
+            "Grammar & Punctuation": ["grammar", "punctuation", "sentence", "tense", "syntax", "spelling", "mechanics"],
+            "Vocabulary":            ["vocabulary", "word choice", "diction", "expression", "precise", "varied"],
+            "Writing for Audience":  ["audience", "purpose", "persuade", "narrative", "creative", "engage", "voice"],
+        },
+    },
+    "hsc": {
+        "math": {
+            "Functions & Graphs":     ["function", "graph", "curve", "domain", "range", "polynomial", "asymptote"],
+            "Calculus":               ["calculus", "derivative", "integral", "differentiation", "integration", "limit", "rate of change"],
+            "Financial Maths":        ["financial", "annuity", "compound interest", "depreciation", "investment", "superannuation"],
+            "Statistics & Data":      ["statistic", "data", "distribution", "probability", "regression", "z-score", "normal"],
+            "Algebra & Equations":    ["algebra", "equation", "inequation", "logarithm", "exponential", "quadratic", "simultaneous"],
+            "Measurement & Geometry": ["measurement", "geometry", "trigonometry", "pythagoras", "area", "volume", "surface area"],
+        },
+        "general_ability": {
+            "Scientific Reasoning": ["scientific", "hypothesis", "theory", "model", "evidence", "peer review"],
+            "Data Analysis":        ["data", "graph", "trend", "table", "analyse results", "interpret", "relationship"],
+            "Experiment Design":    ["experiment", "variable", "control", "method", "reliability", "validity", "procedure"],
+            "Chemical Concepts":    ["chemical", "chemistry", "reaction", "element", "compound", "bond", "periodic"],
+            "Physical Concepts":    ["physics", "force", "energy", "motion", "wave", "electricity", "magnetism", "momentum"],
+            "Biological Concepts":  ["biology", "cell", "genetics", "evolution", "ecosystem", "organism", "dna"],
+        },
+        "english": {
+            "Textual Analysis":       ["analyse", "text", "passage", "close reading", "extract", "textual"],
+            "Essay Writing":          ["essay", "thesis", "argument", "body paragraph", "conclusion", "introduction"],
+            "Creative Writing":       ["creative", "narrative", "story", "character", "setting", "plot"],
+            "Vocabulary & Language":  ["vocabulary", "language", "word choice", "diction", "tone", "register"],
+            "Literary Techniques":    ["technique", "metaphor", "simile", "imagery", "symbolism", "irony", "allusion"],
+            "Text & Context":         ["context", "historical", "cultural", "social", "composer", "audience", "reception"],
+        },
+    },
+    "lifelong": {
+        "math": {
+            "Statistical Analysis":    ["statistic", "hypothesis test", "confidence", "p-value", "regression", "variance"],
+            "Mathematical Modelling":  ["model", "modelling", "simulation", "optimisation", "function", "predict"],
+            "Logical Reasoning":       ["logic", "proof", "formal", "deductive", "inductive", "valid"],
+            "Financial Literacy":      ["financial", "investment", "risk", "return", "market", "budget", "compound"],
+            "Data Interpretation":     ["data", "interpret", "visualisation", "chart", "trend", "insight", "dashboard"],
+            "Quantitative Analysis":   ["quantitative", "measure", "number", "calculate", "estimate", "numerical"],
+        },
+        "general_ability": {
+            "Argumentation":        ["argument", "claim", "premise", "conclusion", "thesis", "contention"],
+            "Evidence Evaluation":  ["evidence", "source", "reliability", "validity", "credibility", "cite"],
+            "Logical Fallacies":    ["fallacy", "ad hominem", "straw man", "false dichotomy", "circular", "slippery slope"],
+            "Analytical Reasoning": ["analysis", "break down", "component", "systemic", "framework", "structure"],
+            "Synthesis & Inference":["synthesis", "inference", "combine", "deduce", "integrate", "draw conclusion"],
+            "Problem Framing":      ["problem", "frame", "define", "scope", "constraints", "objectives"],
+        },
+        "english": {
+            "Academic Reading":      ["academic", "journal", "article", "scholarly", "literature review", "research"],
+            "Academic Writing":      ["academic writing", "report", "essay", "citation", "reference", "apa", "harvard"],
+            "Rhetorical Analysis":   ["rhetoric", "persuasion", "appeal", "ethos", "pathos", "logos", "rhetorical"],
+            "Vocabulary & Register": ["vocabulary", "register", "formal", "technical", "discipline-specific", "jargon"],
+            "Text Critique":         ["critique", "evaluate text", "assess", "strengths", "limitations", "critically"],
+            "Communication":         ["communicate", "clarity", "coherence", "concise", "audience", "presentation"],
+        },
+    },
+}
+
+
+def _map_tags_to_skills(tags: List[str], subject: str, stage_id: str) -> List[str]:
+    """Map raw skill_tags from a question to canonical stage-specific skill names."""
+    stage_subjects = STAGE_SKILLS.get(stage_id) or STAGE_SKILLS["oc_prep"]
+    subject_skills = stage_subjects.get(subject, [])
+    if not subject_skills:
+        return []
+    if not tags:
+        return [subject_skills[0]]
+
+    stage_keywords = STAGE_SKILL_KEYWORDS.get(stage_id) or STAGE_SKILL_KEYWORDS["oc_prep"]
+    keyword_map = stage_keywords.get(subject, {})
+    matched = set()
+
+    for tag in tags:
+        tag_lower = tag.lower().replace("_", " ").strip()
+        found = False
+        for skill, keywords in keyword_map.items():
+            if any(tag_lower in kw or kw in tag_lower for kw in keywords):
+                matched.add(skill)
+                found = True
+        if not found:
+            # Direct match against canonical skill names
+            for skill in subject_skills:
+                if skill.lower() in tag_lower or tag_lower in skill.lower().split(" ")[0]:
+                    matched.add(skill)
+
+    return list(matched) if matched else [subject_skills[0]]
+
 from ..algorithms.bayesian_mastery import BayesianMasteryCalculator
 from ..lib.system_config import get_system_config, cfg_float, cfg_int
 from ..database import (
@@ -108,7 +284,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             else:
                 skill_source = all_responses
 
-            skill_nodes = _build_skill_graph(skill_source, mastery_calc)
+            skill_nodes = _build_skill_graph(skill_source, mastery_calc, active_stage["stage_id"] if active_stage else None)
             overall_mastery = mastery_calc.calculate_overall_mastery(skill_nodes)
             strengths, weaknesses = mastery_calc.identify_strengths_and_weaknesses(
                 skill_nodes
@@ -172,7 +348,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         return {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
+            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Credentials": "true"},
             "body": json.dumps(
                 {
                     "success": True,
@@ -216,32 +392,57 @@ def _extract_params(event: Dict) -> Tuple[Optional[str], Optional[str]]:
     return student_id, session_id
 
 
-def _build_skill_graph(responses: List[Dict], mastery_calc: BayesianMasteryCalculator) -> List[SkillNode]:
+def _build_skill_graph(
+    responses: List[Dict],
+    mastery_calc: BayesianMasteryCalculator,
+    stage_id: Optional[str] = None,
+) -> List[SkillNode]:
     """
-    Group all responses by skill_tag and build a SkillNode for each one,
+    Group responses by canonical stage skill name and build a SkillNode for each,
     then run Bayesian mastery estimation.
+
+    Raw skill_tags from questions are mapped to the canonical skill names defined
+    in STAGE_SKILLS for the student's active stage (defaults to oc_prep).
     """
-    skill_stats: Dict[str, Dict[str, int]] = defaultdict(
-        lambda: {"correct": 0, "total": 0}
+    effective_stage = stage_id if (stage_id and stage_id in STAGE_SKILLS) else "oc_prep"
+    stage_subjects = STAGE_SKILLS[effective_stage]
+
+    # skill_id format: "{subject}.{canonical_skill_name}" (spaces → hyphens for ID safety)
+    skill_stats: Dict[str, Dict[str, Any]] = defaultdict(
+        lambda: {"correct": 0, "total": 0, "subject": "general", "skill_name": ""}
     )
 
     for response in responses:
         is_correct = bool(response.get("is_correct", False))
-        for skill_tag in response.get("skill_tags", []):
-            skill_stats[skill_tag]["total"] += 1
+        raw_tags: List[str] = response.get("skill_tags", [])
+        subject: str = response.get("subject", "")
+
+        if subject not in stage_subjects:
+            # Fall back to tagging the raw tags directly so no data is lost
+            for tag in raw_tags or ["unknown"]:
+                skill_id = f"{subject}.{tag.lower().replace(' ', '-')}"
+                skill_stats[skill_id]["total"] += 1
+                skill_stats[skill_id]["subject"] = subject
+                skill_stats[skill_id]["skill_name"] = tag
+                if is_correct:
+                    skill_stats[skill_id]["correct"] += 1
+            continue
+
+        canonical_skills = _map_tags_to_skills(raw_tags, subject, effective_stage)
+        for skill_name in canonical_skills:
+            skill_id = f"{subject}.{skill_name.lower().replace(' ', '-').replace('&', 'and').replace(\"'\", '')}"
+            skill_stats[skill_id]["total"] += 1
+            skill_stats[skill_id]["subject"] = subject
+            skill_stats[skill_id]["skill_name"] = skill_name
             if is_correct:
-                skill_stats[skill_tag]["correct"] += 1
+                skill_stats[skill_id]["correct"] += 1
 
     skill_nodes: List[SkillNode] = []
     for skill_id, stats in skill_stats.items():
-        parts = skill_id.split(".")
-        subject = parts[0] if parts else "general"
-        skill_name = " ".join(p.replace("-", " ").title() for p in parts)
-
         node = SkillNode(
             skill_id=skill_id,
-            skill_name=skill_name,
-            subject=subject,
+            skill_name=stats["skill_name"] or skill_id,
+            subject=stats["subject"],
             attempts=stats["total"],
             correct_attempts=stats["correct"],
         )
@@ -305,6 +506,6 @@ def _build_stage_error_stats(error_patterns: List) -> Dict:
 def _error(status_code: int, message: str) -> Dict:
     return {
         "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
+        "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Credentials": "true"},
         "body": json.dumps({"success": False, "error": {"message": message}}),
     }

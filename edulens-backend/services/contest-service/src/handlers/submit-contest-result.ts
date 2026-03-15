@@ -8,7 +8,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
@@ -30,10 +30,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const { studentId, sessionId, rawScore, totalQuestions, timeTakenSeconds } = body;
     if (!studentId || rawScore == null) return err(400, 'studentId and rawScore are required');
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Contest must be active
-    const contests = await prisma.$queryRawUnsafe(
+    const contests = await query(
       `SELECT id, status FROM contests WHERE id = $1::uuid`,
       contestId
     ) as any[];
@@ -44,7 +44,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     // Verify student is registered
-    const reg = await prisma.$queryRawUnsafe(
+    const reg = await query(
       `SELECT id FROM contest_registrations WHERE contest_id = $1::uuid AND student_id = $2::uuid`,
       contestId, studentId
     ) as any[];
@@ -53,7 +53,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Upsert result (allow re-submission; best score semantics could be applied here)
     const resultId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO contest_results
          (id, contest_id, student_id, session_id, raw_score, total_questions, time_taken_seconds, submitted_at)
        VALUES

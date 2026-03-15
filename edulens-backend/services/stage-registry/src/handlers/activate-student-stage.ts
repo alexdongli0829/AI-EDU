@@ -6,7 +6,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
@@ -17,10 +17,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return err(400, 'studentId and stageId are required');
     }
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Verify stage exists and is active
-    const stages = await prisma.$queryRawUnsafe(
+    const stages = await query(
       `SELECT id, test_formats FROM stages WHERE id = $1 AND is_active = true`,
       stageId
     ) as any[];
@@ -30,7 +30,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     // Check if already enrolled
-    const existing = await prisma.$queryRawUnsafe(
+    const existing = await query(
       `SELECT id, status FROM student_stages WHERE student_id = $1 AND stage_id = $2`,
       studentId, stageId
     ) as any[];
@@ -41,7 +41,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // --- Bridge bootstrapping ---
     // Find the student's most recently completed stage to seed priors
-    const completedStages = await prisma.$queryRawUnsafe(`
+    const completedStages = await query(`
       SELECT ss.stage_id, ss.stage_profile
       FROM student_stages ss
       WHERE ss.student_id = $1 AND ss.status = 'completed'
@@ -57,7 +57,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       const sourceSkillGraph: Record<string, any> = sourceProfile?.skill_graph || {};
 
       // Load bridges from completed stage → new stage
-      const bridges = await prisma.$queryRawUnsafe(`
+      const bridges = await query(`
         SELECT from_skill, to_skill, prior_weight
         FROM skill_bridges
         WHERE from_stage_id = $1 AND to_stage_id = $2
@@ -83,9 +83,15 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       weaknesses: [],
     };
 
+    // Deactivate any currently active stage (enforce single active stage)
+    await query(
+      `UPDATE student_stages SET status = 'paused' WHERE student_id = $1 AND status = 'active' AND stage_id != $2`,
+      studentId, stageId
+    );
+
     // Upsert the student_stages row
     const studentStageId = uuidv4();
-    await prisma.$executeRawUnsafe(`
+    await query(`
       INSERT INTO student_stages (id, student_id, stage_id, status, stage_profile, activated_at)
       VALUES ($1::uuid, $2::uuid, $3, 'active', $4::jsonb, NOW())
       ON CONFLICT (student_id, stage_id)
@@ -93,7 +99,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     `, studentStageId, studentId, stageId, JSON.stringify(initialProfile));
 
     // Retrieve the actual row id (may differ if ON CONFLICT fired)
-    const rows = await prisma.$queryRawUnsafe(
+    const rows = await query(
       `SELECT id FROM student_stages WHERE student_id = $1 AND stage_id = $2`,
       studentId, stageId
     ) as any[];

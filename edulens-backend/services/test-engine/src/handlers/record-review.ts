@@ -7,7 +7,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 function ok(data: object): APIGatewayProxyResult {
   return {
@@ -46,10 +46,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (!questionId) return err(400, 'questionId is required');
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Verify the session_response exists
-    const existing = await prisma.$queryRawUnsafe<any[]>(
+    const existing = await db.unsafe<any[]>(
       `SELECT id, reattempt_count, ai_interactions FROM session_responses
        WHERE session_id = $1::uuid AND question_id = $2::uuid`,
       sessionId, questionId
@@ -64,7 +64,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (reattemptAnswer !== undefined) {
       // Check answer correctness
-      const qResult = await prisma.$queryRawUnsafe<any[]>(
+      const qResult = await db.unsafe<any[]>(
         `SELECT options, correct_answer FROM questions WHERE id = $1::uuid`,
         questionId
       );
@@ -86,18 +86,18 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       sets.push(`reattempt_count = reattempt_count + 1`);
       // Return correctness in response
       const updateQ = `UPDATE session_responses SET reattempt_count = reattempt_count + 1 WHERE session_id = $1::uuid AND question_id = $2::uuid`;
-      await prisma.$executeRawUnsafe(updateQ, sessionId, questionId);
+      await query(updateQ, sessionId, questionId);
 
       const newCount = (existing[0].reattempt_count || 0) + 1;
       // Continue to handle other fields below
       if (incrementAi) {
-        await prisma.$executeRawUnsafe(
+        await query(
           `UPDATE session_responses SET ai_interactions = ai_interactions + 1 WHERE session_id = $1::uuid AND question_id = $2::uuid`,
           sessionId, questionId
         );
       }
       if (errorClassification) {
-        await prisma.$executeRawUnsafe(
+        await query(
           `UPDATE session_responses SET error_classification = $1 WHERE session_id = $2::uuid AND question_id = $3::uuid`,
           errorClassification, sessionId, questionId
         );
@@ -106,14 +106,14 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     if (incrementAi) {
-      await prisma.$executeRawUnsafe(
+      await query(
         `UPDATE session_responses SET ai_interactions = ai_interactions + 1 WHERE session_id = $1::uuid AND question_id = $2::uuid`,
         sessionId, questionId
       );
     }
 
     if (errorClassification) {
-      await prisma.$executeRawUnsafe(
+      await query(
         `UPDATE session_responses SET error_classification = $1 WHERE session_id = $2::uuid AND question_id = $3::uuid`,
         errorClassification, sessionId, questionId
       );

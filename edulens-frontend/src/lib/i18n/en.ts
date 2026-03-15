@@ -31,6 +31,7 @@ const en = {
   nav: {
     dashboard: 'Dashboard',
     practiceTests: 'Practice Tests',
+    contests: 'Contests',
     news: 'News',
     admin: 'Admin',
     backToApp: 'Back to App',

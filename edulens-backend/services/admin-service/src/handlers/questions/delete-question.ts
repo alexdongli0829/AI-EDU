@@ -1,103 +1,69 @@
 /**
  * Lambda Handler: Delete Question
- * DELETE /admin/questions/:id
+ * DELETE /admin/questions/:questionId
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { prisma } from '@edulens/database';
+import { getDb } from '../../lib/database';
 import { HTTP_STATUS } from '@edulens/common';
 import { logger } from '../../utils/logger';
 
-export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
-  const questionId = event.pathParameters?.id;
+function resp(statusCode: number, body: object): APIGatewayProxyResult {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify(body),
+  };
+}
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  const questionId = event.pathParameters?.questionId;
 
   try {
     if (!questionId) {
-      return {
-        statusCode: HTTP_STATUS.BAD_REQUEST,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: false,
-          error: {
-            code: 'MISSING_QUESTION_ID',
-            message: 'Question ID is required',
-          },
-        }),
-      };
+      return resp(HTTP_STATUS.BAD_REQUEST, {
+        success: false,
+        error: { code: 'MISSING_QUESTION_ID', message: 'Question ID is required' },
+      });
     }
 
     logger.info('Deleting question', { questionId });
 
-    // Verify question exists
-    const existingQuestion = await prisma.question.findUnique({
-      where: { id: questionId },
-    });
+    const db = await getDb();
 
-    if (!existingQuestion) {
-      return {
-        statusCode: HTTP_STATUS.NOT_FOUND,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: false,
-          error: {
-            code: 'QUESTION_NOT_FOUND',
-            message: `Question ${questionId} not found`,
-          },
-        }),
-      };
+    const existing = await db`SELECT id FROM questions WHERE id = ${questionId}::uuid LIMIT 1`;
+    if (existing.length === 0) {
+      return resp(HTTP_STATUS.NOT_FOUND, {
+        success: false,
+        error: { code: 'QUESTION_NOT_FOUND', message: `Question ${questionId} not found` },
+      });
     }
 
-    // Check if question has been used in sessions
-    const responseCount = await prisma.sessionResponse.count({
-      where: { questionId },
-    });
+    // Check if used in any session responses
+    const usageResult = await db`
+      SELECT COUNT(*)::int AS count FROM session_responses WHERE question_id = ${questionId}::uuid
+    `;
+    const responseCount = usageResult[0]?.count || 0;
 
     if (responseCount > 0) {
-      // Don't allow deletion if question has responses
-      // Instead, mark it as inactive or archived
-      return {
-        statusCode: HTTP_STATUS.CONFLICT,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: false,
-          error: {
-            code: 'QUESTION_IN_USE',
-            message: `Question has ${responseCount} responses and cannot be deleted. Consider archiving instead.`,
-          },
-        }),
-      };
-    }
-
-    // Delete question
-    await prisma.question.delete({
-      where: { id: questionId },
-    });
-
-    logger.info('Question deleted successfully', { questionId });
-
-    return {
-      statusCode: HTTP_STATUS.OK,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        success: true,
-        message: 'Question deleted successfully',
-      }),
-    };
-  } catch (error) {
-    logger.error('Error deleting question', { questionId, error });
-
-    return {
-      statusCode: HTTP_STATUS.INTERNAL_ERROR,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      return resp(HTTP_STATUS.CONFLICT, {
         success: false,
         error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Failed to delete question',
+          code: 'QUESTION_IN_USE',
+          message: `Question has ${responseCount} responses and cannot be deleted. Consider marking it inactive instead.`,
         },
-      }),
-    };
+      });
+    }
+
+    await db`DELETE FROM questions WHERE id = ${questionId}::uuid`;
+
+    logger.info('Question deleted', { questionId });
+    return resp(HTTP_STATUS.OK, { success: true, message: 'Question deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting question', { questionId, error });
+    return resp(HTTP_STATUS.INTERNAL_ERROR, {
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to delete question' },
+    });
   }
 };

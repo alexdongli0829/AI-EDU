@@ -1,6 +1,11 @@
 {
   "permissions": {
     "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash",
+      "Fetch",
       "Bash(find /home/ubuntu/workspace/AI-EDU -type d -name \"*infrastructure*\" -o -type d -name \"*deploy*\" -o -type d -name \"*terraform*\" -o -type d -name \"*pulumi*\" 2>/dev/null | head -20)",
       "Bash(find /home/ubuntu/workspace/AI-EDU -name \"*output*\" -type f 2>/dev/null | grep -E \"\\\\.\\(json|txt|md\\)$\" | head -10)",
       "Bash(ls /home/ubuntu/workspace/AI-EDU/edulens-infrastructure/cdk.out/ | grep -E \"\\\\.json$\")",
@@ -141,7 +146,19 @@
       "Bash(npx ts-node:*)",
       "Bash(aws sts:*)",
       "Bash(du:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(pnpm install:*)",
+      "Bash(for svc:*)",
+      "Bash(MINIMAL_SCHEMA='generator client {\n  provider      = \"prisma-client-js\"\n  binaryTargets = [\"native\", \"rhel-openssl-3.0.x\"]\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env\\(\"DATABASE_URL\"\\)\n}'\n\nfor svc in admin-service test-engine; do\n  mkdir -p /home/ubuntu/workspace/AI-EDU-V3/edulens-backend/services/$svc/prisma\n  echo \"$MINIMAL_SCHEMA\" > /home/ubuntu/workspace/AI-EDU-V3/edulens-backend/services/$svc/prisma/schema.prisma\n  echo \"Created $svc/prisma/schema.prisma\"\ndone)",
+      "Bash(DATABASE_URL=\"postgresql://dummy:dummy@localhost/dummy\" node_modules/.bin/prisma generate --schema=prisma/schema.prisma 2>&1)",
+      "Bash(DATABASE_URL=\"postgresql://dummy:dummy@localhost/dummy\" node_modules/.bin/prisma generate --schema=prisma/schema.prisma 2>&1; echo \"Exit: $?\"; ls node_modules/.prisma 2>/dev/null || echo \".prisma not created\")",
+      "Bash(aws cloudwatch:*)",
+      "Bash(cat:*)",
+      "Bash(bash /tmp/api-test.sh 2>&1)",
+      "WebFetch(domain:resources.education.nsw.gov.au)",
+      "WebFetch(domain:education.nsw.gov.au)",
+      "WebFetch(domain:educationstandards.nsw.edu.au)",
+      "WebFetch(domain:curriculum.nsw.edu.au)"
     ]
   }
 }

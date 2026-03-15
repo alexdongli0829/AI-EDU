@@ -6,7 +6,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb } from '../lib/database';
 import { verifyPassword } from '../lib/password';
 import { generateToken } from '../lib/jwt';
 
@@ -48,40 +48,42 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'Username and password are required');
     }
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
-    // Map username to the student email pattern
     const studentEmail = `${username.toLowerCase()}@student.edulens.local`;
 
-    const user = await prisma.user.findUnique({
-      where: { email: studentEmail },
-    });
+    const users = await db`
+      SELECT id, email, name, role, password_hash, created_at
+      FROM users WHERE email = ${studentEmail} LIMIT 1
+    `;
 
-    if (!user || user.role !== 'student') {
+    if (users.length === 0 || users[0].role !== 'student') {
       return errorResponse(401, 'Invalid username or password');
     }
 
-    const isPasswordValid = await verifyPassword(password, user.passwordHash);
+    const user = users[0];
+    const isPasswordValid = await verifyPassword(password, user.password_hash);
     if (!isPasswordValid) {
       return errorResponse(401, 'Invalid username or password');
     }
 
-    // Load student profile
-    const studentProfile = await prisma.student.findUnique({
-      where: { userId: user.id },
-    });
+    const studentProfiles = await db`
+      SELECT id, user_id, grade_level, date_of_birth, parent_id, created_at
+      FROM students WHERE user_id = ${user.id} LIMIT 1
+    `;
 
-    if (!studentProfile) {
+    if (studentProfiles.length === 0) {
       return errorResponse(500, 'Student profile not found');
     }
 
+    const sp = studentProfiles[0];
     const token = generateToken({
       userId: user.id,
       email: user.email,
       role: 'student',
     });
 
-    console.log('Student login successful:', { userId: user.id, studentId: studentProfile.id });
+    console.log('Student login successful:', { userId: user.id, studentId: sp.id });
 
     return successResponse({
       success: true,
@@ -91,15 +93,15 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
         email: user.email,
         name: user.name,
         role: user.role,
-        createdAt: user.createdAt.toISOString(),
+        createdAt: new Date(user.created_at).toISOString(),
       },
       student: {
-        id: studentProfile.id,
-        userId: studentProfile.userId,
-        gradeLevel: studentProfile.gradeLevel,
-        dateOfBirth: studentProfile.dateOfBirth.toISOString(),
-        parentId: studentProfile.parentId,
-        createdAt: studentProfile.createdAt.toISOString(),
+        id: sp.id,
+        userId: sp.user_id,
+        gradeLevel: sp.grade_level,
+        dateOfBirth: new Date(sp.date_of_birth).toISOString(),
+        parentId: sp.parent_id,
+        createdAt: new Date(sp.created_at).toISOString(),
       },
     });
   } catch (error) {

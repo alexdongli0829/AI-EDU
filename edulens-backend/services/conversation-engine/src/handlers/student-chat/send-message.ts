@@ -12,14 +12,12 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../../lib/database';
+import { query } from '../../lib/database';
 import { getChatCompletion, Message } from '../../lib/bedrock';
 
 const MAX_HISTORY_TURNS = 10;
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-  const prisma = await getPrismaClient();
-
   try {
     const sessionId = event.pathParameters?.sessionId;
     if (!sessionId) return error(400, 'sessionId is required');
@@ -29,24 +27,24 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!message) return error(400, 'message is required');
 
     // Verify session
-    const sessions = await prisma.$queryRawUnsafe<any[]>(
+    const sessions = await query(
       `SELECT id, student_id, role, agent_state
        FROM chat_sessions WHERE id = $1::uuid AND role = 'student_tutor'`,
       sessionId
-    );
+    ) as any[];
     if (!sessions?.length) return error(404, 'Student chat session not found or inactive');
 
     const studentId: string = sessions[0].student_id;
 
     // Transition: IDLE → PROCESSING
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE chat_sessions SET agent_state = 'processing' WHERE id = $1::uuid`,
       sessionId
     );
 
     // Persist user message
     const userMessageId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO chat_messages (id, session_id, role, content, timestamp)
        VALUES ($1::uuid, $2::uuid, 'user', $3, NOW())`,
       userMessageId, sessionId, message
@@ -54,9 +52,9 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Load context
     const [questionContext, profile, rawHistory] = await Promise.all([
-      loadQuestionContext(prisma, sessionId),
-      loadStudentProfile(prisma, studentId),
-      loadMessageHistory(prisma, sessionId, MAX_HISTORY_TURNS * 2),
+      loadQuestionContext(sessionId),
+      loadStudentProfile(studentId),
+      loadMessageHistory(sessionId, MAX_HISTORY_TURNS * 2),
     ]);
 
     const systemPrompt = buildSocraticPrompt(questionContext, profile);
@@ -65,7 +63,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
     // Transition: PROCESSING → RESPONDING
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE chat_sessions SET agent_state = 'responding' WHERE id = $1::uuid`,
       sessionId
     );
@@ -74,14 +72,14 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Persist assistant message
     const assistantMessageId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO chat_messages (id, session_id, role, content, timestamp)
        VALUES ($1::uuid, $2::uuid, 'assistant', $3, NOW())`,
       assistantMessageId, sessionId, aiResponse
     );
 
     // Transition: RESPONDING → WAITING_FEEDBACK
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE chat_sessions SET agent_state = 'waiting_feedback' WHERE id = $1::uuid`,
       sessionId
     );
@@ -103,15 +101,15 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 // Context loaders
 // ---------------------------------------------------------------------------
 
-async function loadQuestionContext(prisma: any, sessionId: string): Promise<any | null> {
+async function loadQuestionContext(sessionId: string): Promise<any | null> {
   try {
     // The first system message stores the question context as JSON
-    const rows = await prisma.$queryRawUnsafe<any[]>(
+    const rows = await query(
       `SELECT content FROM chat_messages
        WHERE session_id = $1::uuid AND role = 'system'
        ORDER BY timestamp ASC LIMIT 1`,
       sessionId
-    );
+    ) as any[];
     if (!rows?.length) return null;
 
     const meta = JSON.parse(rows[0].content);
@@ -120,16 +118,16 @@ async function loadQuestionContext(prisma: any, sessionId: string): Promise<any 
 
     // Load question details + the student's original wrong answer
     const [questionRows, responseRows] = await Promise.all([
-      prisma.$queryRawUnsafe<any[]>(
+      query(
         `SELECT text, options, correct_answer, skill_tags, difficulty, estimated_time
          FROM questions WHERE id = $1::uuid`,
         questionId
-      ),
+      ) as Promise<any[]>,
       sessionResponseId
-        ? prisma.$queryRawUnsafe<any[]>(
+        ? query(
             `SELECT student_answer, time_spent FROM session_responses WHERE id = $1::uuid`,
             sessionResponseId
-          )
+          ) as Promise<any[]>
         : Promise.resolve([]),
     ]);
 
@@ -142,26 +140,26 @@ async function loadQuestionContext(prisma: any, sessionId: string): Promise<any 
   }
 }
 
-async function loadStudentProfile(prisma: any, studentId: string): Promise<any | null> {
+async function loadStudentProfile(studentId: string): Promise<any | null> {
   try {
-    const rows = await prisma.$queryRawUnsafe<any[]>(
+    const rows = await query(
       `SELECT skill_graph, error_patterns, overall_mastery
        FROM student_profiles WHERE student_id = $1::uuid`,
       studentId
-    );
+    ) as any[];
     return rows?.[0] ?? null;
   } catch {
     return null;
   }
 }
 
-async function loadMessageHistory(prisma: any, sessionId: string, limit: number): Promise<any[]> {
-  return prisma.$queryRawUnsafe<any[]>(
+async function loadMessageHistory(sessionId: string, limit: number): Promise<any[]> {
+  return query(
     `SELECT role, content FROM chat_messages
      WHERE session_id = $1::uuid
      ORDER BY timestamp ASC LIMIT $2`,
     sessionId, limit
-  );
+  ) as Promise<any[]>;
 }
 
 // ---------------------------------------------------------------------------

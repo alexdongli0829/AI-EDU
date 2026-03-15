@@ -3,7 +3,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../../lib/database';
+import { query } from '../../lib/database';
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -44,10 +44,8 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const limit = parseInt(event.queryStringParameters?.limit || '50');
     const offset = parseInt(event.queryStringParameters?.offset || '0');
 
-    const prisma = await getPrismaClient();
-
     // Get messages
-    const messages = await prisma.$queryRawUnsafe(
+    const messages = await query(
       `SELECT id, role, content, timestamp
        FROM chat_messages
        WHERE session_id = $1

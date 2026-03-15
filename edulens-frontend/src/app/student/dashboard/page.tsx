@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { useTestStore } from '@/store/test-store';
+import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { studentAnalyticsService, StudentAnalytics } from '@/services/student-analytics';
@@ -17,46 +18,61 @@ import {
   Calculator,
   Lightbulb,
   TrendingUp,
+  PenLine,
 } from 'lucide-react';
 
-const SUBJECTS = [
-  {
-    key: 'math' as const,
-    dnaKey: 'math' as const,
-    testSubject: 'math',
-    label: 'Mathematical Reasoning',
-    short: 'Math',
-    color: '#2563EB',
-    light: '#EFF6FF',
-    border: '#BFDBFE',
-    icon: Calculator,
-    description: 'Number, algebra, geometry & problem solving',
+// Stage metadata — maps stage_id to display info and per-subject labels/descriptions
+const STAGE_META: Record<string, {
+  label: string; color: string; light: string;
+  subjects: { key: 'math' | 'thinking' | 'reading' | 'writing'; label: string; testSubject: string; description: string }[];
+}> = {
+  oc_prep: {
+    label: 'OC Preparation', color: '#2563EB', light: '#EFF6FF',
+    subjects: [
+      { key: 'math',     label: 'Mathematical Reasoning', testSubject: 'math',            description: 'Number & algebra, fractions, measurement, geometry, statistics & problem solving' },
+      { key: 'thinking', label: 'Thinking Skills',        testSubject: 'general_ability', description: 'Logical reasoning, pattern recognition, spatial thinking & verbal analogies' },
+      { key: 'reading',  label: 'English Reading',        testSubject: 'english',         description: 'Reading comprehension, vocabulary, inference, grammar & text interpretation' },
+    ],
   },
-  {
-    key: 'thinking' as const,
-    dnaKey: 'thinking' as const,
-    testSubject: 'general_ability',
-    label: 'Thinking Skills',
-    short: 'Thinking',
-    color: '#7C3AED',
-    light: '#F5F3FF',
-    border: '#DDD6FE',
-    icon: Lightbulb,
-    description: 'Logic, patterns, spatial & verbal reasoning',
+  selective: {
+    label: 'Selective High School', color: '#7C3AED', light: '#F5F3FF',
+    subjects: [
+      { key: 'math',     label: 'Mathematical Reasoning', testSubject: 'math',            description: 'Number & algebra, measurement & space, statistics, financial maths & multi-step problem solving. 35 questions / 40 min, no calculator.' },
+      { key: 'thinking', label: 'Thinking Skills',        testSubject: 'general_ability', description: 'Abstract reasoning, logical deduction, pattern recognition, spatial & verbal reasoning. No prior knowledge required. 40 questions / 40 min.' },
+      { key: 'reading',  label: 'Reading',                testSubject: 'english',         description: 'Non-fiction, fiction, poetry & articles — comprehension, inference, vocabulary in context & literary techniques. 17 questions / 45 min.' },
+      { key: 'writing',  label: 'Writing',                testSubject: 'writing',         description: 'One open-response creative or persuasive writing task. Assessed on ideas, structure, language features, grammar, punctuation & vocabulary. 30 min.' },
+    ],
   },
-  {
-    key: 'reading' as const,
-    dnaKey: 'reading' as const,
-    testSubject: 'english',
-    label: 'English Reading',
-    short: 'English',
-    color: '#0D9488',
-    light: '#F0FDFA',
-    border: '#99F6E4',
-    icon: BookOpen,
-    description: 'Comprehension, vocabulary, grammar & inference',
+  hsc: {
+    label: 'HSC Preparation', color: '#0D9488', light: '#F0FDFA',
+    subjects: [
+      { key: 'math',     label: 'Mathematics', testSubject: 'math',            description: 'Functions & graphs, calculus, financial maths, statistics, algebra & measurement' },
+      { key: 'thinking', label: 'Sciences',    testSubject: 'general_ability', description: 'Scientific reasoning, data analysis & experiment design across Physics, Chemistry & Biology' },
+      { key: 'reading',  label: 'English',     testSubject: 'english',         description: 'Textual analysis, essay writing, creative writing, literary techniques & text in context' },
+    ],
   },
+  lifelong: {
+    label: 'University & Beyond', color: '#D97706', light: '#FFFBEB',
+    subjects: [
+      { key: 'math',     label: 'Quantitative Reasoning', testSubject: 'math',            description: 'Statistical analysis, mathematical modelling, data interpretation & financial literacy' },
+      { key: 'thinking', label: 'Critical Thinking',      testSubject: 'general_ability', description: 'Argumentation, evidence evaluation, logical fallacies, analytical reasoning & synthesis' },
+      { key: 'reading',  label: 'Literacy',               testSubject: 'english',         description: 'Academic reading & writing, rhetorical analysis, vocabulary & text critique' },
+    ],
+  },
+};
+
+// Style constants per subject slot (index 0=math, 1=thinking, 2=reading, 3=writing)
+const SUBJECT_STYLES = [
+  { icon: Calculator, color: '#2563EB', light: '#EFF6FF', border: '#BFDBFE' },
+  { icon: Lightbulb,  color: '#7C3AED', light: '#F5F3FF', border: '#DDD6FE' },
+  { icon: BookOpen,   color: '#0D9488', light: '#F0FDFA', border: '#99F6E4' },
+  { icon: PenLine,    color: '#EA580C', light: '#FFF7ED', border: '#FED7AA' },
 ] as const;
+
+const DEFAULT_SUBJECTS = STAGE_META.oc_prep.subjects.map((s, i) => ({
+  ...s,
+  ...SUBJECT_STYLES[i],
+}));
 
 function scoreStatusColor(status: 'good' | 'ok' | 'low') {
   if (status === 'good') return 'text-green-600';
@@ -70,18 +86,15 @@ export default function StudentDashboard() {
   const { tests, loadTests } = useTestStore();
   const { t } = useI18n();
   const [analytics, setAnalytics] = useState<StudentAnalytics | null>(null);
+  const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
+    if (!isAuthenticated) { router.push('/login'); return; }
     if (!student) {
       if (user?.role === 'parent') return;
-      router.push('/login');
-      return;
+      router.push('/login'); return;
     }
     loadAnalytics();
     loadTests();
@@ -89,18 +102,20 @@ export default function StudentDashboard() {
 
   const startTestForSubject = (testSubject: string) => {
     const test = tests.find(t => t.subject === testSubject);
-    if (test) {
-      router.push(`/student/test/take/${test.id}`);
-    } else {
-      router.push('/student/test');
-    }
+    if (test) router.push(`/student/test/take/${test.id}`);
+    else router.push('/student/test');
   };
 
   const loadAnalytics = async () => {
     if (!student?.id) return;
     setLoading(true);
     try {
-      setAnalytics(await studentAnalyticsService.getStudentAnalytics(student.id));
+      // Fetch active stage first, then filter analytics to that stage
+      const stagesRes = await apiClient.listStudentStages(student.id).catch(() => ({ success: false, stages: [] }));
+      const activeStage = stagesRes.success ? (stagesRes.stages ?? []).find((s: any) => s.status === 'active') : null;
+      const stageId = activeStage?.stage_id ?? undefined;
+      setActiveStageId(stageId ?? null);
+      setAnalytics(await studentAnalyticsService.getStudentAnalytics(student.id, stageId));
     } catch {
       setError('Unable to load analytics. Please try again.');
     } finally {
@@ -109,6 +124,13 @@ export default function StudentDashboard() {
   };
 
   if (!user || !student) return null;
+
+  const stageMeta = activeStageId ? STAGE_META[activeStageId] : null;
+  // Merge stage-specific labels/descriptions with fixed style constants
+  const subjects = (stageMeta ? stageMeta.subjects : DEFAULT_SUBJECTS).map((s, i) => ({
+    ...s,
+    ...SUBJECT_STYLES[i],
+  }));
 
   if (loading) {
     return (
@@ -151,8 +173,14 @@ export default function StudentDashboard() {
             {t.studentDash.pickSubject}
           </p>
 
+          {stageMeta && (
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full text-white mb-6" style={{ backgroundColor: stageMeta.color }}>
+              {stageMeta.label}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {SUBJECTS.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
+            {subjects.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
               <button
                 key={key}
                 onClick={() => startTestForSubject(testSubject)}
@@ -181,11 +209,19 @@ export default function StudentDashboard() {
     <div className="min-h-screen bg-gradient-to-b from-teal-50/40 via-white to-white">
 
       <div className="max-w-6xl mx-auto px-4 pt-6 pb-1">
-        <h1 className="text-2xl font-extrabold text-gray-900 mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
-          {t.studentDash.myDashboard}
-        </h1>
+        <div className="flex items-center gap-2 mb-1">
+          <h1 className="text-2xl font-extrabold text-gray-900" style={{ fontFamily: 'var(--font-heading)' }}>
+            {t.studentDash.myDashboard}
+          </h1>
+          {stageMeta && (
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full text-white" style={{ backgroundColor: stageMeta.color }}>
+              {stageMeta.label}
+            </span>
+          )}
+        </div>
         <p className="text-sm text-gray-400">
           Grade {student.gradeLevel} · {analytics.totalTests} test{analytics.totalTests !== 1 ? 's' : ''} completed · Last activity: {analytics.lastTestDate}
+          {!stageMeta && <span className="ml-1 text-amber-500">(all stages)</span>}
         </p>
       </div>
 
@@ -210,11 +246,14 @@ export default function StudentDashboard() {
         {/* ── Score Trend by Subject ── */}
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-extrabold text-gray-800" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.scoreTrend}</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-extrabold text-gray-800" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.scoreTrend}</CardTitle>
+              {stageMeta && <span className="text-xs font-medium text-gray-400">· {stageMeta.label}</span>}
+            </div>
           </CardHeader>
           <CardContent className="space-y-5">
-            {SUBJECTS.map(({ key, label, color }) => {
-              const pts = analytics.scoreTrend[key];
+            {subjects.map(({ key, label, color }) => {
+              const pts = (analytics.scoreTrend as any)[key] ?? [];
               if (pts.length === 0) return (
                 <div key={key} className="flex items-center gap-3">
                   <span className="text-xs font-semibold w-36 flex-shrink-0" style={{ color }}>{label}</span>
@@ -259,7 +298,7 @@ export default function StudentDashboard() {
         <div>
           <h2 className="text-lg font-extrabold text-gray-800 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>{t.studentDash.takeATest}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {SUBJECTS.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
+            {subjects.map(({ label, description, color, light, border, icon: Icon, key, testSubject }) => (
               <button
                 key={key}
                 onClick={() => startTestForSubject(testSubject)}

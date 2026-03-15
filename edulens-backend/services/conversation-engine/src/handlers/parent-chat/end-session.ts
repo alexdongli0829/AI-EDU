@@ -8,7 +8,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
-import { getPrismaClient } from '../../lib/database';
+import { query } from '../../lib/database';
 
 const eventBridge = new EventBridgeClient({
   region: process.env.AWS_REGION || 'ap-southeast-2',
@@ -50,24 +50,22 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'sessionId is required');
     }
 
-    const prisma = await getPrismaClient();
-
     // Fetch session info before closing (need student_id for the event)
-    const sessions = await prisma.$queryRawUnsafe<any[]>(
+    const sessions = await query(
       `SELECT id, user_id, student_id FROM chat_sessions WHERE id = $1`,
       sessionId
-    );
+    ) as any[];
     const studentId: string | null = sessions?.[0]?.student_id ?? null;
 
     // Count messages to include in event payload
-    const countRows = await prisma.$queryRawUnsafe<any[]>(
+    const countRows = await query(
       `SELECT COUNT(*)::int AS count FROM chat_messages WHERE session_id = $1`,
       sessionId
-    );
+    ) as any[];
     const messageCount: number = countRows?.[0]?.count ?? 0;
 
     // Mark session ended + reset agent state
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE chat_sessions
        SET status = 'ended', ended_at = NOW(), agent_state = 'idle'
        WHERE id = $1`,

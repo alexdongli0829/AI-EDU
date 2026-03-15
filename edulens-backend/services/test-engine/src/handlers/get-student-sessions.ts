@@ -4,20 +4,25 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { query } from '../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
     const studentId = event.pathParameters?.studentId || event.queryStringParameters?.studentId;
     if (!studentId) return response(400, { success: false, error: 'studentId is required' });
 
-    const prisma = await getPrismaClient();
+    const stageId = event.queryStringParameters?.stageId;
 
-    // Get all completed sessions for this student
-    const sessions = await prisma.$queryRawUnsafe<any[]>(
+    // Get all completed sessions for this student, optionally filtered by stage
+    const params: any[] = [studentId];
+    const stageFilter = stageId ? `AND ts.stage_id = $2` : '';
+    if (stageId) params.push(stageId);
+
+    const sessions = await query(
       `SELECT
         ts.id as session_id,
         ts.test_id,
+        ts.stage_id,
         t.title as test_title,
         t.subject,
         ts.status,
@@ -33,22 +38,20 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
        LEFT JOIN tests t ON ts.test_id = t.id
        WHERE ts.student_id = $1::uuid
          AND ts.status = 'completed'
+         ${stageFilter}
        ORDER BY ts.completed_at DESC`,
-      studentId
-    );
+      ...params
+    ) as any[];
 
     // For each session, get the per-question answers
     const sessionsWithAnswers = await Promise.all(
       sessions.map(async (session: any) => {
-        const answers = await prisma.$queryRawUnsafe<any[]>(
+        const answers = await query(
           `SELECT
             sr.question_id,
             sr.student_answer,
             sr.is_correct,
             sr.time_spent,
-            sr.reattempt_count,
-            sr.ai_interactions,
-            sr.error_classification,
             q.text as question_text,
             q.options as question_options,
             q.correct_answer,
@@ -58,13 +61,14 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
            FROM session_responses sr
            JOIN questions q ON sr.question_id = q.id
            WHERE sr.session_id = $1::uuid
-           ORDER BY sr.created_at ASC`,
+           ORDER BY sr.id ASC`,
           session.session_id
-        );
+        ) as any[];
 
         return {
           sessionId: session.session_id,
           testId: session.test_id,
+          stageId: session.stage_id || null,
           testTitle: session.test_title || 'OC Practice Test',
           subject: session.subject,
           status: session.status,
@@ -97,9 +101,6 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
               skillTags: a.skill_tags || [],
               difficulty: parseFloat(a.difficulty) || 0.5,
               subject: a.question_subject,
-              reattemptCount: parseInt(a.reattempt_count) || 0,
-              aiInteractions: parseInt(a.ai_interactions) || 0,
-              errorClassification: a.error_classification || null,
             };
           }),
         };

@@ -76,6 +76,7 @@ export declare class LambdaStack extends cdk.Stack {
     readonly getSkillBridgesFunction: lambda.Function;
     readonly listStudentStagesFunction: lambda.Function;
     readonly activateStudentStageFunction: lambda.Function;
+    readonly deactivateStudentStageFunction: lambda.Function;
     readonly listContestsFunction: lambda.Function;
     readonly registerContestFunction: lambda.Function;
     readonly submitContestResultFunction: lambda.Function;

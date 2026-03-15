@@ -7,7 +7,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../lib/database';
+import { getDb } from '../lib/database';
 import { hashPassword, validatePasswordStrength } from '../lib/password';
 
 interface CreateStudentRequest {
@@ -70,26 +70,17 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, passwordValidation.message || 'Invalid password');
     }
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
-    // Verify parent exists and is a parent
-    const parent = await prisma.user.findUnique({
-      where: { id: request.parentId },
-    });
-
-    if (!parent || parent.role !== 'parent') {
+    const parents = await db`SELECT id, role FROM users WHERE id = ${request.parentId} LIMIT 1`;
+    if (parents.length === 0 || parents[0].role !== 'parent') {
       return errorResponse(403, 'Invalid parent account');
     }
 
-    // Use username as email with a student-specific domain
     const studentEmail = `${request.username.toLowerCase()}@student.edulens.local`;
 
-    // Check if username already taken
-    const existingUser = await prisma.user.findUnique({
-      where: { email: studentEmail },
-    });
-
-    if (existingUser) {
+    const existing = await db`SELECT id FROM users WHERE email = ${studentEmail} LIMIT 1`;
+    if (existing.length > 0) {
       return errorResponse(409, 'Username already taken. Please choose a different username.');
     }
 
@@ -97,27 +88,15 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const userId = uuidv4();
     const studentId = uuidv4();
 
-    // Create user record for the student
-    await prisma.user.create({
-      data: {
-        id: userId,
-        email: studentEmail,
-        name: request.name,
-        role: 'student',
-        passwordHash,
-      },
-    });
+    await db`
+      INSERT INTO users (id, email, name, role, password_hash, created_at, updated_at)
+      VALUES (${userId}, ${studentEmail}, ${request.name}, 'student', ${passwordHash}, NOW(), NOW())
+    `;
 
-    // Create student profile linked to parent
-    await prisma.student.create({
-      data: {
-        id: studentId,
-        userId: userId,
-        gradeLevel: request.gradeLevel,
-        dateOfBirth: new Date(request.dateOfBirth),
-        parentId: request.parentId,
-      },
-    });
+    await db`
+      INSERT INTO students (id, user_id, grade_level, date_of_birth, parent_id, created_at, updated_at)
+      VALUES (${studentId}, ${userId}, ${request.gradeLevel}, ${request.dateOfBirth}::date, ${request.parentId}, NOW(), NOW())
+    `;
 
     console.log('Student created:', { userId, studentId, parentId: request.parentId });
 
@@ -137,7 +116,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   } catch (error) {
     console.error('Create student error:', error);
 
-    if (error instanceof Error && error.message.includes('Unique constraint')) {
+    if (error instanceof Error && error.message.includes('unique')) {
       return errorResponse(409, 'Username already taken');
     }
 

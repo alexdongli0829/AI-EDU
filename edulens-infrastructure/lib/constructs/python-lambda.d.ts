@@ -22,6 +22,8 @@ export interface PythonLambdaProps {
     environment?: Record<string, string>;
     timeout?: cdk.Duration;
     memorySize?: number;
+    /** Requirements file to install (relative to codePath). Default: requirements.txt */
+    requirementsFile?: string;
 }
 export declare class PythonLambda extends Construct {
     readonly function: lambda.Function;

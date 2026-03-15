@@ -8,7 +8,7 @@
  * Cached in-process for 5 minutes to avoid a DB round-trip on every request.
  */
 
-import { getPrismaClient } from './database';
+import { getDb, query } from './database';
 
 // ─── Canonical defaults ──────────────────────────────────────────────────────
 // All keys must be declared here. Unknown keys are silently ignored on PUT.
@@ -104,8 +104,8 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export async function getSystemConfig(): Promise<Record<string, string>> {
   if (_cache && Date.now() < _cacheExpiry) return _cache;
 
-  const prisma = await getPrismaClient();
-  const rows = await prisma.$queryRawUnsafe<Array<{ key: string; value: string }>>(
+  const db = await getDb();
+  const rows = await db.unsafe<Array<{ key: string; value: string }>>(
     `SELECT key, value FROM system_config`
   );
 

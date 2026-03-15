@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { studentAnalyticsService, StudentAnalytics, SkillEntry } from '@/services/student-analytics';
@@ -26,6 +26,7 @@ import {
   Calculator,
   Lightbulb,
   BookOpen,
+  PenLine,
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
@@ -54,11 +55,28 @@ interface StudentInsights {
   subjects: SubjectInsight[];
 }
 
-const SUBJECT_UI = {
-  math:             { label: 'Mathematical Reasoning', color: '#2563EB', light: '#EFF6FF', border: '#BFDBFE', icon: Calculator },
-  general_ability:  { label: 'Thinking Skills',        color: '#7C3AED', light: '#F5F3FF', border: '#DDD6FE', icon: Lightbulb },
-  english:          { label: 'English Reading',         color: '#0D9488', light: '#F0FDFA', border: '#99F6E4', icon: BookOpen },
-} as const;
+// Stage-specific subject label mapping
+const STAGE_SUBJECT_LABELS: Record<string, {
+  math: string; general_ability: string; english: string; writing?: string;
+}> = {
+  oc_prep:   { math: 'Mathematical Reasoning', general_ability: 'Thinking Skills',   english: 'English Reading'                     },
+  selective: { math: 'Mathematical Reasoning', general_ability: 'Thinking Skills',   english: 'Reading',         writing: 'Writing' },
+  hsc:       { math: 'Mathematics',            general_ability: 'Sciences',          english: 'English'                             },
+  lifelong:  { math: 'Quantitative Reasoning', general_ability: 'Critical Thinking', english: 'Literacy'                            },
+};
+const DEFAULT_SUBJECT_LABELS = STAGE_SUBJECT_LABELS.oc_prep;
+
+function buildSubjectUI(stageId: string | null | undefined) {
+  const labels = (stageId && STAGE_SUBJECT_LABELS[stageId]) ? STAGE_SUBJECT_LABELS[stageId] : DEFAULT_SUBJECT_LABELS;
+  return {
+    math:            { label: labels.math,            color: '#2563EB', light: '#EFF6FF', border: '#BFDBFE', bg: 'bg-blue-50',    icon: Calculator },
+    general_ability: { label: labels.general_ability, color: '#7C3AED', light: '#F5F3FF', border: '#DDD6FE', bg: 'bg-purple-50',  icon: Lightbulb  },
+    english:         { label: labels.english,         color: '#0D9488', light: '#F0FDFA', border: '#99F6E4', bg: 'bg-teal-50',    icon: BookOpen   },
+    ...(labels.writing ? {
+      writing: { label: labels.writing, color: '#EA580C', light: '#FFF7ED', border: '#FED7AA', bg: 'bg-orange-50', icon: PenLine },
+    } : {}),
+  };
+}
 
 interface StudentInfo {
   id: string;
@@ -69,9 +87,18 @@ interface StudentInfo {
   testsCompleted: number;
 }
 
-export default function ParentStudentAnalyticsPage() {
+const STAGE_META: Record<string, { label: string; color: string }> = {
+  oc_prep:   { label: 'OC Preparation',      color: '#2563EB' },
+  selective: { label: 'Selective High School',color: '#7C3AED' },
+  hsc:       { label: 'HSC Preparation',      color: '#0D9488' },
+  lifelong:  { label: 'University & Beyond',  color: '#D97706' },
+};
+
+function ParentStudentAnalyticsInner() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const stageParam = searchParams.get('stage'); // stage focus passed from dashboard
   const { t } = useI18n();
   const studentId = params.studentId as string;
 
@@ -83,12 +110,23 @@ export default function ParentStudentAnalyticsPage() {
   const [insightsRegenerating, setInsightsRegenerating] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeStage, setActiveStage] = useState<{ stage_id: string; display_name: string } | null>(null);
 
   useEffect(() => {
+    if (!user) return; // wait for Zustand to hydrate from localStorage
     loadStudentData();
-  }, [studentId]);
+  }, [studentId, stageParam, user?.id]);
+
+  // Load insights independently so a failure in loadStudentData never blocks them
+  useEffect(() => {
+    if (!user) return;
+    loadInsights(false);
+  }, [studentId, user?.id]);
 
   const loadStudentData = async () => {
+    setLoading(true);
+    setAnalytics(null);
+    setInsights(null);
     try {
       if (user?.id) {
         const response = await apiClient.listStudents(user.id);
@@ -98,12 +136,14 @@ export default function ParentStudentAnalyticsPage() {
           setStudent(foundStudent);
         }
       }
-      const studentAnalytics = await studentAnalyticsService.getStudentAnalytics(studentId);
+      // Load active stage for context
+      const stagesRes = await apiClient.listStudentStages(studentId).catch(() => null);
+      if (stagesRes?.success) {
+        const active = stagesRes.stages?.find((s: any) => s.status === 'active') ?? null;
+        setActiveStage(active);
+      }
+      const studentAnalytics = await studentAnalyticsService.getStudentAnalytics(studentId, stageParam ?? undefined);
       setAnalytics(studentAnalytics);
-
-      // Auto-generate insights if student has test data
-      // Use forceRefresh=false: backend returns cached if fresh, otherwise generates
-      loadInsights(false);
     } catch (error) {
       console.error('Failed to load student analytics:', error);
     } finally {
@@ -119,7 +159,19 @@ export default function ParentStudentAnalyticsPage() {
         ? await apiClient.regenerateStudentInsights(studentId)
         : await apiClient.getStudentInsights(studentId);
       if (res.success && res.insights) {
-        setInsights(res.insights);
+        // postgres.js may return JSONB as a raw string — always ensure it's a parsed object
+        const insightsData = typeof res.insights === 'string' ? JSON.parse(res.insights) : res.insights;
+        setInsights({ subjects: [], ...insightsData });
+        // If backend flagged the cache as stale, kick off a background regeneration
+        // so the next GET will return fresh data without making the user wait.
+        if (!forceRefresh && res.stale) {
+          apiClient.regenerateStudentInsights(studentId).then((fresh) => {
+            if (fresh.success && fresh.insights) {
+              const freshData = typeof fresh.insights === 'string' ? JSON.parse(fresh.insights) : fresh.insights;
+              setInsights({ subjects: [], ...freshData });
+            }
+          }).catch(() => {/* silent — stale data is still usable */});
+        }
       } else if (res.reason === 'no_tests') {
         // no sessions yet — not an error
       } else if (!res.insights) {
@@ -152,7 +204,28 @@ export default function ParentStudentAnalyticsPage() {
     );
   }
 
-  if (!student) return null;
+  if (!student) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+    </div>
+  );
+
+  const effectiveStageId = stageParam ?? activeStage?.stage_id ?? null;
+  const subjectUI = buildSubjectUI(effectiveStageId);
+
+  // Derived arrays used in Skill Analysis, Error Analysis, and Recent Tests
+  const dnaSubjects = [
+    { key: 'math'     as const, ...subjectUI.math     },
+    { key: 'thinking' as const, ...subjectUI.general_ability },
+    { key: 'reading'  as const, ...subjectUI.english  },
+    ...(subjectUI.writing ? [{ key: 'writing' as const, ...subjectUI.writing }] : []),
+  ];
+  const backendSubjects = [
+    { subjectKey: 'math'            as const, ...subjectUI.math            },
+    { subjectKey: 'general_ability' as const, ...subjectUI.general_ability },
+    { subjectKey: 'english'         as const, ...subjectUI.english         },
+    ...(subjectUI.writing ? [{ subjectKey: 'writing' as const, ...subjectUI.writing }] : []),
+  ];
 
   return (
     <div
@@ -172,6 +245,11 @@ export default function ParentStudentAnalyticsPage() {
             <h1 className="text-base font-bold text-gray-900">{t.analytics.learningAnalytics(student.name)}</h1>
             <p className="text-xs text-gray-500">
               {t.common.grade} {student.gradeLevel} · {t.analytics.parentView} · {analytics?.totalTests || 0} {t.common.testsCompleted.toLowerCase()}
+              {(stageParam ? STAGE_META[stageParam] : activeStage ? STAGE_META[activeStage.stage_id] : null) && (
+                <span className="ml-2 font-semibold" style={{ color: (stageParam ? STAGE_META[stageParam] : STAGE_META[activeStage!.stage_id])?.color }}>
+                  · {(stageParam ? STAGE_META[stageParam] : STAGE_META[activeStage!.stage_id])?.label}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -196,7 +274,10 @@ export default function ParentStudentAnalyticsPage() {
             Performance Overview
           </button>
           <button
-            onClick={() => router.push(`/parent/students/${studentId}/error-analysis`)}
+            onClick={() => {
+              const stage = stageParam ?? activeStage?.stage_id;
+              router.push(`/parent/students/${studentId}/error-analysis${stage ? `?stage=${stage}` : ''}`);
+            }}
             className="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
           >
             <AlertCircle className="h-4 w-4 inline mr-2" />
@@ -327,9 +408,9 @@ export default function ParentStudentAnalyticsPage() {
               )}
 
               {/* Per-subject cards */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {insights.subjects.map(sub => {
-                  const ui = SUBJECT_UI[sub.subject as keyof typeof SUBJECT_UI];
+              <div className={`grid grid-cols-1 gap-4 ${(insights.subjects ?? []).length === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+                {(insights.subjects ?? []).map(sub => {
+                  const ui = subjectUI[sub.subject as keyof typeof subjectUI];
                   if (!ui) return null;
                   const Icon = ui.icon;
                   const trendIcon =
@@ -451,14 +532,10 @@ export default function ParentStudentAnalyticsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
-              {([
-                { key: 'math' as const,     label: 'Mathematical Reasoning', color: '#2563EB', bg: 'bg-blue-50' },
-                { key: 'thinking' as const, label: 'Thinking Skills',        color: '#7C3AED', bg: 'bg-purple-50' },
-                { key: 'reading' as const,  label: 'English Reading',        color: '#0D9488', bg: 'bg-teal-50' },
-              ] as const).map(({ key, label, color, bg }) => {
-                const skills: SkillEntry[] = analytics.skillBreakdown[key];
+              {dnaSubjects.map(({ key, label, color, bg }) => {
+                const skills: SkillEntry[] = analytics.skillBreakdown[key] ?? [];
                 const practiced = skills.filter(s => s.total > 0);
-                const trendData = analytics.monthTrend[key];
+                const trendData = analytics.monthTrend[key] ?? [];
                 return (
                   <div key={key}>
                     <div className={`flex items-center justify-between px-3 py-2 rounded-md mb-3 ${bg}`}>
@@ -604,7 +681,7 @@ export default function ParentStudentAnalyticsPage() {
         )}
 
         {/* ── Error Analysis by Subject ── */}
-        {analytics && (analytics.errorAnalysis.math.total > 0 || analytics.errorAnalysis.thinking.total > 0 || analytics.errorAnalysis.reading.total > 0) && (
+        {analytics && (analytics.errorAnalysis.math.total > 0 || analytics.errorAnalysis.thinking.total > 0 || analytics.errorAnalysis.reading.total > 0 || (analytics.errorAnalysis.writing?.total ?? 0) > 0) && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>{t.analytics.errorAnalysis}</CardTitle>
@@ -613,13 +690,9 @@ export default function ParentStudentAnalyticsPage() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {([
-                  { key: 'math' as const,     label: 'Mathematical Reasoning', color: '#2563EB', bg: 'bg-blue-50' },
-                  { key: 'thinking' as const, label: 'Thinking Skills',        color: '#7C3AED', bg: 'bg-purple-50' },
-                  { key: 'reading' as const,  label: 'English Reading',        color: '#0D9488', bg: 'bg-teal-50' },
-                ] as const).map(({ key, label, color, bg }) => {
-                  const err = analytics.errorAnalysis[key];
+              <div className={`grid grid-cols-1 gap-6 ${dnaSubjects.length === 4 ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'}`}>
+                {dnaSubjects.map(({ key, label, color, bg }) => {
+                  const err = analytics.errorAnalysis[key] ?? { total: 0, careless: 0, timePressure: 0, conceptGap: 0, other: 0 };
                   if (err.total === 0) return (
                     <div key={key}>
                       <div className={`px-3 py-1.5 rounded-md mb-3 ${bg}`}>
@@ -675,12 +748,8 @@ export default function ParentStudentAnalyticsPage() {
               <CardTitle>{t.analytics.recentTests}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {([
-                  { subjectKey: 'math',            label: 'Mathematical Reasoning', color: '#2563EB', bg: 'bg-blue-50' },
-                  { subjectKey: 'general_ability', label: 'Thinking Skills',        color: '#7C3AED', bg: 'bg-purple-50' },
-                  { subjectKey: 'english',         label: 'English Reading',        color: '#0D9488', bg: 'bg-teal-50' },
-                ] as const).map(({ subjectKey, label, color, bg }) => {
+              <div className={`grid grid-cols-1 gap-6 ${backendSubjects.length === 4 ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'}`}>
+                {backendSubjects.map(({ subjectKey, label, color, bg }) => {
                   const tests = analytics.recentResults.filter(t => t.subject === subjectKey);
                   return (
                     <div key={subjectKey}>
@@ -717,5 +786,17 @@ export default function ParentStudentAnalyticsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ParentStudentAnalyticsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+      </div>
+    }>
+      <ParentStudentAnalyticsInner />
+    </Suspense>
   );
 }

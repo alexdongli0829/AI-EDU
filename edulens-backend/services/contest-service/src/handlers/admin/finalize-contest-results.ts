@@ -12,7 +12,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../../lib/database';
+import { getDb, query } from '../../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
@@ -21,10 +21,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (!contestId) return err(400, 'contestId is required');
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Verify contest is in 'scoring' status
-    const contests = await prisma.$queryRawUnsafe(
+    const contests = await query(
       `SELECT id, status FROM contests WHERE id = $1::uuid`,
       contestId
     ) as any[];
@@ -35,7 +35,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     // Load all results ordered by score
-    const results = await prisma.$queryRawUnsafe(`
+    const results = await query(`
       SELECT id, student_id, raw_score
       FROM contest_results
       WHERE contest_id = $1::uuid
@@ -65,7 +65,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Batch update percentile ranks
     for (const u of updates) {
-      await prisma.$executeRawUnsafe(
+      await query(
         `UPDATE contest_results
          SET percentile_rank = $1, rank = $2, finalized_at = NOW()
          WHERE id = $3::uuid`,
@@ -76,7 +76,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     // Transition to finalized
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE contests SET status = 'finalized', updated_at = NOW() WHERE id = $1::uuid`,
       contestId
     );

@@ -4,7 +4,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
@@ -17,9 +17,9 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       };
     }
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
-    const rows = await prisma.$queryRawUnsafe(`
+    const rows = await query(`
       SELECT id, display_name, test_formats, student_agent_prompt, parent_agent_prompt,
              sort_order, is_active, created_at
       FROM stages

@@ -4,7 +4,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -47,11 +47,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'Missing required fields: title, subject, gradeLevel, timeLimit, questions');
     }
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Create test
     const testId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO tests (id, title, description, subject, grade_level, time_limit, question_count)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       testId,
@@ -80,7 +80,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       }
 
       const questionId = uuidv4();
-      await prisma.$executeRawUnsafe(
+      await query(
         `INSERT INTO questions (id, test_id, question_type, subject, question_text, options, correct_answer, skill_tags, difficulty_level, order_index)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         questionId,

@@ -124,17 +124,27 @@ async function handleSingleStudent(studentId: string, forceRefresh: boolean): Pr
   const [, sysConfig] = await Promise.all([getDb(), getSystemConfig()]);
   const staleHours = cfgNum(sysConfig, 'testInsightsCacheHours');
 
-  // Return cache if fresh
+  // Return cache immediately on GET (stale-while-revalidate).
+  // Even stale cached insights are returned instantly — POST or the daily
+  // scheduled batch handles regeneration when the user explicitly asks.
   if (!forceRefresh) {
     const rows = await query<any[]>(
       `SELECT insights_json, last_insights_at FROM student_profiles WHERE student_id = $1::uuid`,
       studentId
     ) as any[];
-    if (rows.length && rows[0].insights_json && rows[0].last_insights_at) {
-      const ageHours = (Date.now() - new Date(rows[0].last_insights_at).getTime()) / 3_600_000;
-      if (ageHours < staleHours) {
-        return ok({ success: true, insights: rows[0].insights_json, cached: true });
-      }
+    if (rows.length && rows[0].insights_json) {
+      const ageHours = rows[0].last_insights_at
+        ? (Date.now() - new Date(rows[0].last_insights_at).getTime()) / 3_600_000
+        : Infinity;
+      // postgres.js may return JSONB as a raw string in unsafe() mode — always ensure it's a parsed object
+      const raw = rows[0].insights_json;
+      const insightsObj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return ok({
+        success: true,
+        insights: insightsObj,
+        cached: true,
+        stale: ageHours >= staleHours,
+      });
     }
   }
 

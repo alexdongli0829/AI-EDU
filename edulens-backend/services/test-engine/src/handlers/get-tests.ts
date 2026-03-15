@@ -3,7 +3,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -43,7 +43,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const limit = parseInt(event.queryStringParameters?.limit || '20');
     const offset = parseInt(event.queryStringParameters?.offset || '0');
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Build query conditions
     let whereClause = '';
@@ -66,7 +66,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     params.push(limit, offset);
 
     // Get tests
-    const tests = await prisma.$queryRawUnsafe(
+    const tests = await query(
       `SELECT 
         id, 
         title, 
@@ -84,7 +84,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     ) as any[];
 
     // Get total count
-    const countResult = await prisma.$queryRawUnsafe(
+    const countResult = await query(
       `SELECT COUNT(*) as total FROM tests WHERE 1=1 ${whereClause}`,
       ...params.slice(0, -2) // Remove limit and offset from count query
     ) as any[];

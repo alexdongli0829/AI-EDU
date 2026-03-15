@@ -3,7 +3,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -43,10 +43,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const includeQuestions = event.queryStringParameters?.includeQuestions === 'true';
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Get test details
-    const testResult = await prisma.$queryRawUnsafe(
+    const testResult = await query(
       `SELECT * FROM tests WHERE id = $1`,
       testId
     ) as any[];
@@ -59,7 +59,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     let questions = null;
     if (includeQuestions) {
-      const questionsResult = await prisma.$queryRawUnsafe(
+      const questionsResult = await query(
         `SELECT 
           id,
           question_type,
@@ -87,7 +87,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     // Get test statistics (number of sessions, average score, etc.)
-    const statsResult = await prisma.$queryRawUnsafe(
+    const statsResult = await query(
       `SELECT 
         COUNT(*) as total_sessions,
         COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_sessions,

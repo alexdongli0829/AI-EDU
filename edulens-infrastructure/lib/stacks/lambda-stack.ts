@@ -99,14 +99,17 @@ export class LambdaStack extends cdk.Stack {
   public readonly getSkillBridgesFunction: lambda.Function;
   public readonly listStudentStagesFunction: lambda.Function;
   public readonly activateStudentStageFunction: lambda.Function;
+  public readonly deactivateStudentStageFunction: lambda.Function;
 
   // Contest Service
   public readonly listContestsFunction: lambda.Function;
   public readonly registerContestFunction: lambda.Function;
   public readonly submitContestResultFunction: lambda.Function;
   public readonly getContestResultsFunction: lambda.Function;
+  public readonly adminListContestSeriesFunction: lambda.Function;
   public readonly adminCreateContestSeriesFunction: lambda.Function;
   public readonly adminCreateContestFunction: lambda.Function;
+  public readonly adminUpdateContestFunction: lambda.Function;
   public readonly adminUpdateContestStatusFunction: lambda.Function;
   public readonly adminFinalizeContestResultsFunction: lambda.Function;
   public readonly getStudentContestHistoryFunction: lambda.Function;
@@ -1000,6 +1003,18 @@ export class LambdaStack extends cdk.Stack {
       redisEndpoint,
     }).function;
 
+    this.deactivateStudentStageFunction = new NodejsLambda(this, 'DeactivateStudentStageLambda', {
+      config,
+      functionName: `edulens-deactivate-student-stage-${config.stage}`,
+      handler: 'dist/handlers/deactivate-student-stage.handler',
+      codePath: stageRegistryPath,
+      description: 'Pause a student stage enrollment',
+      vpc,
+      securityGroup: lambdaSecurityGroup,
+      auroraSecret,
+      redisEndpoint,
+    }).function;
+
     // ============================================================
     // 7. CONTEST SERVICE (Node.js)
     // ============================================================
@@ -1054,6 +1069,18 @@ export class LambdaStack extends cdk.Stack {
       redisEndpoint,
     }).function;
 
+    this.adminListContestSeriesFunction = new NodejsLambda(this, 'AdminListContestSeriesLambda', {
+      config,
+      functionName: `edulens-admin-list-contest-series-${config.stage}`,
+      handler: 'dist/handlers/admin/list-contest-series.handler',
+      codePath: contestServicePath,
+      description: 'Admin: List contest series',
+      vpc,
+      securityGroup: lambdaSecurityGroup,
+      auroraSecret,
+      redisEndpoint,
+    }).function;
+
     this.adminCreateContestSeriesFunction = new NodejsLambda(this, 'AdminCreateContestSeriesLambda', {
       config,
       functionName: `edulens-admin-create-contest-series-${config.stage}`,
@@ -1072,6 +1099,18 @@ export class LambdaStack extends cdk.Stack {
       handler: 'dist/handlers/admin/create-contest.handler',
       codePath: contestServicePath,
       description: 'Admin: Create contest',
+      vpc,
+      securityGroup: lambdaSecurityGroup,
+      auroraSecret,
+      redisEndpoint,
+    }).function;
+
+    this.adminUpdateContestFunction = new NodejsLambda(this, 'AdminUpdateContestLambda', {
+      config,
+      functionName: `edulens-admin-update-contest-${config.stage}`,
+      handler: 'dist/handlers/admin/update-contest.handler',
+      codePath: contestServicePath,
+      description: 'Admin: Update contest details',
       vpc,
       securityGroup: lambdaSecurityGroup,
       auroraSecret,
@@ -1173,8 +1212,10 @@ export class LambdaStack extends cdk.Stack {
       this.registerContestFunction,
       this.submitContestResultFunction,
       this.getContestResultsFunction,
+      this.adminListContestSeriesFunction,
       this.adminCreateContestSeriesFunction,
       this.adminCreateContestFunction,
+      this.adminUpdateContestFunction,
       this.adminUpdateContestStatusFunction,
       this.adminFinalizeContestResultsFunction,
       this.getStudentContestHistoryFunction,

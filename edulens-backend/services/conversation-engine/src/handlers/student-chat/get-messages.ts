@@ -3,7 +3,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getDb, query } from '../../lib/database';
+import { query } from '../../lib/database';
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -37,16 +37,14 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const limit  = parseInt(event.queryStringParameters?.limit  || '50');
     const offset = parseInt(event.queryStringParameters?.offset || '0');
 
-    const db = await getDb();
-
-    const messages = await db.unsafe<any[]>(
+    const messages = await query(
       `SELECT id, role, content, timestamp
        FROM chat_messages
        WHERE session_id = $1::uuid AND role != 'system'
        ORDER BY timestamp ASC
        LIMIT $2 OFFSET $3`,
       sessionId, limit, offset
-    );
+    ) as any[];
 
     return successResponse({
       success: true,

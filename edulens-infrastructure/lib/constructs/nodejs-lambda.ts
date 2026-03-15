@@ -4,8 +4,7 @@
  * Uses NodejsFunction (esbuild) to bundle only imported code, eliminating the
  * need to ship the entire node_modules directory. Packages listed in
  * `externalModules` are excluded from the bundle (available in the Lambda
- * runtime). `@prisma/client` is excluded from esbuild bundling and installed
- * via `nodeModules` so its native binary is available at runtime.
+ * runtime).
  */
 
 import * as path from 'path';
@@ -69,9 +68,6 @@ export class NodejsLambda extends Construct {
     const srcRelPath = filePart.replace(/^dist\//, 'src/') + '.ts';
     const entry      = path.resolve(__dirname, '../../', codePath, srcRelPath);
 
-    // Absolute path to the service root (for Prisma schema lookup)
-    const serviceRoot = path.resolve(__dirname, '../../', codePath);
-
     // ── Log group ─────────────────────────────────────────────────────────────
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
       logGroupName: `/aws/lambda/${functionName}`,
@@ -115,22 +111,10 @@ export class NodejsLambda extends Construct {
         // @aws-sdk/* is built into the Node 20 managed runtime — no need to bundle it.
         externalModules: ['@aws-sdk/*'],
 
-        // @prisma/client cannot be bundled by esbuild (native binary).
-        // NodejsFunction will npm-install it into the output dir separately.
-        nodeModules: ['@prisma/client'],
-
-        commandHooks: {
-          beforeBundling():  string[] { return []; },
-          beforeInstall():   string[] { return []; },
-          // After npm installs @prisma/client, copy the pre-generated .prisma/client
-          // directory (which contains the Lambda-compatible rhel-openssl-3.0.x binary
-          // produced by `prisma generate` with binaryTargets in schema.prisma).
-          afterBundling(inputDir: string, outputDir: string): string[] {
-            return [
-              `[ -d "${inputDir}/node_modules/.prisma" ] && cp -r "${inputDir}/node_modules/.prisma" "${outputDir}/node_modules/.prisma" || true`,
-            ];
-          },
-        },
+        // Prefer TypeScript source for workspace packages (e.g. @edulens/common,
+        // @edulens/database) that have a "source" field pointing to src/index.ts.
+        // This lets esbuild bundle them directly without requiring a pre-built dist/.
+        mainFields: ['source', 'module', 'main'],
 
         minify:    true,
         sourceMap: false,

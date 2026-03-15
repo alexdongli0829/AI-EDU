@@ -6,6 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, HelpCircle, Users, Activity, Database } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
+const API_KEY = process.env.NEXT_PUBLIC_ADMIN_API_KEY || '';
+const adminHeaders = { 'Content-Type': 'application/json', ...(API_KEY ? { 'x-api-key': API_KEY } : {}) };
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -13,11 +15,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/admin/questions?limit=1`).then(r => r.json()).catch(() => null),
-      fetch(`${API}/admin/config`).then(r => r.json()).catch(() => null),
+      fetch(`${API}/admin/questions?limit=1`, { headers: adminHeaders }).then(r => r.json()).catch(() => null),
+      fetch(`${API}/admin/config`, { headers: adminHeaders }).then(r => r.json()).catch(() => null),
     ]).then(([qRes, cRes]) => {
       setStats({
-        totalQuestions: qRes?.total ?? qRes?.questions?.length ?? '—',
+        totalQuestions: qRes?.data?.pagination?.total ?? qRes?.data?.questions?.length ?? qRes?.total ?? '—',
         configKeys: cRes?.config ? Object.keys(cRes.config).length : '—',
       });
     }).finally(() => setLoading(false));

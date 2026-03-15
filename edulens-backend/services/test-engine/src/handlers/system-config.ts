@@ -4,7 +4,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 import {
   CONFIG_DEFAULTS,
   invalidateSystemConfigCache,
@@ -24,10 +24,10 @@ function err(code: number, msg: string): APIGatewayProxyResult {
 }
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-  const prisma = await getPrismaClient();
+  const db = await getDb();
 
   if (event.httpMethod === 'GET') {
-    const rows = await prisma.$queryRawUnsafe<Array<{ key: string; value: string; updated_at: string }>>(
+    const rows = await db.unsafe<Array<{ key: string; value: string; updated_at: string }>>(
       `SELECT key, value, updated_at FROM system_config ORDER BY key`
     );
 
@@ -59,7 +59,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
         rejected.push(key);
         continue;
       }
-      await prisma.$executeRawUnsafe(
+      await query(
         `INSERT INTO system_config (key, value, updated_at)
          VALUES ($1, $2, NOW())
          ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
@@ -84,7 +84,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const reset: string[] = [];
     for (const key of keys) {
       if (!(key in CONFIG_DEFAULTS)) continue;
-      await prisma.$executeRawUnsafe(`DELETE FROM system_config WHERE key = $1`, key);
+      await query(`DELETE FROM system_config WHERE key = $1`, key);
       reset.push(key);
     }
     invalidateSystemConfigCache();

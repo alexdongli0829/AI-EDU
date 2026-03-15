@@ -12,7 +12,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../lib/database';
+import { query } from '../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
@@ -23,11 +23,9 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const { studentId } = JSON.parse(event.body);
     if (!studentId) return err(400, 'studentId is required');
 
-    const prisma = await getPrismaClient();
-
     // Validate contest
-    const contests = await prisma.$queryRawUnsafe(
-      `SELECT id, status, registration_deadline, max_participants FROM contests WHERE id = $1::uuid`,
+    const contests = await query(
+      `SELECT id, status, window_start_at FROM contests WHERE id = $1::uuid`,
       contestId
     ) as any[];
 
@@ -37,32 +35,17 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (contest.status !== 'open') {
       return err(409, `Contest is not open for registration (status: ${contest.status})`);
     }
-    if (contest.registration_deadline && new Date(contest.registration_deadline) < new Date()) {
-      return err(409, 'Registration deadline has passed');
-    }
 
     // Check for existing registration
-    const existing = await prisma.$queryRawUnsafe(
+    const existing = await query(
       `SELECT id FROM contest_registrations WHERE contest_id = $1::uuid AND student_id = $2::uuid`,
       contestId, studentId
     ) as any[];
 
     if (existing.length) return err(409, 'Student is already registered for this contest');
 
-    // Enforce participant cap
-    if (contest.max_participants) {
-      const countRows = await prisma.$queryRawUnsafe(
-        `SELECT COUNT(*) as cnt FROM contest_registrations WHERE contest_id = $1::uuid`,
-        contestId
-      ) as any[];
-      const count = parseInt(countRows[0]?.cnt ?? '0');
-      if (count >= contest.max_participants) {
-        return err(409, 'Contest is full');
-      }
-    }
-
     const registrationId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO contest_registrations (id, contest_id, student_id, registered_at)
        VALUES ($1::uuid, $2::uuid, $3::uuid, NOW())`,
       registrationId,

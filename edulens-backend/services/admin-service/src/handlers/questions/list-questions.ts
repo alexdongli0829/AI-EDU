@@ -4,100 +4,91 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { prisma } from '@edulens/database';
+import { getDb } from '../../lib/database';
 import { HTTP_STATUS } from '@edulens/common';
 import { logger } from '../../utils/logger';
 
-export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
+function resp(statusCode: number, body: object): APIGatewayProxyResult {
+  return {
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'max-age=300',
+    },
+    body: JSON.stringify(body),
+  };
+}
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    // Parse query parameters
-    const testId = event.queryStringParameters?.testId;
     const subject = event.queryStringParameters?.subject;
-    const skillTag = event.queryStringParameters?.skillTag;
-    const limit = parseInt(event.queryStringParameters?.limit || '50');
+    const stageId = event.queryStringParameters?.stageId;
+    const limit = Math.min(parseInt(event.queryStringParameters?.limit || '50'), 200);
     const offset = parseInt(event.queryStringParameters?.offset || '0');
 
-    logger.info('Listing questions', { testId, subject, skillTag, limit, offset });
+    logger.info('Listing questions', { subject, stageId, limit, offset });
 
-    // Build filter
-    const where: any = {};
+    const db = await getDb();
 
-    if (testId) {
-      where.testId = testId;
-    }
+    // Build dynamic WHERE clause
+    const conditions: string[] = [];
+    const params: any[] = [];
 
     if (subject) {
-      where.subject = subject;
+      params.push(subject);
+      conditions.push(`subject = $${params.length}`);
+    }
+    if (stageId) {
+      params.push(stageId);
+      conditions.push(`stage_id = $${params.length}`);
     }
 
-    if (skillTag) {
-      where.skillTags = {
-        has: skillTag,
-      };
-    }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // Fetch questions
-    const questions = await prisma.question.findMany({
-      where,
-      orderBy: [{ testId: 'asc' }, { orderIndex: 'asc' }],
-      skip: offset,
-      take: limit,
-      select: {
-        id: true,
-        testId: true,
-        questionType: true,
-        subject: true,
-        questionText: true,
-        skillTags: true,
-        difficultyLevel: true,
-        estimatedTimeSeconds: true,
-        orderIndex: true,
-        createdAt: true,
+    const questions = await db.unsafe<any[]>(
+      `SELECT id, text, type, options, correct_answer, explanation, difficulty,
+              estimated_time, skill_tags, subject, grade_level, stage_id, is_active, created_at
+       FROM questions ${where}
+       ORDER BY created_at DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+
+    const countResult = await db.unsafe<any[]>(
+      `SELECT COUNT(*)::int AS count FROM questions ${where}`,
+      params
+    );
+
+    const total = countResult[0]?.count || 0;
+
+    return resp(HTTP_STATUS.OK, {
+      success: true,
+      data: {
+        questions: questions.map((q: any) => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          options: typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || []),
+          correctAnswer: q.correct_answer,
+          explanation: q.explanation,
+          difficulty: parseFloat(q.difficulty) || 0.5,
+          estimatedTime: parseInt(q.estimated_time) || 60,
+          skillTags: q.skill_tags || [],
+          subject: q.subject,
+          gradeLevel: q.grade_level,
+          stageId: q.stage_id,
+          isActive: q.is_active,
+          createdAt: q.created_at,
+        })),
+        pagination: { total, limit, offset, hasMore: offset + questions.length < total },
       },
     });
-
-    // Get total count
-    const totalCount = await prisma.question.count({ where });
-
-    logger.info('Questions fetched', {
-      count: questions.length,
-      totalCount,
-    });
-
-    return {
-      statusCode: HTTP_STATUS.OK,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'max-age=300', // Cache for 5 minutes
-      },
-      body: JSON.stringify({
-        success: true,
-        data: {
-          questions,
-          pagination: {
-            total: totalCount,
-            limit,
-            offset,
-            hasMore: offset + questions.length < totalCount,
-          },
-        },
-      }),
-    };
   } catch (error) {
     logger.error('Error listing questions', { error });
-
-    return {
-      statusCode: HTTP_STATUS.INTERNAL_ERROR,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Failed to fetch questions',
-        },
-      }),
-    };
+    return resp(HTTP_STATUS.INTERNAL_ERROR, {
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch questions' },
+    });
   }
 };

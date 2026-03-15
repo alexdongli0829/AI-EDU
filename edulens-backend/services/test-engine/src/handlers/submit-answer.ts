@@ -4,7 +4,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -52,11 +52,15 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'questionId, answer, and timeSpent are required');
     }
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
     // Verify session exists and is active
-    const session = await prisma.$queryRawUnsafe(
-      `SELECT id, test_id FROM test_sessions WHERE id = $1::uuid AND status = 'active'`,
+    const session = await query(
+      `SELECT ts.id, ts.test_id, ts.stage_id, ts.question_count, ts.contest_id,
+              c.question_ids AS contest_question_ids
+       FROM test_sessions ts
+       LEFT JOIN contests c ON c.id = ts.contest_id
+       WHERE ts.id = $1::uuid AND ts.status = 'active'`,
       sessionId
     ) as any[];
 
@@ -66,9 +70,9 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const sessionData = session[0];
 
-    // Get question details (for correctness check)
-    const questionResult = await prisma.$queryRawUnsafe(
-      `SELECT id, text, type, options, correct_answer FROM questions WHERE id = $1::uuid`,
+    // Get question details (for correctness check + subject inference)
+    const questionResult = await query(
+      `SELECT id, text, type, options, correct_answer, subject FROM questions WHERE id = $1::uuid`,
       questionId
     ) as any[];
 
@@ -95,7 +99,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Save answer
     const answerId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO session_responses (id, session_id, question_id, student_answer, is_correct, time_spent)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)`,
       answerId,
@@ -107,7 +111,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     );
 
     // Count total answers in this session (includes the one just saved)
-    const allAnswers = await prisma.$queryRawUnsafe(
+    const allAnswers = await query(
       `SELECT sr.is_correct FROM session_responses sr WHERE sr.session_id = $1::uuid`,
       sessionId
     ) as any[];
@@ -115,27 +119,53 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const answeredCount = allAnswers.length;
     const correctCount = allAnswers.filter((a: any) => a.is_correct).length;
 
-    // Get test info
-    const testInfo = await prisma.$queryRawUnsafe(
-      `SELECT subject, grade_level, question_count FROM tests WHERE id = $1::uuid`,
-      sessionData.test_id
-    ) as any[];
+    // Resolve maxItems and next-question strategy from session metadata
+    let maxItems: number;
+    const contestQIds: string[] | null = Array.isArray(sessionData.contest_question_ids)
+      ? sessionData.contest_question_ids
+      : null;
 
-    const testData = testInfo[0];
+    let nextQFilter: string;
+    let nextQParam: string;
 
-    // Count available questions (same query used at session start)
-    let countQuery = `SELECT COUNT(*) as cnt FROM questions WHERE grade_level = $1 AND is_active = true`;
-    const countParams: any[] = [testData.grade_level];
-    if (testData.subject && testData.subject !== 'mixed') {
-      countQuery += ` AND subject = $2`;
-      countParams.push(testData.subject);
+    if (contestQIds && contestQIds.length > 0) {
+      // Contest session: fixed question list
+      maxItems = contestQIds.length;
+      nextQFilter = ''; // handled separately below
+      nextQParam = '';
+    } else if (sessionData.stage_id) {
+      // Stage-based session: use stored question_count and filter by stage_id + subject
+      maxItems = parseInt(sessionData.question_count) || 20;
+      const currentSubject = question.subject as string | null;
+      if (currentSubject) {
+        nextQFilter = `stage_id = $1 AND subject = $3 AND is_active = true`;
+        nextQParam = sessionData.stage_id;
+      } else {
+        nextQFilter = `stage_id = $1 AND is_active = true`;
+        nextQParam = sessionData.stage_id;
+      }
+    } else {
+      // Test-based session: look up test config
+      const testInfo = await query(
+        `SELECT subject, grade_level, question_count FROM tests WHERE id = $1::uuid`,
+        sessionData.test_id
+      ) as any[];
+      const testData = testInfo[0];
+      if (!testData) {
+        return errorResponse(500, 'Session has no associated test or stage');
+      }
+      const countResult = await query(
+        `SELECT COUNT(*) as cnt FROM questions WHERE grade_level = $1 AND is_active = true`,
+        testData.grade_level
+      ) as any[];
+      const availableCount = parseInt(countResult[0]?.cnt || '0');
+      maxItems = Math.min(testData.question_count, availableCount);
+      nextQFilter = `grade_level = $1 AND is_active = true`;
+      nextQParam = testData.grade_level;
     }
-    const countResult = await prisma.$queryRawUnsafe(countQuery, ...countParams) as any[];
-    const availableCount = parseInt(countResult[0]?.cnt || '0');
-    const maxItems = Math.min(testData.question_count, availableCount);
 
     // Update session totals
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE test_sessions SET total_items = $1, correct_count = $2 WHERE id = $3::uuid`,
       answeredCount,
       correctCount,
@@ -147,7 +177,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       const rawScore = maxItems > 0 ? (correctCount / maxItems) * 100 : 0;
       const scaledScore = Math.round(rawScore);
 
-      await prisma.$executeRawUnsafe(
+      await query(
         `UPDATE test_sessions SET status = 'completed', completed_at = NOW(), scaled_score = $1, raw_score = $2 WHERE id = $3::uuid`,
         scaledScore,
         rawScore / 100,
@@ -171,17 +201,26 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     // Fetch next question using OFFSET = answeredCount (0-based index)
-    let nextQQuery = `SELECT id, type, text, options, difficulty, skill_tags
-                      FROM questions WHERE grade_level = $1 AND is_active = true`;
-    const nextQParams: any[] = [testData.grade_level];
-    if (testData.subject && testData.subject !== 'mixed') {
-      nextQQuery += ` AND subject = $2`;
-      nextQParams.push(testData.subject);
-    }
-    nextQQuery += ` ORDER BY difficulty ASC, id ASC LIMIT 1 OFFSET $${nextQParams.length + 1}`;
-    nextQParams.push(answeredCount);
+    let nextQQuery: string;
+    let nextQParams: any[];
 
-    const nextQuestionData = await prisma.$queryRawUnsafe(nextQQuery, ...nextQParams) as any[];
+    if (contestQIds && contestQIds.length > 0) {
+      // Contest: fetch by array position
+      nextQQuery = `SELECT id, type, text, options, difficulty, skill_tags
+                    FROM questions WHERE id = ANY($1::uuid[]) AND is_active = true
+                    ORDER BY array_position($1::uuid[], id) LIMIT 1 OFFSET $2`;
+      nextQParams = [contestQIds, answeredCount];
+    } else {
+      const currentSubjectForNext = sessionData.stage_id ? (question.subject as string | null) : null;
+      nextQQuery = `SELECT id, type, text, options, difficulty, skill_tags
+                    FROM questions WHERE ${nextQFilter}
+                    ORDER BY difficulty ASC, id ASC LIMIT 1 OFFSET $2`;
+      nextQParams = currentSubjectForNext && nextQFilter.includes('$3')
+        ? [nextQParam, answeredCount, currentSubjectForNext]
+        : [nextQParam, answeredCount];
+    }
+
+    const nextQuestionData = await query(nextQQuery, ...nextQParams) as any[];
 
     let nextQuestion = null;
     if (nextQuestionData && nextQuestionData.length > 0) {

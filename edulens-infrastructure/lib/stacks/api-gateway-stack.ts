@@ -68,6 +68,7 @@ export interface ApiRouteFunctions {
   getSkillBridgesFunction: lambda.Function;
   listStudentStagesFunction: lambda.Function;
   activateStudentStageFunction: lambda.Function;
+  deactivateStudentStageFunction: lambda.Function;
   // Contest Service
   listContestsFunction: lambda.Function;
   registerContestFunction: lambda.Function;
@@ -308,8 +309,9 @@ export class ApiGatewayStack extends cdk.Stack {
     // /students/{studentId}/stages  (Stage Registry enrollment)
     const studentStagesResource = studentByIdResource.addResource('stages');
     studentStagesResource.addMethod('GET', new apigateway.LambdaIntegration(fns.listStudentStagesFunction));
-    studentStagesResource.addResource('{stageId}')
-      .addMethod('POST', new apigateway.LambdaIntegration(fns.activateStudentStageFunction));
+    const studentStageByIdResource = studentStagesResource.addResource('{stageId}');
+    studentStageByIdResource.addMethod('POST', new apigateway.LambdaIntegration(fns.activateStudentStageFunction));
+    studentStageByIdResource.addMethod('DELETE', new apigateway.LambdaIntegration(fns.deactivateStudentStageFunction));
 
     // ----------------------------------------------------------
     // Conversation Engine  /parent-chat/... and /student-chat/...
@@ -396,13 +398,15 @@ export class ApiGatewayStack extends cdk.Stack {
     configResource.addMethod('PUT', new apigateway.LambdaIntegration(fns.adminSystemConfigFunction), { apiKeyRequired: true });
 
     // Admin contest endpoints
-    adminResource.addResource('contest-series')
-      .addMethod('POST', new apigateway.LambdaIntegration(fns.adminCreateContestSeriesFunction), { apiKeyRequired: true });
+    const adminContestSeriesResource = adminResource.addResource('contest-series');
+    adminContestSeriesResource.addMethod('GET',  new apigateway.LambdaIntegration(fns.adminListContestSeriesFunction),   { apiKeyRequired: true });
+    adminContestSeriesResource.addMethod('POST', new apigateway.LambdaIntegration(fns.adminCreateContestSeriesFunction), { apiKeyRequired: true });
 
     const adminContestsResource = adminResource.addResource('contests');
     adminContestsResource.addMethod('POST', new apigateway.LambdaIntegration(fns.adminCreateContestFunction), { apiKeyRequired: true });
 
     const adminContestByIdResource = adminContestsResource.addResource('{id}');
+    adminContestByIdResource.addMethod('PUT', new apigateway.LambdaIntegration(fns.adminUpdateContestFunction), { apiKeyRequired: true });
     adminContestByIdResource.addResource('status')
       .addMethod('PATCH', new apigateway.LambdaIntegration(fns.adminUpdateContestStatusFunction), { apiKeyRequired: true });
     adminContestByIdResource.addResource('finalize')

@@ -5,7 +5,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { getDb } from '../lib/database';
 
 function successResponse(data: object): APIGatewayProxyResult {
   return {
@@ -39,53 +39,38 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'parentId is required');
     }
 
-    const prisma = await getPrismaClient();
+    const db = await getDb();
 
-    // Verify parent exists
-    const parent = await prisma.user.findUnique({
-      where: { id: parentId },
-    });
-
-    if (!parent || parent.role !== 'parent') {
+    const parents = await db`SELECT id, role FROM users WHERE id = ${parentId} LIMIT 1`;
+    if (parents.length === 0 || parents[0].role !== 'parent') {
       return errorResponse(403, 'Invalid parent account');
     }
 
-    // Fetch all students linked to this parent
-    const students = await prisma.student.findMany({
-      where: { parentId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            createdAt: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const rows = await db`
+      SELECT s.id, s.user_id, s.grade_level, s.date_of_birth, s.parent_id, s.created_at,
+             u.email, u.name
+      FROM students s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.parent_id = ${parentId}
+      ORDER BY s.created_at DESC
+    `;
 
-    const result = students.map((s: any) => {
-      const username = s.user.email.replace('@student.edulens.local', '');
-
+    const students = rows.map((s: any) => {
+      const username = s.email.replace('@student.edulens.local', '');
       return {
         id: s.id,
-        userId: s.userId,
-        name: s.user.name,
+        userId: s.user_id,
+        name: s.name,
         username,
-        gradeLevel: s.gradeLevel,
-        dateOfBirth: s.dateOfBirth.toISOString(),
-        parentId: s.parentId,
-        createdAt: s.createdAt.toISOString(),
+        gradeLevel: s.grade_level,
+        dateOfBirth: new Date(s.date_of_birth).toISOString(),
+        parentId: s.parent_id,
+        createdAt: new Date(s.created_at).toISOString(),
         testsCompleted: 0,
       };
     });
 
-    return successResponse({
-      success: true,
-      students: result,
-    });
+    return successResponse({ success: true, students });
   } catch (error) {
     console.error('List students error:', error);
     return errorResponse(500, 'Internal server error');

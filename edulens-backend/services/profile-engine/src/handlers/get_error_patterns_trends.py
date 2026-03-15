@@ -32,10 +32,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Extract student ID from path parameters
         student_id = event.get("pathParameters", {}).get("studentId") or event.get("pathParameters", {}).get("id")
         
+        CORS_HEADERS = {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+        }
+
         if not student_id:
             return {
                 "statusCode": 400,
-                "headers": {"Content-Type": "application/json"},
+                "headers": CORS_HEADERS,
                 "body": json.dumps({
                     "success": False,
                     "error": {
@@ -81,7 +87,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if not recent_responses:
                 return {
                     "statusCode": 200,
-                    "headers": {"Content-Type": "application/json"},
+                    "headers": CORS_HEADERS,
                     "body": json.dumps({
                         "success": True,
                         "data": {
@@ -107,21 +113,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         classified_errors = []
         for response in recent_responses:
             error_type = classifier.classify_error(
-                question_type=response["question_type"],
-                skill_tags=response["skill_tags"],
-                time_spent=response["time_spent"],
-                estimated_time=response["estimated_time"],
-                student_answer=response["student_answer"],
-                correct_answer=response["correct_answer"]
+                question_type=response["question_type"] or "multiple_choice",
+                skill_tags=response["skill_tags"] or [],
+                time_spent=response["time_spent"] or 0,
+                estimated_time=response["estimated_time"] or 60,
+                student_answer=str(response["student_answer"] or ""),
+                correct_answer=str(response["correct_answer"] or "")
             )
-            
+
+            ts = response["answered_at"]
+            if ts is not None and ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts is None:
+                continue  # skip responses with no timestamp
+
             classified_errors.append({
                 "error_type": error_type,
-                "skill_tags": response["skill_tags"],
-                "question_id": response["question_id"],
-                "session_id": response["session_id"],
-                "timestamp": response["answered_at"],
-                "date": response["answered_at"].date()
+                "skill_tags": response["skill_tags"] or [],
+                "question_id": str(response["question_id"]),
+                "session_id": str(response["session_id"]),
+                "timestamp": ts,
+                "date": ts.date()
             })
 
         # Group by time period
@@ -255,7 +267,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "statusCode": 200,
             "headers": {
                 "Content-Type": "application/json",
-                "Cache-Control": "max-age=600"  # Cache for 10 minutes
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+                "Cache-Control": "no-store",
             },
             "body": json.dumps(response_data)
         }
@@ -265,7 +279,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         return {
             "statusCode": 500,
-            "headers": {"Content-Type": "application/json"},
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+            },
             "body": json.dumps({
                 "success": False,
                 "error": {

@@ -5,7 +5,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getDb, query } from '../../lib/database';
+import { query } from '../../lib/database';
 
 function successResponse(data: any): APIGatewayProxyResult {
   return {
@@ -35,8 +35,6 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   try {
     const sessionId = event.pathParameters?.sessionId;
     if (!sessionId) return errorResponse(400, 'sessionId is required');
-
-    const db = await getDb();
 
     await query(
       `UPDATE chat_sessions

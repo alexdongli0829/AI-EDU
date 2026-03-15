@@ -21,8 +21,9 @@ export class ApiClient {
 
     // Request interceptor to add auth token
     this.client.interceptors.request.use((config) => {
-      if (this.token) {
-        config.headers.Authorization = `Bearer ${this.token}`;
+      const token = this.getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
     });
@@ -278,8 +279,13 @@ export class ApiClient {
     return response.data;
   }
 
+  async deactivateStudentStage(studentId: string, stageId: string) {
+    const response = await this.client.delete(`/students/${studentId}/stages/${stageId}`);
+    return response.data;
+  }
+
   // Contests
-  async listContests(params: { stageId?: string; status?: string } = {}) {
+  async listContests(params: { stageId?: string; status?: string; studentId?: string } = {}) {
     const response = await this.client.get('/contests', { params });
     return response.data;
   }

@@ -1,0 +1,15 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Placeholder — this service uses raw SQL only via $queryRawUnsafe.
+// A model entry is required so prisma generate produces the native query engine binary.
+model DeployMarker {
+  id Int @id
+}

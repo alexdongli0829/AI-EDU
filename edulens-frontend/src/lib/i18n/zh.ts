@@ -33,6 +33,7 @@ const zh: Translations = {
   nav: {
     dashboard: '首页',
     practiceTests: '练习测试',
+    contests: '竞赛',
     news: '新闻',
     admin: '管理',
     backToApp: '返回应用',

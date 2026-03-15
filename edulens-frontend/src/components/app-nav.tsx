@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { useI18n, Lang } from '@/lib/i18n';
 import {
-  Home, LayoutDashboard, ClipboardList, Users, LogOut,
+  Home, LayoutDashboard, ClipboardList, Users, LogOut, Trophy,
   ChevronDown, GraduationCap, UserCheck, Sparkles, Newspaper, Globe,
 } from 'lucide-react';
 
@@ -16,11 +16,13 @@ type NavItem = { labelKey: string; href: string; icon: React.ElementType; exact?
 const STUDENT_ITEMS: NavItem[] = [
   { labelKey: 'dashboard',      href: '/student/dashboard', icon: LayoutDashboard, exact: true },
   { labelKey: 'practiceTests',  href: '/student/test',      icon: ClipboardList },
+  { labelKey: 'contests',       href: '/student/contests',  icon: Trophy },
   { labelKey: 'news',           href: '/news',              icon: Newspaper },
 ];
 
 const PARENT_ITEMS: NavItem[] = [
   { labelKey: 'dashboard', href: '/parent/dashboard', icon: Users, exact: true },
+  { labelKey: 'contests',  href: '/parent/contests',  icon: Trophy },
   { labelKey: 'news',      href: '/news',              icon: Newspaper },
 ];
 

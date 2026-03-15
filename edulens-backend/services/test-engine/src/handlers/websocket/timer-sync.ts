@@ -14,14 +14,12 @@ import {
   QueryCommand,
   DeleteItemCommand,
 } from '@aws-sdk/client-dynamodb';
-import { prisma } from '@edulens/database';
+import { query } from '../../lib/database';
 import { TimerService } from '../../services/timer-service';
-import { SessionManager } from '../../services/session-manager';
 
 const TICK_SECONDS = 5;
 const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-southeast-2' });
 const timerService = new TimerService();
-const sessionManager = new SessionManager();
 
 export async function handler(): Promise<void> {
   const wsEndpoint = process.env.WS_ENDPOINT;
@@ -35,13 +33,15 @@ export async function handler(): Promise<void> {
   const apigw = new ApiGatewayManagementApiClient({ endpoint: wsEndpoint });
 
   // Get all active test sessions
-  const activeSessions = await prisma.testSession.findMany({
-    where: { status: 'in_progress' },
-    select: { id: true, studentId: true },
-  });
+  const activeSessions = await query(
+    `SELECT id, student_id FROM test_sessions WHERE status = 'active'`
+  ) as { id: string; student_id: string }[];
 
   await Promise.all(
-    activeSessions.map((session) => processSession(session, apigw, dynamodb, connectionsTable))
+    activeSessions.map((row) => processSession(
+      { id: row.id, studentId: row.student_id },
+      apigw, dynamodb, connectionsTable
+    ))
   );
 }
 
@@ -57,10 +57,28 @@ async function processSession(
   // Auto-complete the session when time runs out
   if (timer.timeRemaining <= 0) {
     try {
-      await sessionManager.completeSession(session.id);
+      const responses = await query(
+        `SELECT is_correct FROM session_responses WHERE session_id = $1::uuid`,
+        session.id
+      ) as any[];
+      const answeredCount = responses.length;
+      const correctCount = responses.filter((r: any) => r.is_correct).length;
+      const sessionRows = await query(
+        `SELECT question_count FROM test_sessions WHERE id = $1::uuid`,
+        session.id
+      ) as any[];
+      const totalQ = parseInt(sessionRows[0]?.question_count) || answeredCount || 1;
+      const rawScore = totalQ > 0 ? (correctCount / totalQ) * 100 : 0;
+      const scaledScore = Math.round(rawScore);
+      await query(
+        `UPDATE test_sessions SET status = 'completed', completed_at = NOW(),
+         scaled_score = $1, raw_score = $2, total_items = $3, correct_count = $4
+         WHERE id = $5::uuid AND status != 'completed'`,
+        scaledScore, rawScore / 100, answeredCount, correctCount, session.id
+      );
       await timerService.stopTimer(session.id);
-    } catch {
-      // Session may already be completed
+    } catch (e) {
+      console.error('Auto-complete error for session', session.id, e);
     }
   }
 

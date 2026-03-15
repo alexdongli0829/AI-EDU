@@ -5,7 +5,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../../lib/database';
+import { query } from '../../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
@@ -14,10 +14,8 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const { studentId, questionId, sessionResponseId, stageId } = JSON.parse(event.body);
     if (!studentId) return error(400, 'studentId is required');
 
-    const prisma = await getPrismaClient();
-
     const sessionId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO chat_sessions (id, student_id, role, agent_state, stage_id, started_at)
        VALUES ($1::uuid, $2::uuid, 'student_tutor', 'idle', $3, NOW())`,
       sessionId,
@@ -29,7 +27,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (questionId) {
       const metaId = uuidv4();
       const metaContent = JSON.stringify({ questionId, sessionResponseId });
-      await prisma.$executeRawUnsafe(
+      await query(
         `INSERT INTO chat_messages (id, session_id, role, content, timestamp)
          VALUES ($1::uuid, $2::uuid, 'system', $3, NOW())`,
         metaId, sessionId, metaContent

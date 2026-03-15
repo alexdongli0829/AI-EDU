@@ -4,14 +4,15 @@
  */
 
 import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
-import { cacheGet, cacheSet, cacheDel, prisma } from '@edulens/database';
+import { cacheGet, cacheSet, cacheDel } from '../lib/redis';
+import { getDb, query } from '../lib/database';
 import {
   InvalidSessionStateError,
   NotFoundError,
   SessionAlreadyCompletedError,
   SessionAlreadyStartedError,
   SessionNotFoundError,
-} from '@edulens/common';
+} from '../lib/errors';
 
 const eventBridge = new EventBridgeClient({
   region: process.env.AWS_REGION || 'ap-southeast-2',

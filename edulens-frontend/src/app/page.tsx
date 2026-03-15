@@ -25,7 +25,7 @@ const LEARNING_STAGES = [
     dot: 'bg-blue-500',
   },
   {
-    id: 'selective_prep',
+    id: 'selective',
     label: 'Selective',
     sublabel: 'Year 6–7',
     description: 'NSW Selective High School entrance preparation',
@@ -34,7 +34,7 @@ const LEARNING_STAGES = [
     dot: 'bg-violet-500',
   },
   {
-    id: 'hsc_prep',
+    id: 'hsc',
     label: 'HSC',
     sublabel: 'Year 11–12',
     description: 'Higher School Certificate preparation',
@@ -43,7 +43,7 @@ const LEARNING_STAGES = [
     dot: 'bg-teal-500',
   },
   {
-    id: 'university',
+    id: 'lifelong',
     label: 'University',
     sublabel: 'Beyond',
     description: 'Tertiary entrance and academic excellence',

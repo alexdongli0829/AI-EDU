@@ -259,20 +259,17 @@ function ReviewModal({
               {answer.questionText || 'Question text unavailable.'}
             </p>
 
-            {/* Original answer markers — always visible */}
+            {/* Show only the student's wrong answer — correct answer hidden until reattempt */}
             <div className="space-y-1.5">
               {answer.options.map((opt, i) => {
-                const isCorrect = opt.toLowerCase().trim() === answer.correctAnswer.toLowerCase().trim();
                 const wasWrong = opt.toLowerCase().trim() === answer.studentAnswer.toLowerCase().trim() && !answer.isCorrect;
                 return (
                   <div key={i} className={`px-3 py-2 rounded-lg border text-xs flex items-center gap-2 ${
-                    isCorrect ? 'border-green-300 bg-green-50 text-green-800'
-                    : wasWrong ? 'border-red-300 bg-red-50 text-red-700 line-through opacity-70'
+                    wasWrong ? 'border-red-300 bg-red-50 text-red-700 line-through opacity-70'
                     : 'border-gray-200 bg-gray-50 text-gray-500'
                   }`}>
-                    {isCorrect && <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />}
                     {wasWrong && <XCircle className="h-3 w-3 text-red-500 flex-shrink-0" />}
-                    {!isCorrect && !wasWrong && <span className="w-3 flex-shrink-0" />}
+                    {!wasWrong && <span className="w-3 flex-shrink-0" />}
                     {opt}
                   </div>
                 );

@@ -1,9 +1,6 @@
 /**
- * @edulens/database - Database layer with Prisma ORM and Redis
+ * @edulens/database - Database layer with postgres.js and Redis
  */
-
-// Prisma Client
-export { prisma, checkDatabaseHealth, transaction } from './client';
 
 // Redis Client & Cache Utilities
 export {
@@ -19,6 +16,3 @@ export {
   cacheIncr,
   checkRedisHealth,
 } from './redis';
-
-// Re-export Prisma types
-export * from '@prisma/client';

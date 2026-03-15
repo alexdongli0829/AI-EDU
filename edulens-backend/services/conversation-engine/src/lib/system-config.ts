@@ -6,7 +6,7 @@
  * Values can be changed via the admin API (PUT /admin/config) without redeployment.
  */
 
-import { getPrismaClient } from './database';
+import { query } from "./database";
 
 // ─── Canonical defaults ──────────────────────────────────────────────────────
 // Must match the authoritative list in test-engine/src/lib/system-config.ts.
@@ -44,10 +44,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export async function getSystemConfig(): Promise<Record<string, string>> {
   if (_cache && Date.now() < _cacheExpiry) return _cache;
 
-  const prisma = await getPrismaClient();
-  const rows = await prisma.$queryRawUnsafe<Array<{ key: string; value: string }>>(
+  const rows = await query(
     `SELECT key, value FROM system_config`
-  );
+  ) as Array<{ key: string; value: string }>;
 
   const merged: Record<string, string> = { ...CONFIG_DEFAULTS };
   for (const row of rows) {

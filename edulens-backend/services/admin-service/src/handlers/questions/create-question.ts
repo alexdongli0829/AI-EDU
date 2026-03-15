@@ -5,135 +5,79 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { z } from 'zod';
-import { prisma } from '@edulens/database';
+import { getDb } from '../../lib/database';
 import { HTTP_STATUS } from '@edulens/common';
 import { logger } from '../../utils/logger';
 
-// Validation schema
 const CreateQuestionSchema = z.object({
-  testId: z.string().uuid(),
-  questionType: z.enum(['multiple_choice', 'short_answer', 'essay']),
-  subject: z.enum(['math', 'reading', 'science', 'writing']),
-  questionText: z.string().min(10).max(5000),
-  options: z.array(z.string()).optional(),
-  correctAnswer: z.string().min(1),
+  text: z.string().min(5),
+  type: z.enum(['multiple_choice', 'short_answer', 'essay']).default('multiple_choice'),
+  options: z.array(z.any()).optional(),
+  correctAnswer: z.string().optional(),
   explanation: z.string().optional(),
-  skillTags: z.array(z.string()).min(1),
-  difficultyLevel: z.number().int().min(1).max(5),
-  estimatedTimeSeconds: z.number().int().min(10).max(3600),
-  orderIndex: z.number().int().min(0),
+  difficulty: z.number().min(0).max(1).default(0.5),
+  estimatedTime: z.number().int().min(10).max(3600).default(60),
+  skillTags: z.array(z.string()).default([]),
+  subject: z.string().optional(),
+  gradeLevel: z.number().int().optional(),
+  stageId: z.string().optional(),
+  isActive: z.boolean().default(true),
 });
 
-export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
+function resp(statusCode: number, body: object): APIGatewayProxyResult {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify(body),
+  };
+}
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    // TODO: Verify admin authentication
-    // const adminId = event.requestContext.authorizer?.userId;
-
-    // Parse and validate request
     const body = JSON.parse(event.body || '{}');
-    const validatedData = CreateQuestionSchema.parse(body);
+    const data = CreateQuestionSchema.parse(body);
 
-    logger.info('Creating question', {
-      testId: validatedData.testId,
-      questionType: validatedData.questionType,
-    });
+    logger.info('Creating question', { type: data.type });
 
-    // Verify test exists
-    const test = await prisma.test.findUnique({
-      where: { id: validatedData.testId },
-    });
+    const db = await getDb();
 
-    if (!test) {
-      return {
-        statusCode: HTTP_STATUS.NOT_FOUND,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: false,
-          error: {
-            code: 'TEST_NOT_FOUND',
-            message: `Test ${validatedData.testId} not found`,
-          },
-        }),
-      };
-    }
+    const result = await db<{ id: string }[]>`
+      INSERT INTO questions (
+        text, type, options, correct_answer, explanation, difficulty,
+        estimated_time, skill_tags, subject, grade_level, stage_id, is_active,
+        created_at, updated_at
+      ) VALUES (
+        ${data.text},
+        ${data.type},
+        ${JSON.stringify(data.options || [])}::jsonb,
+        ${data.correctAnswer || null},
+        ${data.explanation || null},
+        ${data.difficulty},
+        ${data.estimatedTime},
+        ${data.skillTags}::text[],
+        ${data.subject || null},
+        ${data.gradeLevel || null},
+        ${data.stageId || null},
+        ${data.isActive},
+        NOW(), NOW()
+      )
+      RETURNING id
+    `;
 
-    // Validate multiple choice questions have options
-    if (validatedData.questionType === 'multiple_choice') {
-      if (!validatedData.options || validatedData.options.length < 2) {
-        return {
-          statusCode: HTTP_STATUS.BAD_REQUEST,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            success: false,
-            error: {
-              code: 'INVALID_OPTIONS',
-              message: 'Multiple choice questions must have at least 2 options',
-            },
-          }),
-        };
-      }
-    }
+    logger.info('Question created', { id: result[0]?.id });
 
-    // Create question
-    const question = await prisma.question.create({
-      data: {
-        testId: validatedData.testId,
-        questionType: validatedData.questionType,
-        subject: validatedData.subject,
-        questionText: validatedData.questionText,
-        options: validatedData.options || [],
-        correctAnswer: validatedData.correctAnswer,
-        explanation: validatedData.explanation,
-        skillTags: validatedData.skillTags,
-        difficultyLevel: validatedData.difficultyLevel,
-        estimatedTimeSeconds: validatedData.estimatedTimeSeconds,
-        orderIndex: validatedData.orderIndex,
-      },
-    });
-
-    logger.info('Question created successfully', {
-      questionId: question.id,
-      testId: question.testId,
-    });
-
-    return {
-      statusCode: HTTP_STATUS.CREATED,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        success: true,
-        data: question,
-      }),
-    };
+    return resp(HTTP_STATUS.CREATED, { success: true, id: result[0]?.id });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return {
-        statusCode: HTTP_STATUS.BAD_REQUEST,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid request data',
-            details: error.errors,
-          },
-        }),
-      };
-    }
-
-    logger.error('Error creating question', { error });
-
-    return {
-      statusCode: HTTP_STATUS.INTERNAL_ERROR,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      return resp(HTTP_STATUS.BAD_REQUEST, {
         success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Failed to create question',
-        },
-      }),
-    };
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid request data', details: error.errors },
+      });
+    }
+    logger.error('Error creating question', { error });
+    return resp(HTTP_STATUS.INTERNAL_ERROR, {
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to create question' },
+    });
   }
 };

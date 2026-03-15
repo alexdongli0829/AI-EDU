@@ -40,21 +40,41 @@ export default function TestTakePage() {
   const [submitting, setSubmitting] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
+  // Parse route param:
+  //   "contest--{contestId}"  → contest mode
+  //   "stageId--subject"      → stage/subject mode
+  //   UUID                    → legacy testId mode
+  const isContest = testId?.startsWith('contest--');
+  const parsedContestId = isContest ? testId.slice('contest--'.length) : undefined;
+  const isStageSubject = !isContest && testId?.includes('--');
+  const [parsedStageId, parsedSubject] = isStageSubject ? testId.split('--') : [undefined, undefined];
+  const sessionKey = testId; // used to detect navigation to a different test
+
   // Initialize test — reset if navigating to a different test
   useEffect(() => {
     if (!testId) return;
     const studentId = student?.id || user?.id;
     if (!studentId) return;
 
-    // If there's an existing session for a different test, reset it
-    if (currentSession && currentSession.testId !== testId) {
+    // If there's an existing session for a different test/subject, reset it
+    const sessionMatchesRoute = isContest
+      ? (currentSession as any)?.contestId === parsedContestId
+      : isStageSubject
+        ? currentSession?.stageId === parsedStageId && currentSession?.subject === parsedSubject
+        : currentSession?.testId === testId;
+    if (currentSession && !sessionMatchesRoute) {
       resetTest();
       return; // useEffect will re-run after reset clears currentSession
     }
 
     if (!currentSession) {
-      startTest(testId, studentId).catch(() => {
-        router.push('/student/test');
+      const opts = isContest
+        ? { contestId: parsedContestId }
+        : isStageSubject
+          ? { stageId: parsedStageId, subject: parsedSubject }
+          : { testId };
+      startTest(studentId, opts).catch(() => {
+        router.push('/student/contests');
       });
     }
   }, [user?.id, student?.id, testId, currentSession, startTest, resetTest, router]);

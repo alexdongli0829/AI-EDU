@@ -18,17 +18,34 @@ const adminHeaders = (): Record<string, string> => {
   return h;
 };
 
-const SUBJECTS = [
-  { value: 'math', label: 'Mathematical Reasoning' },
+const STAGES = [
+  { value: 'oc_prep',   label: 'OC Preparation' },
+  { value: 'selective', label: 'Selective High School' },
+  { value: 'hsc',       label: 'HSC Preparation' },
+  { value: 'lifelong',  label: 'University & Beyond' },
+];
+
+const SUBJECTS_BY_STAGE: Record<string, { value: string; label: string }[]> = {
+  oc_prep:   [{ value: 'math', label: 'Mathematical Reasoning' }, { value: 'general_ability', label: 'Thinking Skills' }, { value: 'english', label: 'English Reading' }],
+  selective: [{ value: 'math', label: 'Mathematical Reasoning' }, { value: 'general_ability', label: 'Thinking Skills' }, { value: 'english', label: 'English Reading' }, { value: 'writing', label: 'Writing' }],
+  hsc:       [{ value: 'math', label: 'Mathematics' }, { value: 'general_ability', label: 'Sciences' }, { value: 'english', label: 'English' }],
+  lifelong:  [{ value: 'math', label: 'Quantitative Reasoning' }, { value: 'general_ability', label: 'Critical Thinking' }, { value: 'english', label: 'Literacy' }],
+};
+const ALL_SUBJECTS = [
+  { value: 'math', label: 'Math' },
   { value: 'general_ability', label: 'Thinking Skills' },
-  { value: 'english', label: 'English Reading' },
+  { value: 'english', label: 'English' },
+  { value: 'writing', label: 'Writing' },
 ];
 
 const SKILL_OPTIONS: Record<string, string[]> = {
   math: ['Number & Algebra', 'Fractions & Decimals', 'Measurement & Geometry', 'Statistics & Probability', 'Problem Solving', 'Working Mathematically'],
   general_ability: ['Logical Reasoning', 'Pattern Recognition', 'Spatial Reasoning', 'Verbal Reasoning', 'Abstract Reasoning', 'Critical Thinking'],
   english: ['Reading Comprehension', 'Vocabulary', 'Inference & Interpretation', 'Grammar & Language', 'Text Structure', 'Language & Expression'],
+  writing: ['Text Structure', 'Language & Expression', 'Grammar & Language', 'Vocabulary', 'Persuasive Writing', 'Creative Writing'],
 };
+
+const STAGE_LABEL: Record<string, string> = { oc_prep: 'OC Prep', selective: 'Selective', hsc: 'HSC', lifelong: 'Lifelong' };
 
 interface QuestionOption { text: string; isCorrect: boolean }
 interface Question {
@@ -42,6 +59,7 @@ interface Question {
   estimatedTime: number;
   skillTags: string[];
   subject: string;
+  stageId: string;
   gradeLevel: number;
   isActive: boolean;
   createdAt: string;
@@ -53,7 +71,7 @@ const EMPTY_Q: Omit<Question, 'id' | 'createdAt'> = {
     { text: '', isCorrect: false }, { text: '', isCorrect: false },
   ],
   correctAnswer: '', explanation: '', difficulty: 0.5, estimatedTime: 30,
-  skillTags: [], subject: 'math', gradeLevel: 4, isActive: true,
+  skillTags: [], subject: 'math', stageId: 'oc_prep', gradeLevel: 4, isActive: true,
 };
 
 export default function AdminQuestionsPageWrapper() {
@@ -71,6 +89,7 @@ function AdminQuestionsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [filterSubject, setFilterSubject] = useState('');
+  const [filterStage, setFilterStage] = useState('');
   const [searchText, setSearchText] = useState('');
 
   // Editor state
@@ -96,16 +115,19 @@ function AdminQuestionsPage() {
     try {
       const params = new URLSearchParams({ limit: String(LIMIT), offset: String((page - 1) * LIMIT) });
       if (filterSubject) params.set('subject', filterSubject);
+      if (filterStage) params.set('stageId', filterStage);
       const res = await fetch(`${API}/admin/questions?${params}`, { headers: adminHeaders() });
       const data = await res.json();
       if (data.success !== false) {
-        setQuestions(data.questions || []);
-        setTotal(data.total || data.questions?.length || 0);
+        const questions = data.data?.questions || data.questions || [];
+        const total = data.data?.pagination?.total ?? data.data?.questions?.length ?? data.total ?? questions.length;
+        setQuestions(questions);
+        setTotal(total);
       }
     } catch {
       showToast('err', 'Failed to load questions');
     } finally { setLoading(false); }
-  }, [page, filterSubject]);
+  }, [page, filterSubject, filterStage]);
 
   useEffect(() => { fetchQuestions(); }, [fetchQuestions]);
   useEffect(() => {
@@ -129,7 +151,7 @@ function AdminQuestionsPage() {
       correctAnswer: q.correctAnswer, explanation: q.explanation || '',
       difficulty: q.difficulty, estimatedTime: q.estimatedTime || 30,
       skillTags: [...(q.skillTags || [])], subject: q.subject,
-      gradeLevel: q.gradeLevel, isActive: q.isActive !== false,
+      stageId: q.stageId || 'oc_prep', gradeLevel: q.gradeLevel, isActive: q.isActive !== false,
     });
   };
 
@@ -262,8 +284,18 @@ function AdminQuestionsPage() {
             />
           </div>
 
-          {/* Subject + Grade + Difficulty row */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* Stage + Subject row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Stage</label>
+              <select
+                value={form.stageId || 'oc_prep'}
+                onChange={e => setForm((p: any) => ({ ...p, stageId: e.target.value, subject: SUBJECTS_BY_STAGE[e.target.value]?.[0]?.value || 'math', skillTags: [] }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                {STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">Subject</label>
               <select
@@ -271,9 +303,13 @@ function AdminQuestionsPage() {
                 onChange={e => setForm((p: any) => ({ ...p, subject: e.target.value, skillTags: [] }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               >
-                {SUBJECTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                {(SUBJECTS_BY_STAGE[form.stageId || 'oc_prep'] || ALL_SUBJECTS).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
+          </div>
+
+          {/* Grade + Difficulty row */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">Grade Level</label>
               <select
@@ -281,7 +317,7 @@ function AdminQuestionsPage() {
                 onChange={e => setForm((p: any) => ({ ...p, gradeLevel: parseInt(e.target.value) }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               >
-                {[3, 4, 5, 6].map(g => <option key={g} value={g}>Year {g}</option>)}
+                {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(g => <option key={g} value={g}>Year {g}</option>)}
               </select>
             </div>
             <div>
@@ -440,8 +476,8 @@ function AdminQuestionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-4">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex gap-3 mb-4 flex-wrap">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <Input
             placeholder="Search questions..."
@@ -451,12 +487,20 @@ function AdminQuestionsPage() {
           />
         </div>
         <select
+          value={filterStage}
+          onChange={e => { setFilterStage(e.target.value); setFilterSubject(''); setPage(1); }}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700"
+        >
+          <option value="">All Stages</option>
+          {STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        <select
           value={filterSubject}
           onChange={e => { setFilterSubject(e.target.value); setPage(1); }}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700"
         >
           <option value="">All Subjects</option>
-          {SUBJECTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          {(filterStage ? SUBJECTS_BY_STAGE[filterStage] : ALL_SUBJECTS).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </div>
 
@@ -481,7 +525,8 @@ function AdminQuestionsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-4 py-2.5 font-semibold text-gray-600 w-[45%]">Question</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-600 w-[40%]">Question</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Stage</th>
                   <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Subject</th>
                   <th className="text-center px-4 py-2.5 font-semibold text-gray-600">Diff</th>
                   <th className="text-center px-4 py-2.5 font-semibold text-gray-600">Grade</th>
@@ -502,8 +547,13 @@ function AdminQuestionsPage() {
                         </div>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                        {STAGE_LABEL[q.stageId] || q.stageId || '—'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">
-                      {SUBJECTS.find(s => s.value === q.subject)?.label || q.subject}
+                      {ALL_SUBJECTS.find(s => s.value === q.subject)?.label || q.subject}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-block w-8 text-center text-xs font-bold rounded-full py-0.5 ${

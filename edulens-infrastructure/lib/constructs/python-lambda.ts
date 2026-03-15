@@ -25,6 +25,8 @@ export interface PythonLambdaProps {
   environment?: Record<string, string>;
   timeout?: cdk.Duration;
   memorySize?: number;
+  /** Requirements file to install (relative to codePath). Default: requirements.txt */
+  requirementsFile?: string;
 }
 
 export class PythonLambda extends Construct {
@@ -46,6 +48,7 @@ export class PythonLambda extends Construct {
       environment = {},
       timeout,
       memorySize,
+      requirementsFile = 'requirements.txt',
     } = props;
 
     // Create log group
@@ -61,19 +64,7 @@ export class PythonLambda extends Construct {
       runtime: lambda.Runtime.PYTHON_3_12,
       handler,
       code: lambda.Code.fromAsset(codePath, {
-        exclude: [
-          'venv',
-          '.venv',
-          '__pycache__',
-          '*.pyc',
-          '.pytest_cache',
-          'tests',
-          '*.md',
-          'requirements-dev.txt',
-          '.git',
-          '.env',
-          '.env.local',
-        ],
+        exclude: ['venv', '.venv', '__pycache__', '*.pyc', '.pytest_cache', 'tests', '*.md', 'requirements-dev.txt', '.git', '.env'],
       }),
       description,
 

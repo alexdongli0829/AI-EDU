@@ -10,7 +10,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../../lib/database';
+import { query } from '../../lib/database';
 import { getChatCompletion, Message } from '../../lib/bedrock';
 
 // How many recent turns to keep verbatim in the context window
@@ -20,8 +20,6 @@ const MAX_MEMORY_SUMMARIES = 3;
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   console.log('Send parent chat message:', { path: event.path, method: event.httpMethod });
-
-  const prisma = await getPrismaClient();
 
   try {
     const sessionId = event.pathParameters?.sessionId;
@@ -35,11 +33,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // ----------------------------------------------------------------
     // 1. Load session and verify it's active
     // ----------------------------------------------------------------
-    const sessions = await prisma.$queryRawUnsafe<any[]>(
+    const sessions = await query(
       `SELECT id, student_id, role, agent_state, metadata
        FROM chat_sessions WHERE id = $1::uuid`,
       sessionId
-    );
+    ) as any[];
     if (!sessions?.length) return error(404, 'Chat session not found or inactive');
 
     const session = sessions[0];
@@ -49,7 +47,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // ----------------------------------------------------------------
     // 2. Transition: IDLE → PROCESSING
     // ----------------------------------------------------------------
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE chat_sessions SET agent_state = 'processing' WHERE id = $1::uuid`,
       sessionId
     );
@@ -58,7 +56,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // 3. Persist the user message
     // ----------------------------------------------------------------
     const userMessageId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO chat_messages (id, session_id, role, content, timestamp)
        VALUES ($1::uuid, $2::uuid, 'user', $3, NOW())`,
       userMessageId, sessionId, message
@@ -71,9 +69,9 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     //    c) Recent message history (Tier 1 — current + cached)
     // ----------------------------------------------------------------
     const [profile, memories, rawHistory] = await Promise.all([
-      loadStudentProfile(prisma, studentId),
-      loadConversationMemories(prisma, studentId),
-      loadMessageHistory(prisma, sessionId, MAX_HISTORY_TURNS * 2),
+      loadStudentProfile(studentId),
+      loadConversationMemories(studentId),
+      loadMessageHistory(sessionId, MAX_HISTORY_TURNS * 2),
     ]);
 
     // ----------------------------------------------------------------
@@ -90,7 +88,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // ----------------------------------------------------------------
     // 6. Call the AI — transition PROCESSING → RESPONDING
     // ----------------------------------------------------------------
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE chat_sessions SET agent_state = 'responding' WHERE id = $1::uuid`,
       sessionId
     );
@@ -101,7 +99,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // 7. Persist the assistant message
     // ----------------------------------------------------------------
     const assistantMessageId = uuidv4();
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO chat_messages (id, session_id, role, content, timestamp)
        VALUES ($1::uuid, $2::uuid, 'assistant', $3, NOW())`,
       assistantMessageId, sessionId, aiResponse
@@ -110,7 +108,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // ----------------------------------------------------------------
     // 8. Transition: RESPONDING → WAITING_FEEDBACK
     // ----------------------------------------------------------------
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE chat_sessions SET agent_state = 'waiting_feedback' WHERE id = $1::uuid`,
       sessionId
     );
@@ -127,12 +125,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Best-effort: reset agent state on error
     try {
-      const prismaReset = await getPrismaClient();
-      const sessionId = event.pathParameters?.sessionId;
-      if (sessionId) {
-        await prismaReset.$executeRawUnsafe(
+      const resetId = event.pathParameters?.sessionId;
+      if (resetId) {
+        await query(
           `UPDATE chat_sessions SET agent_state = 'idle' WHERE id = $1::uuid`,
-          sessionId
+          resetId
         );
       }
     } catch { /* ignore */ }
@@ -145,11 +142,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 // Context loaders
 // ---------------------------------------------------------------------------
 
-async function loadStudentProfile(prisma: any, studentId: string | null): Promise<any | null> {
+async function loadStudentProfile(studentId: string | null): Promise<any | null> {
   if (!studentId) return null;
   try {
     // Load actual test session results — more reliable than empty profile table
-    const sessions = await prisma.$queryRawUnsafe<any[]>(
+    const sessions = await query(
       `SELECT ts.id, t.title, t.subject, ts.scaled_score, ts.correct_count, ts.total_items,
               ts.completed_at
        FROM test_sessions ts
@@ -157,29 +154,29 @@ async function loadStudentProfile(prisma: any, studentId: string | null): Promis
        WHERE ts.student_id = $1::uuid AND ts.status = 'completed'
        ORDER BY ts.completed_at DESC LIMIT 10`,
       studentId
-    );
+    ) as any[];
 
     if (!sessions.length) return null;
 
     // Load per-question answers for the most recent 3 sessions
     const recentIds = sessions.slice(0, 3).map((s: any) => s.id);
-    const answers = await prisma.$queryRawUnsafe<any[]>(
+    const answers = await query(
       `SELECT sr.session_id, sr.is_correct, sr.time_spent, q.subject, q.skill_tags, q.text
        FROM session_responses sr
        JOIN questions q ON sr.question_id = q.id
        WHERE sr.session_id = ANY($1::uuid[])
        ORDER BY sr.created_at ASC`,
       recentIds
-    );
+    ) as any[];
 
     // Also try the profile table
     let profile = null;
     try {
-      const rows = await prisma.$queryRawUnsafe<any[]>(
+      const rows = await query(
         `SELECT skill_graph, error_patterns, time_behavior, overall_mastery, strengths, weaknesses
          FROM student_profiles WHERE student_id = $1::uuid`,
         studentId
-      );
+      ) as any[];
       profile = rows?.[0] ?? null;
     } catch {}
 
@@ -190,37 +187,30 @@ async function loadStudentProfile(prisma: any, studentId: string | null): Promis
   }
 }
 
-async function loadConversationMemories(
-  prisma: any,
-  studentId: string | null
-): Promise<any[]> {
+async function loadConversationMemories(studentId: string | null): Promise<any[]> {
   if (!studentId) return [];
   try {
-    return await prisma.$queryRawUnsafe<any[]>(
+    return await query(
       `SELECT summary, key_topics, insights_extracted, created_at
        FROM conversation_memory
        WHERE student_id = $1
        ORDER BY created_at DESC
        LIMIT $2`,
       studentId, MAX_MEMORY_SUMMARIES
-    );
+    ) as any[];
   } catch {
     return [];
   }
 }
 
-async function loadMessageHistory(
-  prisma: any,
-  sessionId: string,
-  limit: number
-): Promise<any[]> {
-  return prisma.$queryRawUnsafe<any[]>(
+async function loadMessageHistory(sessionId: string, limit: number): Promise<any[]> {
+  return query(
     `SELECT role, content FROM chat_messages
      WHERE session_id = $1::uuid
      ORDER BY timestamp ASC
      LIMIT $2`,
     sessionId, limit
-  );
+  ) as Promise<any[]>;
 }
 
 // ---------------------------------------------------------------------------

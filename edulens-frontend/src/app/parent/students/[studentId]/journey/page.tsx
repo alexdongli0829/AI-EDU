@@ -1,24 +1,44 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense, useCallback } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, CheckCircle2, Clock, Lock, ChevronRight, Trophy } from 'lucide-react';
+import {
+  Loader2, ArrowLeft, CheckCircle2, Clock, Lock, ChevronRight, Trophy,
+  TrendingUp, AlertTriangle, BarChart2,
+} from 'lucide-react';
 
-interface StageRow {
-  id: string; stage_id: string; student_id: string;
-  status: 'active' | 'completed' | 'paused';
-  display_name: string; sort_order: number;
-  activated_at: string | null; completed_at: string | null;
-  stage_profile: {
-    overall_mastery?: number; strengths?: string[]; weaknesses?: string[];
-  } | null;
+// ─── types ───────────────────────────────────────────────────────────────────
+
+interface StageProfile {
+  overall_mastery?: number;
+  strengths?: string[];
+  weaknesses?: string[];
 }
 
-// The full canonical pathway — all stages shown even if not enrolled
+interface StageRow {
+  id: string;
+  stage_id: string;
+  student_id: string;
+  status: 'active' | 'completed' | 'paused';
+  display_name: string;
+  sort_order: number;
+  activated_at: string | null;
+  completed_at: string | null;
+  stage_profile: StageProfile | string | null;
+}
+
+interface ErrorSummary {
+  totalResponses: number;
+  incorrectResponses: number;
+  topPatterns: Array<{ errorType: string; count: number; severity: string }>;
+}
+
+// ─── canonical stage metadata ─────────────────────────────────────────────────
+
 const CANONICAL_STAGES = [
   {
     id: 'oc_prep', label: 'OC Preparation', sublabel: 'Year 4–5',
@@ -27,28 +47,42 @@ const CANONICAL_STAGES = [
     targetExam: 'OC Placement Test',
   },
   {
-    id: 'selective_prep', label: 'Selective High School', sublabel: 'Year 6–7',
+    id: 'selective', label: 'Selective High School', sublabel: 'Year 6–7',
     description: 'Selective Schools placement test preparation. Deeper analytical and reasoning skills beyond OC level.',
     color: '#7C3AED', light: '#F5F3FF', border: '#DDD6FE',
     targetExam: 'Selective Schools Test',
   },
   {
-    id: 'hsc_prep', label: 'HSC Preparation', sublabel: 'Year 11–12',
+    id: 'hsc', label: 'HSC Preparation', sublabel: 'Year 11–12',
     description: 'Higher School Certificate preparation across all subject areas. ATAR-focused skill development.',
     color: '#0D9488', light: '#F0FDFA', border: '#99F6E4',
     targetExam: 'HSC Examinations',
   },
   {
-    id: 'university', label: 'University & Beyond', sublabel: 'Tertiary',
+    id: 'lifelong', label: 'University & Beyond', sublabel: 'Tertiary',
     description: 'Tertiary study preparation and ongoing academic excellence. Learning DNA adapts to higher-order thinking.',
     color: '#D97706', light: '#FFFBEB', border: '#FDE68A',
     targetExam: 'Tertiary Entrance',
   },
 ];
 
-export default function StudentJourneyPage() {
+function parseStageProfile(raw: StageProfile | string | null): StageProfile | null {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+  return raw;
+}
+
+// ─── inner component ──────────────────────────────────────────────────────────
+
+function JourneyPageInner() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightStage = searchParams.get('stage');
+  const stageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
   const studentId = params.studentId as string;
   const { user } = useAuthStore();
 
@@ -57,8 +91,39 @@ export default function StudentJourneyPage() {
   const [contestStats, setContestStats] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activating, setActivating] = useState<string | null>(null);
 
-  useEffect(() => { loadData(); }, [studentId]);
+  // Stage performance panel
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const [errorCache, setErrorCache] = useState<Record<string, ErrorSummary | null>>({});
+  const [loadingErrorStage, setLoadingErrorStage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) { router.replace('/login'); return; }
+    loadData();
+  }, [studentId]);
+
+  useEffect(() => {
+    if (highlightStage && stageRefs.current[highlightStage]) {
+      setTimeout(() => {
+        stageRefs.current[highlightStage]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+    }
+  }, [highlightStage, enrolledStages]);
+
+  // Auto-select the active stage as the performance view
+  useEffect(() => {
+    if (enrolledStages.length > 0 && !selectedStageId) {
+      const active = enrolledStages.find(s => s.status === 'active');
+      const first = enrolledStages[0];
+      const autoSelect = active ?? first;
+      if (autoSelect) {
+        setSelectedStageId(autoSelect.stage_id);
+        loadErrorsForStage(autoSelect.stage_id);
+      }
+    }
+  }, [enrolledStages]);
 
   const loadData = async () => {
     try {
@@ -73,16 +138,72 @@ export default function StudentJourneyPage() {
         if (found) setStudentName(found.name);
       }
       if (stagesRes.success) setEnrolledStages(stagesRes.stages || []);
-      if (historyRes.success && historyRes.stats?.contestsParticipated > 0) {
-        setContestStats(historyRes.stats);
+      if ((historyRes as any).success && (historyRes as any).stats?.contestsParticipated > 0) {
+        setContestStats((historyRes as any).stats);
       }
     } catch { setError('Failed to load learning journey'); }
     finally { setLoading(false); }
   };
 
+  const loadErrorsForStage = useCallback(async (stageId: string) => {
+    if (errorCache[stageId] !== undefined) return; // already cached (null = no data)
+    setLoadingErrorStage(stageId);
+    try {
+      const res = await apiClient.getErrorPatternsAggregate(studentId, 90, stageId);
+      if (res.success && res.data) {
+        setErrorCache(prev => ({
+          ...prev,
+          [stageId]: {
+            totalResponses: res.data.totalResponses ?? 0,
+            incorrectResponses: res.data.incorrectResponses ?? 0,
+            topPatterns: (res.data.errorPatterns ?? []).slice(0, 3),
+          },
+        }));
+      } else {
+        setErrorCache(prev => ({ ...prev, [stageId]: null }));
+      }
+    } catch {
+      setErrorCache(prev => ({ ...prev, [stageId]: null }));
+    } finally {
+      setLoadingErrorStage(null);
+    }
+  }, [studentId, errorCache]);
+
+  const handleSelectStage = (stageId: string) => {
+    setSelectedStageId(stageId);
+    loadErrorsForStage(stageId);
+    // scroll roadmap card into view
+    setTimeout(() => {
+      stageRefs.current[stageId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  };
+
+  const handleActivateStage = async (stageId: string) => {
+    const currentActive = enrolledStages.find(s => s.status === 'active');
+    if (currentActive && currentActive.stage_id !== stageId) {
+      const meta = CANONICAL_STAGES.find(c => c.id === stageId);
+      const ok = window.confirm(
+        `Switch active stage to "${meta?.label ?? stageId}"? This will deactivate "${currentActive.display_name}". Only one stage can be active at a time.`
+      );
+      if (!ok) return;
+    }
+    setActivating(stageId);
+    try {
+      await apiClient.activateStudentStage(studentId, stageId);
+      await loadData();
+    } catch (e: any) {
+      setError(e?.response?.data?.error || 'Failed to activate stage');
+    } finally {
+      setActivating(null);
+    }
+  };
+
   const enrolledMap = Object.fromEntries(enrolledStages.map(s => [s.stage_id, s]));
   const activeStage = enrolledStages.find(s => s.status === 'active');
   const completedCount = enrolledStages.filter(s => s.status === 'completed').length;
+
+  // Only show tabs for enrolled stages, ordered by sort_order
+  const tabStages = [...enrolledStages].sort((a, b) => a.sort_order - b.sort_order);
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -95,7 +216,7 @@ export default function StudentJourneyPage() {
       <div className="max-w-3xl mx-auto px-4 py-6">
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-5">
           <Button size="sm" variant="ghost" onClick={() => router.back()} className="p-1">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -105,7 +226,7 @@ export default function StudentJourneyPage() {
             </h1>
             <p className="text-xs text-gray-400">
               {completedCount > 0 ? `${completedCount} stage${completedCount !== 1 ? 's' : ''} completed · ` : ''}
-              {activeStage ? `Currently: ${activeStage.display_name}` : 'No active stage yet'}
+              {activeStage ? `Active: ${activeStage.display_name}` : 'No active stage yet'}
             </p>
           </div>
         </div>
@@ -123,7 +244,7 @@ export default function StudentJourneyPage() {
                 <p className="text-sm font-semibold text-amber-800">Contest Performance</p>
                 <p className="text-xs text-amber-600">
                   {contestStats.contestsParticipated} contests · avg {Math.round(contestStats.avgPercentile)}th percentile
-                  {contestStats.bestPercentile >= 90 && <span className="ml-1">· 🏆 Top 10% achieved!</span>}
+                  {contestStats.bestPercentile >= 90 && <span className="ml-1">· Top 10% achieved!</span>}
                 </p>
               </div>
             </div>
@@ -135,20 +256,217 @@ export default function StudentJourneyPage() {
           </div>
         )}
 
-        {/* Visual Roadmap */}
+        {/* ── Stage Performance Section ─────────────────────────────────────────── */}
+        {tabStages.length > 0 && (
+          <div className="mb-6">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Stage Performance</p>
+
+            {/* Stage tabs */}
+            <div className="flex gap-2 flex-wrap mb-4">
+              {tabStages.map(s => {
+                const meta = CANONICAL_STAGES.find(c => c.id === s.stage_id);
+                const isSelected = selectedStageId === s.stage_id;
+                const isActive = s.status === 'active';
+                return (
+                  <button
+                    key={s.stage_id}
+                    onClick={() => handleSelectStage(s.stage_id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
+                    style={isSelected ? {
+                      backgroundColor: meta?.color ?? '#6B7280',
+                      borderColor: meta?.color ?? '#6B7280',
+                      color: '#fff',
+                    } : {
+                      backgroundColor: '#fff',
+                      borderColor: meta?.border ?? '#E5E7EB',
+                      color: meta?.color ?? '#6B7280',
+                    }}
+                  >
+                    {isActive && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+                    {meta?.label ?? s.display_name}
+                    {isActive && <span className="text-[8px] opacity-70 ml-0.5">Active</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Performance panel for selected stage */}
+            {selectedStageId && enrolledMap[selectedStageId] && (() => {
+              const enrolled = enrolledMap[selectedStageId];
+              const meta = CANONICAL_STAGES.find(c => c.id === selectedStageId)!;
+              const profile = parseStageProfile(enrolled.stage_profile);
+              const mastery = profile?.overall_mastery;
+              const strengths = profile?.strengths ?? [];
+              const weaknesses = profile?.weaknesses ?? [];
+              const isActive = enrolled.status === 'active';
+              const isCompleted = enrolled.status === 'completed';
+              const errorData = errorCache[selectedStageId];
+              const loadingErrors = loadingErrorStage === selectedStageId;
+              const errorRate = errorData && errorData.totalResponses > 0
+                ? Math.round((errorData.incorrectResponses / errorData.totalResponses) * 100)
+                : null;
+
+              return (
+                <Card className="border shadow-sm" style={{ borderColor: meta?.border ?? '#E5E7EB' }}>
+                  <CardContent className="p-4">
+                    {/* Stage header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold" style={{ color: meta?.color }}>
+                          {meta?.label ?? enrolled.display_name}
+                        </p>
+                        <span className="text-[9px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{meta?.sublabel}</span>
+                        {isActive && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: meta?.color }}>
+                            Active
+                          </span>
+                        )}
+                        {isCompleted && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                            Completed
+                          </span>
+                        )}
+                      </div>
+                      {enrolled.activated_at && (
+                        <span className="text-[9px] text-gray-400">
+                          Since {new Date(enrolled.activated_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Mastery bar */}
+                    {mastery != null ? (
+                      <div className="mb-4">
+                        <div className="flex justify-between text-[10px] mb-1">
+                          <span className="text-gray-500 font-medium">Stage Mastery</span>
+                          <span className="font-bold" style={{ color: meta?.color }}>{Math.round(mastery * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2">
+                          <div className="h-2 rounded-full transition-all"
+                            style={{ width: `${Math.round(mastery * 100)}%`, backgroundColor: meta?.color }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mb-4 text-xs text-gray-400">No mastery data yet — complete some tests to build your profile.</div>
+                    )}
+
+                    {/* Strengths & weaknesses */}
+                    {(strengths.length > 0 || weaknesses.length > 0) && (
+                      <div className="grid grid-cols-2 gap-3 mb-4 text-[11px]">
+                        {strengths.length > 0 && (
+                          <div>
+                            <p className="font-bold text-emerald-600 mb-1">Strengths</p>
+                            <ul className="text-gray-600 space-y-0.5">
+                              {strengths.slice(0, 4).map(s => <li key={s}>· {s}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {weaknesses.length > 0 && (
+                          <div>
+                            <p className="font-bold text-orange-500 mb-1">Focus Areas</p>
+                            <ul className="text-gray-600 space-y-0.5">
+                              {weaknesses.slice(0, 4).map(w => <li key={w}>· {w}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Error summary */}
+                    <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-100">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Error Summary · Last 90 days</p>
+                      </div>
+                      {loadingErrors ? (
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading error data…
+                        </div>
+                      ) : errorData ? (
+                        <div>
+                          <div className="flex gap-4 text-xs mb-2">
+                            <div>
+                              <span className="font-bold text-gray-800">{errorData.incorrectResponses}</span>
+                              <span className="text-gray-400 ml-1">errors</span>
+                              {errorRate !== null && (
+                                <span className={`ml-1.5 text-[10px] font-semibold ${errorRate > 40 ? 'text-red-500' : errorRate > 20 ? 'text-amber-500' : 'text-green-600'}`}>
+                                  ({errorRate}% error rate)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {errorData.topPatterns.length > 0 && (
+                            <div className="space-y-1">
+                              {errorData.topPatterns.map((p, i) => (
+                                <div key={i} className="flex items-center justify-between text-[10px]">
+                                  <span className="text-gray-600">{p.errorType.replace(/_/g, ' ')}</span>
+                                  <span className={`font-semibold ${p.severity === 'high' ? 'text-red-500' : p.severity === 'medium' ? 'text-amber-500' : 'text-gray-500'}`}>
+                                    {p.count}× · {p.severity}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400">No error data yet for this stage.</p>
+                      )}
+                    </div>
+
+                    {/* Action links */}
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        className="text-xs h-7 px-3"
+                        style={{ backgroundColor: meta?.color, color: '#fff' }}
+                        onClick={() => router.push(`/parent/analytics/${studentId}`)}
+                      >
+                        <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
+                        Performance Analysis
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7 px-3"
+                        style={{ borderColor: meta?.color, color: meta?.color }}
+                        onClick={() => router.push(`/parent/students/${studentId}/error-analysis?stage=${selectedStageId}`)}
+                      >
+                        <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
+                        Error Details
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* No enrolled stages prompt */}
+        {tabStages.length === 0 && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
+            No stage enrolled yet. Activate a stage below to start tracking performance.
+          </div>
+        )}
+
+        {/* ── Learning Pathway Roadmap ───────────────────────────────────────────── */}
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Learning Pathway</p>
         <div className="space-y-0">
           {CANONICAL_STAGES.map((canonical, idx) => {
             const enrolled = enrolledMap[canonical.id];
             const isActive = enrolled?.status === 'active';
             const isCompleted = enrolled?.status === 'completed';
             const isLocked = !enrolled;
-            const mastery = enrolled?.stage_profile?.overall_mastery;
-            const strengths = enrolled?.stage_profile?.strengths || [];
-            const weaknesses = enrolled?.stage_profile?.weaknesses || [];
             const isLast = idx === CANONICAL_STAGES.length - 1;
+            const isHighlighted = highlightStage === canonical.id || selectedStageId === canonical.id;
 
             return (
-              <div key={canonical.id} className="flex gap-4">
+              <div
+                key={canonical.id}
+                ref={el => { stageRefs.current[canonical.id] = el; }}
+                className={`flex gap-4 ${isHighlighted ? 'rounded-xl ring-2 ring-offset-1' : ''}`}
+                style={isHighlighted ? { boxShadow: `0 0 0 2px ${canonical.color}60` } : {}}
+              >
                 {/* Timeline column */}
                 <div className="flex flex-col items-center">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border-2 font-bold text-sm ${
@@ -168,88 +486,97 @@ export default function StudentJourneyPage() {
                 </div>
 
                 {/* Stage card */}
-                <div className={`flex-1 pb-5 ${isLast ? '' : ''}`}>
-                  <Card className={`border transition-all ${
-                    isActive    ? 'shadow-md' :
-                    isCompleted ? 'border-emerald-100' :
-                                  'border-gray-100 opacity-60'
-                  }`} style={isActive ? { borderColor: canonical.color } : {}}>
+                <div className="flex-1 pb-5">
+                  <Card
+                    className={`border transition-all cursor-pointer hover:shadow-sm ${
+                      isActive    ? 'shadow-md' :
+                      isCompleted ? 'border-emerald-100' :
+                                    'border-gray-100 opacity-60'
+                    }`}
+                    style={isActive ? { borderColor: canonical.color } : {}}
+                    onClick={() => enrolled && handleSelectStage(canonical.id)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-1">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-sm" style={{ color: isLocked ? '#9CA3AF' : canonical.color }}>
-                              {canonical.label}
-                            </p>
-                            <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                              {canonical.sublabel}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-sm" style={{ color: isLocked ? '#9CA3AF' : canonical.color }}>
+                            {canonical.label}
+                          </p>
+                          <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                            {canonical.sublabel}
+                          </span>
+                          {isActive && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                              style={{ backgroundColor: canonical.color }}>Active</span>
+                          )}
+                          {isCompleted && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                              Completed
                             </span>
-                            {isActive && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
-                                style={{ backgroundColor: canonical.color }}>Active</span>
-                            )}
-                            {isCompleted && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                                Completed
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[9px] text-gray-400 mt-0.5">{canonical.targetExam}</p>
+                          )}
                         </div>
+                        {enrolled && (
+                          <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
+                        )}
                       </div>
 
-                      <p className="text-xs text-gray-500 leading-relaxed mb-3">{canonical.description}</p>
+                      <p className="text-[9px] text-gray-400 mb-1">{canonical.targetExam}</p>
+                      <p className="text-xs text-gray-500 leading-relaxed">{canonical.description}</p>
 
-                      {/* Enrolled stage details */}
-                      {enrolled && (
-                        <>
-                          {enrolled.activated_at && (
-                            <p className="text-[9px] text-gray-400 mb-2">
-                              Started {new Date(enrolled.activated_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })}
-                              {enrolled.completed_at && ` · Completed ${new Date(enrolled.completed_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })}`}
-                            </p>
-                          )}
-
-                          {mastery != null && (
-                            <div className="mb-3">
-                              <div className="flex justify-between text-[10px] mb-1">
-                                <span className="text-gray-400 font-medium">Stage Mastery</span>
-                                <span className="font-bold" style={{ color: canonical.color }}>{Math.round(mastery * 100)}%</span>
-                              </div>
-                              <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                <div className="h-1.5 rounded-full transition-all"
-                                  style={{ width: `${Math.round(mastery * 100)}%`, backgroundColor: canonical.color }} />
-                              </div>
-                            </div>
-                          )}
-
-                          {(strengths.length > 0 || weaknesses.length > 0) && (
-                            <div className="grid grid-cols-2 gap-2 text-[10px]">
-                              {strengths.length > 0 && (
-                                <div>
-                                  <p className="font-semibold text-emerald-600 mb-0.5">Strengths</p>
-                                  <ul className="text-gray-500 space-y-0.5">
-                                    {strengths.slice(0, 3).map((s: string) => <li key={s}>· {s}</li>)}
-                                  </ul>
-                                </div>
-                              )}
-                              {weaknesses.length > 0 && (
-                                <div>
-                                  <p className="font-semibold text-orange-500 mb-0.5">Focus Areas</p>
-                                  <ul className="text-gray-500 space-y-0.5">
-                                    {weaknesses.slice(0, 3).map((w: string) => <li key={w}>· {w}</li>)}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </>
+                      {enrolled?.activated_at && (
+                        <p className="text-[9px] text-gray-400 mt-1.5">
+                          Started {new Date(enrolled.activated_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })}
+                          {enrolled.completed_at && ` · Completed ${new Date(enrolled.completed_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })}`}
+                        </p>
                       )}
 
+                      {/* Quick mastery indicator for enrolled stages */}
+                      {enrolled && (() => {
+                        const profile = parseStageProfile(enrolled.stage_profile);
+                        const mastery = profile?.overall_mastery;
+                        if (mastery == null) return null;
+                        return (
+                          <div className="mt-2">
+                            <div className="flex justify-between text-[9px] mb-0.5">
+                              <span className="text-gray-400">Mastery</span>
+                              <span className="font-semibold" style={{ color: canonical.color }}>{Math.round(mastery * 100)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-1">
+                              <div className="h-1 rounded-full" style={{ width: `${Math.round(mastery * 100)}%`, backgroundColor: canonical.color }} />
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Activate / switch buttons */}
                       {isLocked && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-1">
-                          <Lock className="h-3 w-3" />
-                          <span>Unlocks when ready · Learning DNA carries forward from previous stages</span>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                            <Lock className="h-3 w-3" />
+                            <span>Learning DNA carries forward from previous stages</span>
+                          </div>
+                          <Button
+                            size="sm" variant="outline"
+                            className="text-[10px] h-6 px-2 shrink-0"
+                            style={{ borderColor: canonical.color, color: canonical.color }}
+                            disabled={activating === canonical.id}
+                            onClick={e => { e.stopPropagation(); handleActivateStage(canonical.id); }}
+                          >
+                            {activating === canonical.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Set as Active'}
+                          </Button>
+                        </div>
+                      )}
+                      {!isLocked && !isActive && (
+                        <div className="mt-2 flex justify-end">
+                          <Button
+                            size="sm" variant="outline"
+                            className="text-[10px] h-6 px-2"
+                            style={{ borderColor: canonical.color, color: canonical.color }}
+                            disabled={activating === canonical.id}
+                            onClick={e => { e.stopPropagation(); handleActivateStage(canonical.id); }}
+                          >
+                            {activating === canonical.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Switch to this Stage'}
+                          </Button>
                         </div>
                       )}
                     </CardContent>
@@ -269,7 +596,22 @@ export default function StudentJourneyPage() {
             so the new stage starts with deep context, not from zero.
           </p>
         </div>
+
       </div>
     </div>
+  );
+}
+
+// ─── export ───────────────────────────────────────────────────────────────────
+
+export default function JourneyPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-teal-600 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <JourneyPageInner />
+    </Suspense>
   );
 }

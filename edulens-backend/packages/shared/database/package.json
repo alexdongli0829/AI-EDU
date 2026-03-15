@@ -2,6 +2,7 @@
   "name": "@edulens/database",
   "version": "1.0.0",
   "main": "./dist/index.js",
+  "source": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
@@ -14,12 +15,10 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@prisma/client": "^5.8.0",
-    "@edulens/common": "*",
+    "@edulens/common": "workspace:*",
     "ioredis": "^5.3.2"
   },
   "devDependencies": {
-    "prisma": "^5.8.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

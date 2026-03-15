@@ -27,7 +27,7 @@ interface TestState {
 
   // Actions
   loadTests: (filters?: { subject?: string; gradeLevel?: number }) => Promise<void>;
-  startTest: (testId: string, studentId: string) => Promise<void>;
+  startTest: (studentId: string, options: { testId?: string; stageId?: string; subject?: string; contestId?: string }) => Promise<void>;
   submitAnswer: (answer: string) => Promise<SubmitAnswerResponse>;
   resetTest: () => void;
 }
@@ -53,10 +53,10 @@ export const useTestStore = create<TestState>((set, get) => ({
     }
   },
 
-  startTest: async (testId: string, studentId: string) => {
+  startTest: async (studentId: string, options: { testId?: string; stageId?: string; subject?: string; contestId?: string }) => {
     set({ loading: true });
     try {
-      const session = await testApiClient.startTestSession(testId, studentId);
+      const session = await testApiClient.startTestSession(studentId, options);
       set({
         currentSession: session,
         currentQuestion: session.currentQuestion,

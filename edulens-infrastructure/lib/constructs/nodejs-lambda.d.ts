@@ -1,7 +1,10 @@
 /**
  * Node.js Lambda Construct
  *
- * Reusable construct for creating Node.js Lambda functions with common configuration
+ * Uses NodejsFunction (esbuild) to bundle only imported code, eliminating the
+ * need to ship the entire node_modules directory. Packages listed in
+ * `externalModules` are excluded from the bundle (available in the Lambda
+ * runtime).
  */
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -12,7 +15,13 @@ import { EnvironmentConfig } from '../../config/environments';
 export interface NodejsLambdaProps {
     config: EnvironmentConfig;
     functionName: string;
+    /**
+     * Lambda handler in the form used by CDK: `dist/handlers/login.handler`
+     * The construct converts this to a TypeScript entry path:
+     *   dist/handlers/login.handler  →  <codePath>/src/handlers/login.ts
+     */
     handler: string;
+    /** Relative path from the infra root to the service directory */
     codePath: string;
     description: string;
     vpc: ec2.Vpc;

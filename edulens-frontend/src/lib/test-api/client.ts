@@ -25,7 +25,8 @@ export interface Question {
 
 export interface TestSession {
   sessionId: string;
-  testId: string;
+  testId: string | null;
+  stageId: string | null;
   testTitle: string;
   subject: string;
   timeRemaining: number;
@@ -72,11 +73,14 @@ export class TestApiClient {
     return response.json();
   }
 
-  async startTestSession(testId: string, studentId: string): Promise<TestSession> {
+  async startTestSession(
+    studentId: string,
+    options: { testId?: string; stageId?: string; subject?: string; testFormat?: string; contestId?: string } = {}
+  ): Promise<TestSession> {
     const response = await fetch(`${this.baseUrl}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ testId, studentId }),
+      body: JSON.stringify({ studentId, ...options }),
     });
 
     if (!response.ok) throw new Error('Failed to start test session');

@@ -52,7 +52,8 @@ def init_database():
         print("Database connection established")
     except Exception as e:
         print(f"Database connection failed: {e}")
-        raise
+        # Do not re-raise — let the handler's try/except handle DB errors
+        # so API Gateway always gets a proper HTTP response with CORS headers
 
 
 @contextmanager
