@@ -5,7 +5,7 @@ REST API endpoint for error trend analysis over time
 
 import json
 from typing import Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from ..database import (
@@ -69,10 +69,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
             
             # Filter by date range
-            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            now_utc = datetime.now(timezone.utc)
+            cutoff_date = now_utc - timedelta(days=days_back)
             recent_responses = [
-                r for r in responses 
-                if r["answered_at"] >= cutoff_date and not r["is_correct"]
+                r for r in responses
+                if r["answered_at"] is not None and not r["is_correct"] and (
+                    r["answered_at"].replace(tzinfo=timezone.utc) if r["answered_at"].tzinfo is None else r["answered_at"]
+                ) >= cutoff_date
             ]
             
             if not recent_responses:
@@ -87,7 +90,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             "period": period,
                             "dateRange": {
                                 "from": cutoff_date.isoformat(),
-                                "to": datetime.utcnow().isoformat(),
+                                "to": now_utc.isoformat(),
                                 "days": days_back
                             },
                             "trends": {},
@@ -239,7 +242,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "period": period,
                 "dateRange": {
                     "from": cutoff_date.isoformat(),
-                    "to": datetime.utcnow().isoformat(),
+                    "to": now_utc.isoformat(),
                     "days": days_back
                 },
                 "trends": error_trends,

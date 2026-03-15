@@ -293,6 +293,11 @@ export class ApiClient {
     const response = await this.client.get(`/contests/${contestId}/results/${studentId}`);
     return response.data;
   }
+
+  async getStudentContestHistory(studentId: string) {
+    const response = await this.client.get(`/students/${studentId}/contest-history`);
+    return response.data;
+  }
 }
 
 // Singleton instance

@@ -109,6 +109,7 @@ export class LambdaStack extends cdk.Stack {
   public readonly adminCreateContestFunction: lambda.Function;
   public readonly adminUpdateContestStatusFunction: lambda.Function;
   public readonly adminFinalizeContestResultsFunction: lambda.Function;
+  public readonly getStudentContestHistoryFunction: lambda.Function;
 
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
@@ -266,7 +267,7 @@ export class LambdaStack extends cdk.Stack {
     this.endTestSessionFunction = new NodejsLambda(this, 'EndTestSessionLambda', {
       config,
       functionName: `edulens-end-test-session-${config.stage}`,
-      handler: 'dist/handlers/end-test-session.handler',
+      handler: 'dist/handlers/complete.handler',
       codePath: '../edulens-backend/services/test-engine',
       description: 'End a test session',
       vpc,
@@ -414,7 +415,7 @@ export class LambdaStack extends cdk.Stack {
     this.parentChatSendStreamFunction = new NodejsLambda(this, 'ParentChatSendStreamLambda', {
       config,
       functionName: `edulens-parent-chat-send-stream-${config.stage}`,
-      handler: 'dist/handlers/parent-chat/send-message-stream.handler',
+      handler: 'dist/handlers/parent-chat/stream-message.handler',
       codePath: '../edulens-backend/services/conversation-engine',
       description: 'Parent chat send message (SSE streaming)',
       vpc,
@@ -518,7 +519,7 @@ export class LambdaStack extends cdk.Stack {
     this.studentChatSendStreamFunction = new NodejsLambda(this, 'StudentChatSendStreamLambda', {
       config,
       functionName: `edulens-student-chat-send-stream-${config.stage}`,
-      handler: 'dist/handlers/student-chat/send-message-stream.handler',
+      handler: 'dist/handlers/student-chat/stream-message.handler',
       codePath: '../edulens-backend/services/conversation-engine',
       description: 'Student chat send message (SSE streaming)',
       vpc,
@@ -576,7 +577,7 @@ export class LambdaStack extends cdk.Stack {
       config,
       functionName: `edulens-websocket-connect-${config.stage}`,
       handler: 'dist/handlers/websocket/connect.handler',
-      codePath: '../edulens-backend/services/conversation-engine',
+      codePath: '../edulens-backend/services/test-engine',
       description: 'WebSocket connect handler',
       vpc,
       securityGroup: lambdaSecurityGroup,
@@ -607,7 +608,7 @@ export class LambdaStack extends cdk.Stack {
       config,
       functionName: `edulens-websocket-disconnect-${config.stage}`,
       handler: 'dist/handlers/websocket/disconnect.handler',
-      codePath: '../edulens-backend/services/conversation-engine',
+      codePath: '../edulens-backend/services/test-engine',
       description: 'WebSocket disconnect handler',
       vpc,
       securityGroup: lambdaSecurityGroup,
@@ -637,7 +638,7 @@ export class LambdaStack extends cdk.Stack {
       config,
       functionName: `edulens-timer-sync-${config.stage}`,
       handler: 'dist/handlers/websocket/timer-sync.handler',
-      codePath: '../edulens-backend/services/conversation-engine',
+      codePath: '../edulens-backend/services/test-engine',
       description: 'Timer sync broadcaster (every 1 minute)',
       vpc,
       securityGroup: lambdaSecurityGroup,
@@ -696,6 +697,7 @@ export class LambdaStack extends cdk.Stack {
       redisEndpoint,
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
+      requirementsFile: 'requirements-light.txt',
     }).function;
 
     this.errorPatternsTrendsFunction = new PythonLambda(this, 'ErrorPatternsTrendsLambda', {
@@ -710,6 +712,7 @@ export class LambdaStack extends cdk.Stack {
       redisEndpoint,
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
+      requirementsFile: 'requirements-light.txt',
     }).function;
 
     // ============================================================
@@ -1100,6 +1103,18 @@ export class LambdaStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(60),
     }).function;
 
+    this.getStudentContestHistoryFunction = new NodejsLambda(this, 'GetStudentContestHistoryLambda', {
+      config,
+      functionName: `edulens-student-contest-history-${config.stage}`,
+      handler: 'dist/handlers/get-student-contest-history.handler',
+      codePath: contestServicePath,
+      description: 'Get student contest history with percentile trend',
+      vpc,
+      securityGroup: lambdaSecurityGroup,
+      auroraSecret,
+      redisEndpoint,
+    }).function;
+
     // ============================================================
     // 8. GRANT DATABASE SECRET ACCESS TO ALL FUNCTIONS
     // ============================================================
@@ -1162,6 +1177,7 @@ export class LambdaStack extends cdk.Stack {
       this.adminCreateContestFunction,
       this.adminUpdateContestStatusFunction,
       this.adminFinalizeContestResultsFunction,
+      this.getStudentContestHistoryFunction,
     ];
 
     const secretReadPolicy = new iam.PolicyStatement({

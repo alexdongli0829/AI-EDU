@@ -4,7 +4,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 import { getSystemConfig, cfgInt } from '../lib/system-config';
 
 function successResponse(data: any): APIGatewayProxyResult {
@@ -51,7 +51,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'Either testId or stageId is required');
     }
 
-    const [prisma, sysConfig] = await Promise.all([getPrismaClient(), getSystemConfig()]);
+    const [, sysConfig] = await Promise.all([getDb(), getSystemConfig()]);
 
     // --- Resolve test config ---
     // Start with system-config defaults; override from test record or stage test_formats
@@ -63,7 +63,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     let studentStageId: string | null = null;
 
     if (testId) {
-      const test = await prisma.$queryRawUnsafe(
+      const test = await query(
         `SELECT id, title, subject, grade_level, time_limit, question_count FROM tests WHERE id = $1::uuid`,
         testId
       ) as any[];
@@ -82,7 +82,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (stageId) {
       // Load stage config and resolve the student's stage enrollment id
-      const stageRows = await prisma.$queryRawUnsafe(
+      const stageRows = await query(
         `SELECT id, display_name, test_formats FROM stages WHERE id = $1 AND is_active = true`,
         stageId
       ) as any[];
@@ -99,7 +99,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       if (!testTitle || testTitle === 'Practice Test') testTitle = `${stage.display_name} — ${testFormat || 'Practice'}`;
 
       // Resolve the student_stage enrollment id
-      const ssRows = await prisma.$queryRawUnsafe(
+      const ssRows = await query(
         `SELECT id FROM student_stages WHERE student_id = $1 AND stage_id = $2 AND status = 'active'`,
         studentId, stageId
       ) as any[];
@@ -111,7 +111,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // --- Validate contest if provided ---
     if (contestId) {
-      const contestRows = await prisma.$queryRawUnsafe(
+      const contestRows = await query(
         `SELECT id, status FROM contests WHERE id = $1::uuid`,
         contestId
       ) as any[];
@@ -125,7 +125,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     // Cancel any existing active sessions for this student (allow fresh start)
-    await prisma.$executeRawUnsafe(
+    await query(
       `UPDATE test_sessions SET status = 'cancelled' WHERE student_id = $1::uuid AND status = 'active'`,
       studentId
     );
@@ -146,7 +146,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       }
     }
 
-    const countResult = await prisma.$queryRawUnsafe(countQuery, ...countParams) as any[];
+    const countResult = await query(countQuery, ...countParams) as any[];
     const availableCount = parseInt(countResult[0]?.cnt || '0');
 
     if (availableCount === 0) {
@@ -160,17 +160,19 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // --- Create test session ---
     const sessionId = uuidv4();
 
-    await prisma.$executeRawUnsafe(
+    await query(
       `INSERT INTO test_sessions
-         (id, test_id, student_id, student_stage_id, contest_id, status, time_remaining, estimated_ability, started_at)
+         (id, test_id, student_id, student_stage_id, contest_id, status, time_remaining, estimated_ability, started_at, stage_id, question_count)
        VALUES
-         ($1::uuid, $2, $3::uuid, $4, $5, 'active', $6, 0.0, NOW())`,
+         ($1::uuid, $2, $3::uuid, $4, $5, 'active', $6, 0.0, NOW(), $7, $8)`,
       sessionId,
       testId ? testId : null,
       studentId,
       studentStageId,
       contestId ? contestId : null,
-      timeRemaining
+      timeRemaining,
+      stageId || null,
+      totalQuestions
     );
 
     // --- Fetch first question ---
@@ -193,7 +195,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       firstQQuery += ` ORDER BY difficulty ASC, id ASC LIMIT 1`;
     }
 
-    const questionData = await prisma.$queryRawUnsafe(firstQQuery, ...firstQParams) as any[];
+    const questionData = await query(firstQQuery, ...firstQParams) as any[];
 
     if (!questionData || questionData.length === 0) {
       return errorResponse(500, 'Unable to fetch first question');

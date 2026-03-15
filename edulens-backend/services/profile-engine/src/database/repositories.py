@@ -20,7 +20,7 @@ class TestSessionRepository:
             SELECT
                 id, student_id, test_id, status,
                 started_at, completed_at, time_remaining,
-                current_question_index, total_questions, score
+                0 AS current_question_index, question_count AS total_questions, scaled_score AS score
             FROM test_sessions
             WHERE id = :session_id
         """)
@@ -88,17 +88,17 @@ class SessionResponseRepository:
                 sr.id,
                 sr.question_id,
                 sr.student_answer,
-                sr.correct_answer,
+                q.correct_answer,
                 sr.is_correct,
                 sr.time_spent,
-                sr.answered_at,
-                q.question_type,
-                q.estimated_time_seconds,
+                sr.id AS answered_at,
+                q.type AS question_type,
+                q.estimated_time,
                 q.skill_tags
             FROM session_responses sr
             JOIN questions q ON sr.question_id = q.id
             WHERE sr.session_id = :session_id
-            ORDER BY sr.answered_at ASC
+            ORDER BY sr.id ASC
         """)
 
         results = self.db.execute(
@@ -114,7 +114,7 @@ class SessionResponseRepository:
                 "correct_answer": r[3],
                 "is_correct": r[4],
                 "time_spent": r[5],
-                "answered_at": r[6],
+                "answered_at": None,
                 "question_type": r[7],
                 "estimated_time": r[8],
                 "skill_tags": r[9] or []
@@ -149,12 +149,12 @@ class SessionResponseRepository:
                 sr.session_id,
                 sr.question_id,
                 sr.student_answer,
-                sr.correct_answer,
+                q.correct_answer,
                 sr.is_correct,
                 sr.time_spent,
-                sr.answered_at,
-                q.question_type,
-                q.estimated_time_seconds,
+                ts.completed_at AS answered_at,
+                q.type AS question_type,
+                q.estimated_time,
                 q.skill_tags
             FROM session_responses sr
             JOIN questions q ON sr.question_id = q.id
@@ -163,7 +163,7 @@ class SessionResponseRepository:
             WHERE ts.student_id = :student_id
                 AND ts.status = 'completed'
                 {extra_where}
-            ORDER BY sr.answered_at DESC
+            ORDER BY ts.completed_at DESC, sr.id DESC
             LIMIT :limit
         """
 

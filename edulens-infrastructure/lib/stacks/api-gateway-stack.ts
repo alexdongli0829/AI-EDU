@@ -77,6 +77,7 @@ export interface ApiRouteFunctions {
   adminCreateContestFunction: lambda.Function;
   adminUpdateContestStatusFunction: lambda.Function;
   adminFinalizeContestResultsFunction: lambda.Function;
+  getStudentContestHistoryFunction: lambda.Function;
 }
 
 export interface ApiGatewayStackProps extends cdk.StackProps {
@@ -299,6 +300,10 @@ export class ApiGatewayStack extends cdk.Stack {
       .addMethod('GET', new apigateway.LambdaIntegration(fns.errorPatternsAggregateFunction));
     errorPatternsResource.addResource('trends')
       .addMethod('GET', new apigateway.LambdaIntegration(fns.errorPatternsTrendsFunction));
+
+    // /students/{studentId}/contest-history
+    studentByIdResource.addResource('contest-history')
+      .addMethod('GET', new apigateway.LambdaIntegration(fns.getStudentContestHistoryFunction));
 
     // /students/{studentId}/stages  (Stage Registry enrollment)
     const studentStagesResource = studentByIdResource.addResource('stages');

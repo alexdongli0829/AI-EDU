@@ -6,7 +6,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { getPrismaClient } from '../lib/database';
+import { getDb, query } from '../lib/database';
 import { getSystemConfig, cfgStr, cfgInt, cfgNum } from '../lib/system-config';
 
 const CORS = {
@@ -107,8 +107,8 @@ export async function handler(event: any): Promise<any> {
 // ─── Batch mode (EventBridge daily) ──────────────────────────────────────────
 
 async function handleBatch(): Promise<void> {
-  const prisma = await getPrismaClient();
-  const students = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+  const db = await getDb();
+  const students = await db.unsafe<Array<{ id: string }>>(
     `SELECT id FROM students`
   );
   console.log(`Daily insights batch: ${students.length} students`);
@@ -121,15 +121,15 @@ async function handleBatch(): Promise<void> {
 // ─── Single student ───────────────────────────────────────────────────────────
 
 async function handleSingleStudent(studentId: string, forceRefresh: boolean): Promise<APIGatewayProxyResult> {
-  const [prisma, sysConfig] = await Promise.all([getPrismaClient(), getSystemConfig()]);
+  const [, sysConfig] = await Promise.all([getDb(), getSystemConfig()]);
   const staleHours = cfgNum(sysConfig, 'testInsightsCacheHours');
 
   // Return cache if fresh
   if (!forceRefresh) {
-    const rows = await prisma.$queryRawUnsafe<any[]>(
+    const rows = await query<any[]>(
       `SELECT insights_json, last_insights_at FROM student_profiles WHERE student_id = $1::uuid`,
       studentId
-    );
+    ) as any[];
     if (rows.length && rows[0].insights_json && rows[0].last_insights_at) {
       const ageHours = (Date.now() - new Date(rows[0].last_insights_at).getTime()) / 3_600_000;
       if (ageHours < staleHours) {
@@ -138,36 +138,36 @@ async function handleSingleStudent(studentId: string, forceRefresh: boolean): Pr
     }
   }
 
-  // Fetch all completed sessions
-  const sessions = await prisma.$queryRawUnsafe<any[]>(
+  // Fetch all completed sessions (stage-based sessions have no test_id, skip them for insights)
+  const sessions = await query(
     `SELECT ts.id, ts.completed_at, t.subject, t.title,
             ts.scaled_score, ts.correct_count, ts.total_items
      FROM test_sessions ts
      JOIN tests t ON ts.test_id = t.id
-     WHERE ts.student_id = $1::uuid AND ts.status = 'completed'
+     WHERE ts.student_id = $1::uuid AND ts.status = 'completed' AND ts.test_id IS NOT NULL
      ORDER BY ts.completed_at ASC`,
     studentId
-  );
+  ) as any[];
 
   if (!sessions.length) {
     return ok({ success: true, insights: null, reason: 'no_tests' });
   }
 
   // Fetch all responses
-  const responses = await prisma.$queryRawUnsafe<any[]>(
+  const responses = await query(
     `SELECT sr.is_correct, q.skill_tags, q.subject, ts.completed_at
      FROM session_responses sr
      JOIN questions q ON sr.question_id = q.id
      JOIN test_sessions ts ON sr.session_id = ts.id
      WHERE ts.student_id = $1::uuid AND ts.status = 'completed'`,
     studentId
-  );
+  ) as any[];
 
   // Student grade level
-  const studentRow = await prisma.$queryRawUnsafe<any[]>(
+  const studentRow = await query(
     `SELECT grade_level FROM students WHERE id = $1::uuid`,
     studentId
-  );
+  ) as any[];
   const gradeLevel = studentRow[0]?.grade_level || 5;
 
   // Build per-subject summary for the prompt
@@ -218,7 +218,7 @@ async function handleSingleStudent(studentId: string, forceRefresh: boolean): Pr
   insights.totalTests = sessions.length;
 
   // Upsert
-  await prisma.$executeRawUnsafe(
+  await query(
     `INSERT INTO student_profiles (id, student_id, insights_json, last_insights_at, updated_at)
      VALUES (uuid_generate_v4(), $1::uuid, $2::jsonb, NOW(), NOW())
      ON CONFLICT (student_id)

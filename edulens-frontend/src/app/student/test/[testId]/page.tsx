@@ -38,7 +38,7 @@ export default function TestPage() {
         setQuestions(testData.questions || []);
 
         // Start test session
-        const sessionData = await apiClient.startTestSession(testId, student.id);
+        const sessionData = await apiClient.startTestSession(student.id, { testId });
         setSession(sessionData);
         setTimeRemaining(sessionData.timeRemaining);
 

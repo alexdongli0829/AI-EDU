@@ -1,21 +1,33 @@
 /**
  * Node.js Lambda Construct
  *
- * Reusable construct for creating Node.js Lambda functions with common configuration
+ * Uses NodejsFunction (esbuild) to bundle only imported code, eliminating the
+ * need to ship the entire node_modules directory. Packages listed in
+ * `externalModules` are excluded from the bundle (available in the Lambda
+ * runtime). `@prisma/client` is excluded from esbuild bundling and installed
+ * via `nodeModules` so its native binary is available at runtime.
  */
 
+import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
 import { EnvironmentConfig } from '../../config/environments';
 
 export interface NodejsLambdaProps {
   config: EnvironmentConfig;
   functionName: string;
+  /**
+   * Lambda handler in the form used by CDK: `dist/handlers/login.handler`
+   * The construct converts this to a TypeScript entry path:
+   *   dist/handlers/login.handler  →  <codePath>/src/handlers/login.ts
+   */
   handler: string;
+  /** Relative path from the infra root to the service directory */
   codePath: string;
   description: string;
   vpc: ec2.Vpc;
@@ -48,77 +60,84 @@ export class NodejsLambda extends Construct {
       memorySize,
     } = props;
 
-    // Create log group
+    // ── Derive TypeScript entry from handler string ───────────────────────────
+    // 'dist/handlers/login.handler'               → src/handlers/login.ts
+    // 'dist/handlers/parent-chat/stream.handler'  → src/handlers/parent-chat/stream.ts
+    const parts = handler.split('.');
+    const exportedFn = parts[parts.length - 1];          // 'handler'
+    const filePart   = parts.slice(0, -1).join('.');     // 'dist/handlers/login'
+    const srcRelPath = filePart.replace(/^dist\//, 'src/') + '.ts';
+    const entry      = path.resolve(__dirname, '../../', codePath, srcRelPath);
+
+    // Absolute path to the service root (for Prisma schema lookup)
+    const serviceRoot = path.resolve(__dirname, '../../', codePath);
+
+    // ── Log group ─────────────────────────────────────────────────────────────
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
       logGroupName: `/aws/lambda/${functionName}`,
-      retention: config.logRetentionDays,
+      retention:    config.logRetentionDays,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Create Lambda function
-    this.function = new lambda.Function(this, 'Function', {
+    // ── Lambda function (esbuild-bundled) ─────────────────────────────────────
+    this.function = new NodejsFunction(this, 'Function', {
       functionName,
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler,
-      code: lambda.Code.fromAsset(codePath, {
-        exclude: [
-          'test',
-          'tests',
-          '__tests__',
-          '*.test.ts',
-          '*.test.js',
-          '*.spec.ts',
-          '*.spec.js',
-          '*.md',
-          '.git',
-          '.env',
-          '.env.local',
-          'tsconfig.json',
-          'jest.config.js',
-          'coverage',
-          'node_modules/@types',
-          'node_modules/typescript',
-          'node_modules/prisma',
-        ],
-      }),
+      runtime:     lambda.Runtime.NODEJS_20_X,
+      entry,
+      handler:     exportedFn,
       description,
 
-      // VPC configuration
       vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-      },
+      vpcSubnets:    { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [securityGroup],
 
-      // Resource configuration
-      timeout: timeout || cdk.Duration.seconds(config.lambda.timeout),
+      timeout:    timeout    || cdk.Duration.seconds(config.lambda.timeout),
       memorySize: memorySize || config.lambda.memorySize,
 
-      // Environment variables
       environment: {
-        NODE_ENV: config.stage,
-        STAGE: config.stage,
-        DB_SECRET_ARN: auroraSecret.secretArn, // Lambda will read secret and construct connection string
-        REDIS_URL: `redis://${redisEndpoint}:6379`,
-        LOG_LEVEL: 'info',
+        NODE_ENV:      config.stage,
+        STAGE:         config.stage,
+        DB_SECRET_ARN: auroraSecret.secretArn,
+        REDIS_URL:     `redis://${redisEndpoint}:6379`,
+        LOG_LEVEL:     'info',
         ...environment,
       },
 
-      // X-Ray tracing
       tracing: config.enableXRay ? lambda.Tracing.ACTIVE : lambda.Tracing.DISABLED,
 
-      // Reserved concurrency (production only)
       ...(config.stage === 'prod' && {
         reservedConcurrentExecutions: 100,
       }),
 
-      // Log group
       logGroup,
+
+      bundling: {
+        // @aws-sdk/* is built into the Node 20 managed runtime — no need to bundle it.
+        externalModules: ['@aws-sdk/*'],
+
+        // @prisma/client cannot be bundled by esbuild (native binary).
+        // NodejsFunction will npm-install it into the output dir separately.
+        nodeModules: ['@prisma/client'],
+
+        commandHooks: {
+          beforeBundling():  string[] { return []; },
+          beforeInstall():   string[] { return []; },
+          // After npm installs @prisma/client, copy the pre-generated .prisma/client
+          // directory (which contains the Lambda-compatible rhel-openssl-3.0.x binary
+          // produced by `prisma generate` with binaryTargets in schema.prisma).
+          afterBundling(inputDir: string, outputDir: string): string[] {
+            return [
+              `[ -d "${inputDir}/node_modules/.prisma" ] && cp -r "${inputDir}/node_modules/.prisma" "${outputDir}/node_modules/.prisma" || true`,
+            ];
+          },
+        },
+
+        minify:    true,
+        sourceMap: false,
+        target:    'node20',
+      },
     });
 
-    // Note: Database secret access is granted in the Lambda stack to avoid cyclic dependencies
-
-    // Add tags
     cdk.Tags.of(this.function).add('Service', functionName.split('-')[1] || 'unknown');
   }
 }

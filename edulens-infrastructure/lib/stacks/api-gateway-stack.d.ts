@@ -66,6 +66,7 @@ export interface ApiRouteFunctions {
     adminCreateContestFunction: lambda.Function;
     adminUpdateContestStatusFunction: lambda.Function;
     adminFinalizeContestResultsFunction: lambda.Function;
+    getStudentContestHistoryFunction: lambda.Function;
 }
 export interface ApiGatewayStackProps extends cdk.StackProps {
     config: EnvironmentConfig;

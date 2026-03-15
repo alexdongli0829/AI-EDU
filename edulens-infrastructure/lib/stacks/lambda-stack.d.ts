@@ -84,5 +84,6 @@ export declare class LambdaStack extends cdk.Stack {
     readonly adminCreateContestFunction: lambda.Function;
     readonly adminUpdateContestStatusFunction: lambda.Function;
     readonly adminFinalizeContestResultsFunction: lambda.Function;
+    readonly getStudentContestHistoryFunction: lambda.Function;
     constructor(scope: Construct, id: string, props: LambdaStackProps);
 }

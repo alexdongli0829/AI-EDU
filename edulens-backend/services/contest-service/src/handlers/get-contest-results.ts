@@ -5,7 +5,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { getPrismaClient } from '../lib/database';
+import { query } from '../lib/database';
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
@@ -14,10 +14,8 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (!contestId || !studentId) return err(400, 'contestId and studentId are required');
 
-    const prisma = await getPrismaClient();
-
-    // Verify contest exists and is finalized
-    const contests = await prisma.$queryRawUnsafe(
+    // Verify contest exists
+    const contests = await query(
       `SELECT id, title, status FROM contests WHERE id = $1::uuid`,
       contestId
     ) as any[];
@@ -39,17 +37,18 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       };
     }
 
-    // Load the student's result
-    const results = await prisma.$queryRawUnsafe(`
+    // Load the student's result + contest stats
+    const results = await query(`
       SELECT
-        cr.raw_score,
-        cr.total_questions,
-        cr.time_taken_seconds,
-        cr.percentile_rank,
+        cr.score,
         cr.rank,
-        cr.finalized_at,
-        (SELECT COUNT(*) FROM contest_results WHERE contest_id = $1::uuid) AS total_participants
+        cr.percentile,
+        cr.scored_at,
+        c.total_participants,
+        c.avg_score,
+        COALESCE(array_length(c.question_ids, 1), 0) AS question_count
       FROM contest_results cr
+      JOIN contests c ON c.id = cr.contest_id
       WHERE cr.contest_id = $1::uuid AND cr.student_id = $2::uuid
     `, contestId, studentId) as any[];
 
@@ -66,13 +65,13 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
         contestTitle: contest.title,
         studentId,
         result: {
-          rawScore: r.raw_score,
-          totalQuestions: r.total_questions,
-          timeTakenSeconds: r.time_taken_seconds,
-          percentileRank: r.percentile_rank,
+          score: r.score,
+          totalQuestions: r.question_count,
+          percentile: parseFloat(r.percentile ?? '0'),
           rank: r.rank,
           totalParticipants: parseInt(r.total_participants ?? '0'),
-          finalizedAt: r.finalized_at,
+          avgScore: r.avg_score ? parseFloat(r.avg_score) : null,
+          scoredAt: r.scored_at,
         },
       }),
     };

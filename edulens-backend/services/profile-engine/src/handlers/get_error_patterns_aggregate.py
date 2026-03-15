@@ -5,7 +5,7 @@ REST API endpoint for comprehensive error pattern analysis
 
 import json
 from typing import Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from ..database import (
     get_db_session,
@@ -70,10 +70,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
             
             # Filter by date range
-            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            now_utc = datetime.now(timezone.utc)
+            cutoff_date = now_utc - timedelta(days=days_back)
             recent_responses = [
-                r for r in responses 
-                if r["answered_at"] >= cutoff_date
+                r for r in responses
+                if r["answered_at"] is not None and (
+                    r["answered_at"].replace(tzinfo=timezone.utc) if r["answered_at"].tzinfo is None else r["answered_at"]
+                ) >= cutoff_date
             ]
             
             if not recent_responses:
@@ -87,7 +90,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             "stageId": stage_id,
                             "dateRange": {
                                 "from": cutoff_date.isoformat(),
-                                "to": datetime.utcnow().isoformat(),
+                                "to": now_utc.isoformat(),
                                 "days": days_back
                             },
                             "totalResponses": 0,
@@ -192,7 +195,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "stageId": stage_id,
                 "dateRange": {
                     "from": cutoff_date.isoformat(),
-                    "to": datetime.utcnow().isoformat(),
+                    "to": now_utc.isoformat(),
                     "days": days_back
                 },
                 "totalResponses": len(recent_responses),
