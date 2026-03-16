@@ -76,6 +76,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       const questionId = questionContext?.questionId ?? undefined;
       const agentResult = await invokeAgent('student-tutor', {
         prompt: message,
+        conversationHistory: chatHistory,
         studentId,
         questionId,
       });

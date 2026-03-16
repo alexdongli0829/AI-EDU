@@ -89,16 +89,40 @@ def invoke(payload: dict) -> str:
     user_input = payload.get("prompt", "I don't know how to solve this.")
     student_id = payload.get("studentId", "mock-student-001")
     question_id = payload.get("questionId", "mock-q-001")
+    conversation_history = payload.get("conversationHistory", [])
 
-    logger.info("Student Tutor received: %s (student: %s, question: %s)",
-                user_input[:100], student_id, question_id)
+    logger.info("Student Tutor received: %s (student: %s, question: %s, history: %d turns)",
+                user_input[:100], student_id, question_id, len(conversation_history))
 
-    # Lazy import signal extraction
+    # Lazy import guardrails + signal extraction
+    from guardrails.input_guardrail import check_input_guardrails
     from guardrails.signal_extraction import extract_signals
+
+    # Pre-check input guardrails (students need content filtering too)
+    guardrail_result = check_input_guardrails(user_input)
+    if guardrail_result.blocked:
+        logger.info("Input blocked by guardrail: %s", guardrail_result.reason)
+        return json.dumps({
+            "response": guardrail_result.redirect_message,
+            "blocked": True,
+            "reason": guardrail_result.reason,
+        })
 
     # Run the agent (lazy init on first call)
     agent = _get_agent()
-    result = agent(user_input)
+
+    # Build messages list with conversation history for multi-turn context
+    messages = []
+    for msg in conversation_history:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": [{"text": content}]})
+
+    # Add current user message
+    messages.append({"role": "user", "content": [{"text": user_input}]})
+
+    result = agent(messages=messages)
     response_text = result.message["content"][0]["text"]
 
     # Extract signals for analytics

@@ -102,6 +102,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       // AgentCore Runtime path — agent handles its own system prompt + tools
       const agentResult = await invokeAgent('parent-advisor', {
         prompt: message,
+        conversationHistory: chatHistory,
         studentId: studentId ?? undefined,
       });
 

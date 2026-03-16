@@ -278,6 +278,7 @@ export class AgentCoreStack extends cdk.Stack {
         Agent: 'parent-advisor',
       },
     });
+    parentAdvisorEndpoint.addDependency(parentAdvisorRuntime);
 
     const studentTutorEndpoint = new bedrockagentcore.CfnRuntimeEndpoint(this, 'StudentTutorEndpoint', {
       agentRuntimeId: studentTutorRuntime.attrAgentRuntimeId,
@@ -289,6 +290,7 @@ export class AgentCoreStack extends cdk.Stack {
         Agent: 'student-tutor',
       },
     });
+    studentTutorEndpoint.addDependency(studentTutorRuntime);
 
     // Store ARNs for cross-stack reference
     this.parentAdvisorRuntimeArn = parentAdvisorRuntime.attrAgentRuntimeArn;

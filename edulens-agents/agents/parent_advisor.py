@@ -95,8 +95,10 @@ def invoke(payload: dict) -> str:
     """Parent Advisor agent entry point for AgentCore Runtime."""
     user_input = payload.get("prompt", "")
     student_id = payload.get("studentId", "mock-student-001")
+    conversation_history = payload.get("conversationHistory", [])
 
-    logger.info("Parent Advisor received: %s (student: %s)", user_input[:100], student_id)
+    logger.info("Parent Advisor received: %s (student: %s, history: %d turns)",
+                user_input[:100], student_id, len(conversation_history))
 
     # Lazy import guardrails
     from guardrails.input_guardrail import check_input_guardrails
@@ -115,7 +117,19 @@ def invoke(payload: dict) -> str:
 
     # Run the agent (lazy init on first call)
     agent = _get_agent()
-    result = agent(user_input)
+
+    # Build messages list with conversation history for multi-turn context
+    messages = []
+    for msg in conversation_history:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": [{"text": content}]})
+
+    # Add current user message
+    messages.append({"role": "user", "content": [{"text": user_input}]})
+
+    result = agent(messages=messages)
     response_text = result.message["content"][0]["text"]
 
     # Post-check output guardrails

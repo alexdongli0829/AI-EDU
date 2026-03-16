@@ -4,7 +4,7 @@
  * Invokes agents deployed on AgentCore Runtime (Strands Python agents).
  * The agents handle their own system prompts, tool calling, guardrails,
  * and signal extraction. This client sends the user prompt + context
- * and receives the response.
+ * (including conversation history for multi-turn) and receives the response.
  */
 
 import {
@@ -24,8 +24,14 @@ const STUDENT_TUTOR_ENDPOINT     = process.env.STUDENT_TUTOR_ENDPOINT_NAME || 'e
 
 export type AgentType = 'parent-advisor' | 'student-tutor';
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface AgentCoreRequest {
   prompt: string;
+  conversationHistory?: ChatMessage[];
   studentId?: string;
   questionId?: string;
 }
@@ -46,6 +52,37 @@ function getConfig(agentType: AgentType) {
 }
 
 /**
+ * Collect the streaming response body into a string.
+ * The SDK returns `response` as a ReadableStream / AsyncIterable of bytes.
+ */
+async function collectResponseBody(stream: any): Promise<string> {
+  const chunks: Uint8Array[] = [];
+
+  if (stream && typeof stream[Symbol.asyncIterator] === 'function') {
+    for await (const chunk of stream) {
+      if (chunk instanceof Uint8Array) {
+        chunks.push(chunk);
+      } else if (typeof chunk === 'object' && chunk !== null) {
+        // SDK may wrap in event objects — try common shapes
+        const bytes = chunk.chunk?.bytes ?? chunk.bytes ?? chunk.body;
+        if (bytes instanceof Uint8Array) {
+          chunks.push(bytes);
+        } else if (typeof bytes === 'string') {
+          chunks.push(new TextEncoder().encode(bytes));
+        }
+      }
+    }
+  } else if (stream instanceof Uint8Array) {
+    chunks.push(stream);
+  } else if (typeof stream === 'string') {
+    return stream;
+  }
+
+  if (chunks.length === 0) return '';
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
+/**
  * Invoke an AgentCore Runtime agent and return the full response.
  */
 export async function invokeAgent(
@@ -61,7 +98,11 @@ export async function invokeAgent(
     );
   }
 
-  const payload: Record<string, string> = { prompt: request.prompt };
+  // Build payload with conversation history for multi-turn context
+  const payload: Record<string, any> = { prompt: request.prompt };
+  if (request.conversationHistory?.length) {
+    payload.conversationHistory = request.conversationHistory;
+  }
   if (request.studentId)  payload.studentId  = request.studentId;
   if (request.questionId) payload.questionId = request.questionId;
 
@@ -74,22 +115,9 @@ export async function invokeAgent(
 
   const result = await agentCoreClient.send(command);
 
-  // The response payload is a streaming blob — collect it
-  let rawBody = '';
-  if (result.response) {
-    // response is a ReadableStream or similar
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of result.response as any) {
-      if (chunk instanceof Uint8Array) {
-        chunks.push(chunk);
-      } else if (chunk?.chunk?.bytes) {
-        chunks.push(chunk.chunk.bytes);
-      }
-    }
-    rawBody = new TextDecoder().decode(Buffer.concat(chunks));
-  }
+  const rawBody = await collectResponseBody(result.response);
 
-  // Parse JSON — handle double-encoding
+  // Parse JSON — handle possible double-encoding
   let parsed: any;
   try {
     parsed = JSON.parse(rawBody);
