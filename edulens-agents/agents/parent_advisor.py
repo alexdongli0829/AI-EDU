@@ -9,20 +9,6 @@ import logging
 import os
 
 from bedrock_agentcore import BedrockAgentCoreApp
-from strands import Agent
-from strands.models import BedrockModel
-
-from tools.parent_advisor_tools import (
-    query_student_profile,
-    query_test_results,
-    query_skill_breakdown,
-    query_time_behavior,
-    query_error_patterns,
-)
-from tools.memory_tools import retrieve_memories
-from guardrails.input_guardrail import check_input_guardrails
-from guardrails.output_guardrail import check_output_guardrails
-from guardrails.signal_extraction import extract_signals
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -64,26 +50,44 @@ FOLLOW-UP QUESTIONS:
 
 MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 
-model = BedrockModel(
-    model_id=MODEL_ID,
-    temperature=0.3,
-    streaming=True,
-)
+# ---- Lazy-initialised agent (avoids heavy work at import time) ----
 
-# ---- Agent ----
+_agent = None
 
-agent = Agent(
-    model=model,
-    tools=[
-        query_student_profile,
-        query_test_results,
-        query_skill_breakdown,
-        query_time_behavior,
-        query_error_patterns,
-        retrieve_memories,
-    ],
-    system_prompt=PARENT_ADVISOR_SYSTEM_PROMPT,
-)
+
+def _get_agent():
+    """Return the singleton Agent, creating it on first call."""
+    global _agent
+    if _agent is None:
+        from strands import Agent
+        from strands.models import BedrockModel
+        from tools.parent_advisor_tools import (
+            query_student_profile,
+            query_test_results,
+            query_skill_breakdown,
+            query_time_behavior,
+            query_error_patterns,
+        )
+        from tools.memory_tools import retrieve_memories
+
+        model = BedrockModel(
+            model_id=MODEL_ID,
+            temperature=0.3,
+            streaming=True,
+        )
+        _agent = Agent(
+            model=model,
+            tools=[
+                query_student_profile,
+                query_test_results,
+                query_skill_breakdown,
+                query_time_behavior,
+                query_error_patterns,
+                retrieve_memories,
+            ],
+            system_prompt=PARENT_ADVISOR_SYSTEM_PROMPT,
+        )
+    return _agent
 
 
 @app.entrypoint
@@ -93,6 +97,11 @@ def invoke(payload: dict) -> str:
     student_id = payload.get("studentId", "mock-student-001")
 
     logger.info("Parent Advisor received: %s (student: %s)", user_input[:100], student_id)
+
+    # Lazy import guardrails
+    from guardrails.input_guardrail import check_input_guardrails
+    from guardrails.output_guardrail import check_output_guardrails
+    from guardrails.signal_extraction import extract_signals
 
     # Pre-check input guardrails
     guardrail_result = check_input_guardrails(user_input)
@@ -104,7 +113,8 @@ def invoke(payload: dict) -> str:
             "reason": guardrail_result.reason,
         })
 
-    # Run the agent
+    # Run the agent (lazy init on first call)
+    agent = _get_agent()
     result = agent(user_input)
     response_text = result.message["content"][0]["text"]
 

@@ -9,16 +9,6 @@ import logging
 import os
 
 from bedrock_agentcore import BedrockAgentCoreApp
-from strands import Agent
-from strands.models import BedrockModel
-
-from tools.student_tutor_tools import (
-    load_question_context,
-    query_student_level,
-    record_understanding,
-)
-from tools.memory_tools import retrieve_memories
-from guardrails.signal_extraction import extract_signals
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,24 +47,40 @@ IMPORTANT: At the start of the conversation, ALWAYS call load_question_context f
 
 MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 
-model = BedrockModel(
-    model_id=MODEL_ID,
-    temperature=0.5,  # Slightly more creative for tutoring
-    streaming=True,
-)
+# ---- Lazy-initialised agent (avoids heavy work at import time) ----
 
-# ---- Agent ----
+_agent = None
 
-agent = Agent(
-    model=model,
-    tools=[
-        load_question_context,
-        query_student_level,
-        retrieve_memories,
-        record_understanding,
-    ],
-    system_prompt=STUDENT_TUTOR_SYSTEM_PROMPT,
-)
+
+def _get_agent():
+    """Return the singleton Agent, creating it on first call."""
+    global _agent
+    if _agent is None:
+        from strands import Agent
+        from strands.models import BedrockModel
+        from tools.student_tutor_tools import (
+            load_question_context,
+            query_student_level,
+            record_understanding,
+        )
+        from tools.memory_tools import retrieve_memories
+
+        model = BedrockModel(
+            model_id=MODEL_ID,
+            temperature=0.5,  # Slightly more creative for tutoring
+            streaming=True,
+        )
+        _agent = Agent(
+            model=model,
+            tools=[
+                load_question_context,
+                query_student_level,
+                retrieve_memories,
+                record_understanding,
+            ],
+            system_prompt=STUDENT_TUTOR_SYSTEM_PROMPT,
+        )
+    return _agent
 
 
 @app.entrypoint
@@ -87,7 +93,11 @@ def invoke(payload: dict) -> str:
     logger.info("Student Tutor received: %s (student: %s, question: %s)",
                 user_input[:100], student_id, question_id)
 
-    # Run the agent
+    # Lazy import signal extraction
+    from guardrails.signal_extraction import extract_signals
+
+    # Run the agent (lazy init on first call)
+    agent = _get_agent()
     result = agent(user_input)
     response_text = result.message["content"][0]["text"]
 
