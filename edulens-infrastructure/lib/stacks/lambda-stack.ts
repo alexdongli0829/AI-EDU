@@ -705,6 +705,7 @@ export class LambdaStack extends cdk.Stack {
       redisEndpoint,
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
+      requirementsFile: 'requirements-light.txt',
     }).function;
 
     // Grant EventBridge permission to invoke calculateProfile (TestCompletedRule)
