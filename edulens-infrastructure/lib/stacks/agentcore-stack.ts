@@ -98,9 +98,9 @@ export class AgentCoreStack extends cdk.Stack {
       eventExpiryDuration: config.stage === 'prod' ? 365 : 90,
       memoryExecutionRoleArn: memoryExecutionRole.roleArn,
       memoryStrategies: [
-        { semanticMemoryStrategy: {} },
-        { summaryMemoryStrategy: {} },
-        { userPreferenceMemoryStrategy: {} },
+        { semanticMemoryStrategy: { name: 'edulens_semantic', description: 'Extract student learning insights from conversations' } },
+        { summaryMemoryStrategy: { name: 'edulens_summary', description: 'Summarize conversation sessions' } },
+        { userPreferenceMemoryStrategy: { name: 'edulens_preferences', description: 'Track parent communication preferences' } },
       ],
     });
 
@@ -222,10 +222,8 @@ export class AgentCoreStack extends cdk.Stack {
       networkConfiguration: {
         networkMode: 'VPC',
         networkModeConfig: {
-          vpcEndpointConfiguration: {
-            securityGroupIds: [agentSecurityGroup.securityGroupId],
-            subnetIds: privateSubnetIds,
-          },
+          securityGroups: [agentSecurityGroup.securityGroupId],
+          subnets: privateSubnetIds,
         },
       },
       environmentVariables: {
@@ -241,7 +239,7 @@ export class AgentCoreStack extends cdk.Stack {
         idleRuntimeSessionTimeout: config.stage === 'prod' ? 900 : 300,
         maxLifetime: 28800,
       },
-      protocolConfiguration: { serverProtocol: 'HTTP' },
+      protocolConfiguration: 'HTTP',
     });
 
     // DEFAULT endpoint auto-created; add explicit endpoint for pinned versions
@@ -265,10 +263,8 @@ export class AgentCoreStack extends cdk.Stack {
       networkConfiguration: {
         networkMode: 'VPC',
         networkModeConfig: {
-          vpcEndpointConfiguration: {
-            securityGroupIds: [agentSecurityGroup.securityGroupId],
-            subnetIds: privateSubnetIds,
-          },
+          securityGroups: [agentSecurityGroup.securityGroupId],
+          subnets: privateSubnetIds,
         },
       },
       environmentVariables: {
@@ -284,7 +280,7 @@ export class AgentCoreStack extends cdk.Stack {
         idleRuntimeSessionTimeout: config.stage === 'prod' ? 900 : 300,
         maxLifetime: 28800,
       },
-      protocolConfiguration: { serverProtocol: 'HTTP' },
+      protocolConfiguration: 'HTTP',
     });
 
     new agentcore.CfnRuntimeEndpoint(this, 'StudentTutorEndpoint', {
