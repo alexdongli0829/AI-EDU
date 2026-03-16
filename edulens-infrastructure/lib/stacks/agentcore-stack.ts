@@ -1,15 +1,16 @@
 /**
- * AgentCore Stack — Phase 1 (Foundation)
+ * AgentCore Stack — Full Deployment
  *
- * Provisions Bedrock AgentCore foundation resources:
+ * Provisions all Bedrock AgentCore resources:
  *   - S3 bucket for agent code zip artifacts (direct code deployment)
  *   - AgentCore Memory (created via CLI, referenced by ID)
  *   - IAM roles for Memory execution and Runtime execution
  *   - Security group for VPC-based agent networking
+ *   - CfnRuntime for Parent Advisor and Student Tutor agents
+ *   - CfnRuntimeEndpoint for each agent
  *
- * AgentCore Runtimes are created in Phase 2 after agent code is
- * packaged and uploaded to S3. Uses direct code deployment (zip)
- * instead of container-based deployment for faster iteration.
+ * Agent code must be packaged and uploaded to S3 before deployment.
+ * Use scripts/deploy-agents.sh to build ARM64 packages and upload.
  *
  * See: https://aws.amazon.com/blogs/machine-learning/iterate-faster-with-amazon-bedrock-agentcore-runtime-direct-code-deployment/
  */
@@ -19,6 +20,7 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as bedrockagentcore from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Construct } from 'constructs';
 import { EnvironmentConfig } from '../../config/environments';
 
@@ -32,6 +34,8 @@ export interface AgentCoreStackProps extends cdk.StackProps {
 export class AgentCoreStack extends cdk.Stack {
   public readonly memoryId: string;
   public readonly codeBucket: s3.Bucket;
+  public readonly parentAdvisorRuntimeArn: string;
+  public readonly studentTutorRuntimeArn: string;
 
   constructor(scope: Construct, id: string, props: AgentCoreStackProps) {
     super(scope, id, props);
@@ -181,6 +185,116 @@ export class AgentCoreStack extends cdk.Stack {
     cdk.Tags.of(agentSecurityGroup).add('Name', `edulens-agentcore-sg-${stageToken}`);
 
     // ================================================================
+    // AgentCore Runtimes (Parent Advisor + Student Tutor)
+    // ================================================================
+    // Agent code zip must be uploaded to S3 BEFORE cdk deploy.
+    // Use: scripts/deploy-agents.sh to build ARM64 packages and upload.
+    //
+    // Key deployment constraints:
+    //   - AgentCore Runtime runs on ARM64 Linux
+    //   - 30s cold start limit — packages must be trimmed
+    //   - Runtime env only has pip pre-installed — all deps in zip
+    //   - botocore trimmed to essential services only
+    //   - opentelemetry .dist-info must be preserved (entry_points)
+    //   - Lazy imports in agent entry points to speed up startup
+
+    const parentAdvisorRuntime = new bedrockagentcore.CfnRuntime(this, 'ParentAdvisorRuntime', {
+      agentRuntimeName: `edulens_parent_advisor_${stageToken}`,
+      description: 'EduLens Parent Advisor Agent - Strands Python (ARM64)',
+      agentRuntimeArtifact: {
+        codeConfiguration: {
+          code: {
+            s3: {
+              bucket: this.codeBucket.bucketName,
+              prefix: 'parent-advisor/code.zip',
+            },
+          },
+          runtime: 'PYTHON_3_12',
+          entryPoint: ['agents/parent_advisor.py'],
+        },
+      },
+      roleArn: runtimeExecutionRole.roleArn,
+      networkConfiguration: {
+        networkMode: 'PUBLIC',
+      },
+      environmentVariables: {
+        MODEL_ID: bedrockModelId,
+        MEMORY_ID: this.memoryId,
+        STAGE: stageToken,
+      },
+      tags: {
+        Project: 'EduLens',
+        Stage: stageToken,
+        Agent: 'parent-advisor',
+      },
+    });
+
+    const studentTutorRuntime = new bedrockagentcore.CfnRuntime(this, 'StudentTutorRuntime', {
+      agentRuntimeName: `edulens_student_tutor_${stageToken}`,
+      description: 'EduLens Student Tutor Agent - Strands Python (ARM64)',
+      agentRuntimeArtifact: {
+        codeConfiguration: {
+          code: {
+            s3: {
+              bucket: this.codeBucket.bucketName,
+              prefix: 'student-tutor/code.zip',
+            },
+          },
+          runtime: 'PYTHON_3_12',
+          entryPoint: ['agents/student_tutor.py'],
+        },
+      },
+      roleArn: runtimeExecutionRole.roleArn,
+      networkConfiguration: {
+        networkMode: 'PUBLIC',
+      },
+      environmentVariables: {
+        MODEL_ID: bedrockModelId,
+        MEMORY_ID: this.memoryId,
+        STAGE: stageToken,
+      },
+      tags: {
+        Project: 'EduLens',
+        Stage: stageToken,
+        Agent: 'student-tutor',
+      },
+    });
+
+    // Ensure runtimes are created after the S3 bucket and IAM role
+    parentAdvisorRuntime.addDependency(this.codeBucket.node.defaultChild as cdk.CfnResource);
+    studentTutorRuntime.addDependency(this.codeBucket.node.defaultChild as cdk.CfnResource);
+
+    // ================================================================
+    // AgentCore Runtime Endpoints
+    // ================================================================
+
+    const parentAdvisorEndpoint = new bedrockagentcore.CfnRuntimeEndpoint(this, 'ParentAdvisorEndpoint', {
+      agentRuntimeId: parentAdvisorRuntime.attrAgentRuntimeId,
+      name: `edulens_parent_advisor_ep_${stageToken}`,
+      description: 'EduLens Parent Advisor Endpoint',
+      tags: {
+        Project: 'EduLens',
+        Stage: stageToken,
+        Agent: 'parent-advisor',
+      },
+    });
+
+    const studentTutorEndpoint = new bedrockagentcore.CfnRuntimeEndpoint(this, 'StudentTutorEndpoint', {
+      agentRuntimeId: studentTutorRuntime.attrAgentRuntimeId,
+      name: `edulens_student_tutor_ep_${stageToken}`,
+      description: 'EduLens Student Tutor Endpoint',
+      tags: {
+        Project: 'EduLens',
+        Stage: stageToken,
+        Agent: 'student-tutor',
+      },
+    });
+
+    // Store ARNs for cross-stack reference
+    this.parentAdvisorRuntimeArn = parentAdvisorRuntime.attrAgentRuntimeArn;
+    this.studentTutorRuntimeArn = studentTutorRuntime.attrAgentRuntimeArn;
+
+    // ================================================================
     // Outputs
     // ================================================================
 
@@ -215,6 +329,42 @@ export class AgentCoreStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'BedrockModelId', {
       value: bedrockModelId,
       description: 'Bedrock model ID for agents',
+    });
+
+    new cdk.CfnOutput(this, 'ParentAdvisorRuntimeId', {
+      value: parentAdvisorRuntime.attrAgentRuntimeId,
+      description: 'Parent Advisor AgentCore Runtime ID',
+      exportName: `edulens-parent-advisor-runtime-id-${stageToken}`,
+    });
+
+    new cdk.CfnOutput(this, 'ParentAdvisorRuntimeArn', {
+      value: parentAdvisorRuntime.attrAgentRuntimeArn,
+      description: 'Parent Advisor AgentCore Runtime ARN',
+      exportName: `edulens-parent-advisor-runtime-arn-${stageToken}`,
+    });
+
+    new cdk.CfnOutput(this, 'ParentAdvisorEndpointName', {
+      value: `edulens_parent_advisor_ep_${stageToken}`,
+      description: 'Parent Advisor Endpoint Name (qualifier for invoke)',
+      exportName: `edulens-parent-advisor-endpoint-name-${stageToken}`,
+    });
+
+    new cdk.CfnOutput(this, 'StudentTutorRuntimeId', {
+      value: studentTutorRuntime.attrAgentRuntimeId,
+      description: 'Student Tutor AgentCore Runtime ID',
+      exportName: `edulens-student-tutor-runtime-id-${stageToken}`,
+    });
+
+    new cdk.CfnOutput(this, 'StudentTutorRuntimeArn', {
+      value: studentTutorRuntime.attrAgentRuntimeArn,
+      description: 'Student Tutor AgentCore Runtime ARN',
+      exportName: `edulens-student-tutor-runtime-arn-${stageToken}`,
+    });
+
+    new cdk.CfnOutput(this, 'StudentTutorEndpointName', {
+      value: `edulens_student_tutor_ep_${stageToken}`,
+      description: 'Student Tutor Endpoint Name (qualifier for invoke)',
+      exportName: `edulens-student-tutor-endpoint-name-${stageToken}`,
     });
   }
 }
