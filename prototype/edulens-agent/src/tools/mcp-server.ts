@@ -355,29 +355,34 @@ const retrieveMemories = tool(
 );
 
 // ---------------------------------------------------------------------------
-// Export MCP servers — one per agent role
+// Export MCP server factories — create fresh instances per query() call
+// to avoid "Already connected to a transport" errors
 // ---------------------------------------------------------------------------
 
-export const parentAdvisorMcpServer = createSdkMcpServer({
-  name: "edulens-parent-advisor-tools",
-  version: "1.0.0",
-  tools: [
-    queryStudentProfile,
-    queryTestResults,
-    querySkillBreakdown,
-    queryTimeBehavior,
-    queryErrorPatterns,
-    retrieveMemories,
-  ],
-});
+export function createParentAdvisorMcpServer() {
+  return createSdkMcpServer({
+    name: "edulens-parent-advisor-tools",
+    version: "1.0.0",
+    tools: [
+      queryStudentProfile,
+      queryTestResults,
+      querySkillBreakdown,
+      queryTimeBehavior,
+      queryErrorPatterns,
+      retrieveMemories,
+    ],
+  });
+}
 
-export const studentTutorMcpServer = createSdkMcpServer({
-  name: "edulens-student-tutor-tools",
-  version: "1.0.0",
-  tools: [
-    loadQuestionContext,
-    queryStudentLevel,
-    retrieveMemories,
-    recordUnderstanding,
-  ],
-});
+export function createStudentTutorMcpServer() {
+  return createSdkMcpServer({
+    name: "edulens-student-tutor-tools",
+    version: "1.0.0",
+    tools: [
+      loadQuestionContext,
+      queryStudentLevel,
+      retrieveMemories,
+      recordUnderstanding,
+    ],
+  });
+}

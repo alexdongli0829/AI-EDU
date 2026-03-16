@@ -3,7 +3,7 @@
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { parentAdvisorMcpServer } from "../tools/mcp-server.js";
+import { createParentAdvisorMcpServer } from "../tools/mcp-server.js";
 import { inputGuardrailMatcher } from "../hooks/input-guardrail.js";
 import { outputGuardrailMatcher } from "../hooks/output-guardrail.js";
 import { signalExtractionMatcher } from "../hooks/signal-extraction.js";
@@ -57,7 +57,7 @@ export async function runParentAdvisor(userMessage: string): Promise<string> {
       maxTurns: 10,
       permissionMode: "bypassPermissions",
       mcpServers: {
-        "edulens-tools": parentAdvisorMcpServer,
+        "edulens-tools": createParentAdvisorMcpServer(),
       },
       hooks: {
         UserPromptSubmit: [inputGuardrailMatcher],

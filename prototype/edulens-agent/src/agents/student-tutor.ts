@@ -3,7 +3,7 @@
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { studentTutorMcpServer } from "../tools/mcp-server.js";
+import { createStudentTutorMcpServer } from "../tools/mcp-server.js";
 import { signalExtractionMatcher } from "../hooks/signal-extraction.js";
 
 // System prompt from the spec
@@ -45,7 +45,7 @@ export async function runStudentTutor(userMessage: string): Promise<string> {
       maxTurns: 10,
       permissionMode: "bypassPermissions",
       mcpServers: {
-        "edulens-tutor-tools": studentTutorMcpServer,
+        "edulens-tutor-tools": createStudentTutorMcpServer(),
       },
       hooks: {
         PostToolUse: [signalExtractionMatcher],
