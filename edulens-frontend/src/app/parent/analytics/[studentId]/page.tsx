@@ -131,6 +131,7 @@ function ParentStudentAnalyticsInner() {
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [insightsRegenerating, setInsightsRegenerating] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [insightsTab, setInsightsTab] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [activeStage, setActiveStage] = useState<{ stage_id: string; display_name: string } | null>(null);
   // Maps stageId → enrollment status for the viewed student
@@ -325,14 +326,23 @@ function ParentStudentAnalyticsInner() {
             Performance Overview
           </button>
           <button
-            onClick={() => {
+            disabled={!isViewedStageActive}
+            onClick={isViewedStageActive ? () => {
               const stage = stageParam ?? activeStage?.stage_id;
               router.push(`/parent/students/${studentId}/error-analysis${stage ? `?stage=${stage}` : ''}`);
-            }}
-            className="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+            } : undefined}
+            title={!isViewedStageActive ? 'Diagnostic Insights is only available for the active stage' : undefined}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center ${
+              isViewedStageActive
+                ? 'text-gray-600 hover:bg-gray-100'
+                : 'text-gray-400 cursor-not-allowed opacity-50'
+            }`}
           >
-            <AlertCircle className="h-4 w-4 inline mr-2" />
-            Error Analysis
+            {isViewedStageActive
+              ? <AlertCircle className="h-4 w-4 mr-2" />
+              : <Lock className="h-4 w-4 mr-2" />
+            }
+            Diagnostic Insights
           </button>
         </div>
       </div>
@@ -450,128 +460,167 @@ function ParentStudentAnalyticsInner() {
                 )}
               </CardContent>
             </Card>
-          ) : (
-            <div className="space-y-4">
-              {/* Overall summary */}
-              {insights.overallSummary && (
-                <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: '#F5EDD0', borderLeft: `4px solid ${GOLD}`, color: NAVY }}>
-                  {insights.overallSummary}
-                </div>
-              )}
+          ) : (() => {
+            const subs = insights.subjects ?? [];
+            const activeKey = (insightsTab && subs.find(s => s.subject === insightsTab))
+              ? insightsTab
+              : subs[0]?.subject ?? '';
+            const activeSub = subs.find(s => s.subject === activeKey);
+            const activeUI = activeSub ? subjectUI[activeSub.subject as keyof typeof subjectUI] : null;
+            const trendIcon = !activeSub ? null :
+              activeSub.trend === 'improving' ? <TrendingUp className="h-4 w-4 text-green-600" /> :
+              activeSub.trend === 'declining' ? <TrendingDown className="h-4 w-4 text-red-500" /> :
+              <Minus className="h-4 w-4 text-gray-400" />;
+            const trendLabel = !activeSub ? '' :
+              activeSub.trend === 'improving' ? `+${activeSub.trendDelta}% improving` :
+              activeSub.trend === 'declining' ? `${activeSub.trendDelta}% declining` : 'Stable';
+            const trendColor = !activeSub ? '' :
+              activeSub.trend === 'improving' ? 'text-green-600' :
+              activeSub.trend === 'declining' ? 'text-red-500' : 'text-gray-500';
 
-              {/* Per-subject cards */}
-              <div className={`grid grid-cols-1 gap-4 ${(insights.subjects ?? []).length === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
-                {(insights.subjects ?? []).map(sub => {
-                  const ui = subjectUI[sub.subject as keyof typeof subjectUI];
-                  if (!ui) return null;
-                  const Icon = ui.icon;
-                  const trendIcon =
-                    sub.trend === 'improving' ? <TrendingUp className="h-3.5 w-3.5 text-green-600" /> :
-                    sub.trend === 'declining' ? <TrendingDown className="h-3.5 w-3.5 text-red-500" /> :
-                    <Minus className="h-3.5 w-3.5 text-gray-400" />;
-                  const trendLabel =
-                    sub.trend === 'improving' ? `+${sub.trendDelta}% improving` :
-                    sub.trend === 'declining' ? `${sub.trendDelta}% declining` :
-                    'Stable';
-                  const trendColor =
-                    sub.trend === 'improving' ? 'text-green-600' :
-                    sub.trend === 'declining' ? 'text-red-500' : 'text-gray-500';
+            return (
+              <div className="space-y-5">
+                {/* Overall summary */}
+                {insights.overallSummary && (
+                  <div
+                    className="px-5 py-4 rounded-lg leading-relaxed"
+                    style={{ backgroundColor: '#F5EDD0', borderLeft: `4px solid ${GOLD}`, color: NAVY, fontSize: '0.95rem' }}
+                  >
+                    {insights.overallSummary}
+                  </div>
+                )}
 
-                  return (
-                    <Card key={sub.subject} className="border shadow-sm" style={{ borderColor: ui.border }}>
-                      <CardContent className="p-4">
-                        {/* Subject header */}
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ backgroundColor: ui.color }}>
-                              <Icon className="h-4 w-4 text-white" />
-                            </div>
-                            <span className="text-xs font-bold" style={{ color: ui.color }}>{ui.label}</span>
-                          </div>
-                          <div className={`flex items-center gap-1 text-xs font-semibold ${trendColor}`}>
+                {/* Subject tab bar + panel */}
+                {subs.length > 0 && (
+                  <Card className="overflow-hidden shadow-sm" style={{ border: `1px solid ${activeUI?.border ?? '#E5E7EB'}` }}>
+                    {/* Tabs */}
+                    <div className="flex border-b border-gray-200 bg-gray-50/70 overflow-x-auto">
+                      {subs.map(sub => {
+                        const sUI = subjectUI[sub.subject as keyof typeof subjectUI];
+                        if (!sUI) return null;
+                        const SIcon = sUI.icon;
+                        const isActive = sub.subject === activeKey;
+                        return (
+                          <button
+                            key={sub.subject}
+                            onClick={() => setInsightsTab(sub.subject)}
+                            className="flex items-center gap-2 px-5 py-3.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px"
+                            style={isActive
+                              ? { color: sUI.color, borderBottomColor: sUI.color, background: 'white' }
+                              : { color: '#9CA3AF', borderBottomColor: 'transparent' }
+                            }
+                          >
+                            <SIcon className="h-4 w-4" />
+                            {sUI.label}
+                            {sub.trend === 'improving' && <TrendingUp className="h-3.5 w-3.5 text-green-500" />}
+                            {sub.trend === 'declining' && <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Active subject panel */}
+                    {activeSub && activeUI && (
+                      <CardContent className="p-6 space-y-5">
+                        {/* Status + trend */}
+                        <div className="flex items-start justify-between gap-4">
+                          <p className="text-base text-gray-700 leading-relaxed flex-1">{activeSub.currentStatus}</p>
+                          <div className={`flex items-center gap-1.5 text-sm font-semibold shrink-0 ${trendColor}`}>
                             {trendIcon}
                             <span>{trendLabel}</span>
                           </div>
                         </div>
 
-                        {/* Current status */}
-                        <p className="text-xs text-gray-600 mb-3 leading-relaxed">{sub.currentStatus}</p>
-
-                        {/* Day-by-day progress */}
-                        {sub.dailyProgress && (
-                          <div className="mb-3 px-2.5 py-2 rounded-md text-xs text-gray-600" style={{ backgroundColor: ui.light }}>
-                            <span className="font-semibold" style={{ color: ui.color }}>Progress: </span>
-                            {sub.dailyProgress}
+                        {/* Recent progress note */}
+                        {activeSub.dailyProgress && (
+                          <div
+                            className="px-4 py-3 rounded-lg text-sm leading-relaxed"
+                            style={{ backgroundColor: activeUI.light }}
+                          >
+                            <span className="font-semibold" style={{ color: activeUI.color }}>Recent progress: </span>
+                            <span className="text-gray-700">{activeSub.dailyProgress}</span>
                           </div>
                         )}
 
-                        {/* Strong & Weak skills */}
-                        <div className="grid grid-cols-2 gap-2 mb-3">
-                          {sub.strongSkills.length > 0 && (
+                        {/* Strengths & Needs Work */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                          {activeSub.strongSkills.length > 0 && (
                             <div>
-                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Strong</p>
-                              {sub.strongSkills.map(s => (
-                                <div key={s} className="flex items-start gap-1 mb-0.5">
-                                  <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0 mt-0.5" />
-                                  <span className="text-xs text-gray-700 leading-tight">{s}</span>
-                                </div>
-                              ))}
+                              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Strengths</p>
+                              <div className="space-y-1.5">
+                                {activeSub.strongSkills.map(s => (
+                                  <div key={s} className="flex items-start gap-2">
+                                    <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                    <span className="text-sm text-gray-700 leading-snug">{s}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
-                          {sub.weakSkills.length > 0 && (
+                          {activeSub.weakSkills.length > 0 && (
                             <div>
-                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Needs Work</p>
-                              {sub.weakSkills.map(s => (
-                                <div key={s} className="flex items-start gap-1 mb-0.5">
-                                  <AlertCircle className="h-3 w-3 text-amber-500 flex-shrink-0 mt-0.5" />
-                                  <span className="text-xs text-gray-700 leading-tight">{s}</span>
-                                </div>
-                              ))}
+                              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Needs Work</p>
+                              <div className="space-y-1.5">
+                                {activeSub.weakSkills.map(s => (
+                                  <div key={s} className="flex items-start gap-2">
+                                    <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                    <span className="text-sm text-gray-700 leading-snug">{s}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
 
-                        {/* Improvements */}
-                        {sub.improvements.length > 0 && (
-                          <div className="mb-3">
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Improvement Areas</p>
-                            {sub.improvements.map((imp, i) => (
-                              <p key={i} className="text-xs text-gray-600 mb-0.5 pl-2 border-l-2" style={{ borderColor: ui.color }}>
-                                {imp}
-                              </p>
-                            ))}
+                        {/* Improvement areas */}
+                        {activeSub.improvements.length > 0 && (
+                          <div>
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Improvement Areas</p>
+                            <div className="space-y-2">
+                              {activeSub.improvements.map((imp, i) => (
+                                <p
+                                  key={i}
+                                  className="text-sm text-gray-700 pl-3.5 border-l-2 leading-relaxed"
+                                  style={{ borderColor: activeUI.color }}
+                                >
+                                  {imp}
+                                </p>
+                              ))}
+                            </div>
                           </div>
                         )}
 
                         {/* Next steps */}
-                        {sub.nextSteps.length > 0 && (
+                        {activeSub.nextSteps.length > 0 && (
                           <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
-                            {sub.nextSteps.map((step, i) => (
-                              <div key={i} className="flex items-start gap-1.5 mb-1">
-                                <ArrowRight className="h-3 w-3 flex-shrink-0 mt-0.5" style={{ color: ui.color }} />
-                                <span className="text-xs text-gray-700 leading-snug">{step}</span>
-                              </div>
-                            ))}
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Next Steps</p>
+                            <div className="space-y-2">
+                              {activeSub.nextSteps.map((step, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                  <ArrowRight className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: activeUI.color }} />
+                                  <span className="text-sm text-gray-700 leading-snug">{step}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                    )}
+                  </Card>
+                )}
 
-              {/* Chat CTA */}
-              <Button
-                onClick={() => router.push(`/parent/chat?studentId=${studentId}`)}
-                className="w-full bg-teal-600 hover:bg-teal-700"
-                size="sm"
-              >
-                <MessageCircle className="h-4 w-4 mr-2" />
-                Discuss This Analysis with AI Advisor
-              </Button>
-            </div>
-          )}
+                {/* Chat CTA */}
+                <Button
+                  onClick={() => router.push(`/parent/chat?studentId=${studentId}`)}
+                  className="w-full bg-teal-600 hover:bg-teal-700"
+                  size="sm"
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Discuss This Analysis with AI Advisor
+                </Button>
+              </div>
+            );
+          })()}
           </>)}
         </div>
 

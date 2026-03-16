@@ -112,7 +112,7 @@ const en = {
     improvementAreas: 'Improvement Areas',
     nextSteps: 'Next Steps',
     progress: 'Progress',
-    errorAnalysis: 'Error Analysis',
+    errorAnalysis: 'Diagnostic Insights',
     errorAnalysisDesc: 'Breakdown of incorrect answers by error type across all completed tests',
     noErrorsYet: 'No errors recorded yet',
     carelessError: 'Careless Error',

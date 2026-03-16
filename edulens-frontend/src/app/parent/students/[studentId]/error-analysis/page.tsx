@@ -165,7 +165,7 @@ function ErrorAnalysisInner() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
         <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-teal-600" />
-        <h3 className="text-lg font-semibold mb-2">Loading Error Analysis</h3>
+        <h3 className="text-lg font-semibold mb-2">Loading Diagnostic Insights</h3>
         <p className="text-muted-foreground">Analyzing error patterns…</p>
       </div>
     </div>
@@ -200,7 +200,7 @@ function ErrorAnalysisInner() {
               {student.name.charAt(0)}
             </div>
             <div>
-              <h1 className="text-base font-bold text-gray-900">Error Pattern Analysis — {student.name}</h1>
+              <h1 className="text-base font-bold text-gray-900">Diagnostic Insights — {student.name}</h1>
               <p className="text-xs text-gray-500">
                 Grade {student.gradeLevel}
                 {activeStage && stageFilter === 'active' && (
@@ -299,7 +299,7 @@ function ErrorAnalysisInner() {
             className="px-4 py-2 text-sm font-medium rounded-md bg-orange-600 text-white transition-colors"
           >
             <AlertTriangle className="h-4 w-4 inline mr-2" />
-            Error Analysis
+            Diagnostic Insights
           </button>
         </div>
       </div>
@@ -338,7 +338,7 @@ function ErrorAnalysisInner() {
                 Stage Not Active
               </h3>
               <p className="text-sm mb-4" style={{ color: '#6B7280' }}>
-                Error Analysis is only available for the student's currently active stage.
+                Diagnostic Insights is only available for the student's currently active stage.
                 {filteredStageMeta && (
                   <> Activate <strong>{filteredStageMeta.display_name}</strong> on the dashboard to unlock this view.</>
                 )}
