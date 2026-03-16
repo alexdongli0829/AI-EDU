@@ -123,6 +123,23 @@ const summarizationQueueArn = `arn:aws:sqs:${config.region}:${config.account}:ed
 const insightsQueueArn      = `arn:aws:sqs:${config.region}:${config.account}:edulens-insights-queue-${config.stage}`;
 const eventBusArn           = `arn:aws:events:${config.region}:${config.account}:event-bus/default`;
 
+// ============================================================
+// AgentCore Stack  (S3 + IAM + Runtime + Endpoints)
+// Created before Lambda stack so runtime ARNs can be passed to chat Lambdas.
+// ============================================================
+
+const agentCoreStack = new AgentCoreStack(app, `EduLensAgentCoreStack-${config.stage}`, {
+  env,
+  config,
+  vpc: networkStack.vpc,
+  lambdaSecurityGroup: networkStack.lambdaSecurityGroup,
+  auroraSecret: databaseStack.auroraSecret,
+  description: `EduLens AgentCore AI Agents (${config.stage})`,
+  tags: config.tags,
+});
+agentCoreStack.addDependency(networkStack);
+agentCoreStack.addDependency(databaseStack);
+
 const lambdaStack = new LambdaStack(app, `EduLensLambdaStack-${config.stage}`, {
   env,
   config,
@@ -134,6 +151,8 @@ const lambdaStack = new LambdaStack(app, `EduLensLambdaStack-${config.stage}`, {
   insightsQueueArn,
   eventBusArn,
   connectionsTable: databaseStack.connectionsTable,
+  parentAdvisorRuntimeArn: agentCoreStack.parentAdvisorRuntimeArn,
+  studentTutorRuntimeArn: agentCoreStack.studentTutorRuntimeArn,
   description: `EduLens Lambda Functions (${config.stage})`,
   tags: config.tags,
 });
@@ -141,6 +160,7 @@ const lambdaStack = new LambdaStack(app, `EduLensLambdaStack-${config.stage}`, {
 lambdaStack.addDependency(networkStack);
 lambdaStack.addDependency(databaseStack);
 lambdaStack.addDependency(jobsStack);   // ensures queues exist before Lambda tries to consume them
+lambdaStack.addDependency(agentCoreStack); // ensures runtime ARNs are available
 
 // ============================================================
 // 7. Wire API Gateway routes (REST + WebSocket)
@@ -224,27 +244,6 @@ const monitoringStack = new MonitoringStack(app, `EduLensMonitoringStack-${confi
 
 monitoringStack.addDependency(lambdaStack);
 monitoringStack.addDependency(apiGatewayStack);
-
-// ============================================================
-// 11. AgentCore Stack  (S3 + IAM + Memory for AI agents)
-//
-// Depends on Network (VPC/subnets) and Database (Aurora secret).
-// Phase 1: S3 bucket, IAM roles, SG, Memory reference
-// Phase 2: Package agent code, upload zip to S3, create Runtimes via CLI
-// ============================================================
-
-const agentCoreStack = new AgentCoreStack(app, `EduLensAgentCoreStack-${config.stage}`, {
-  env,
-  config,
-  vpc: networkStack.vpc,
-  lambdaSecurityGroup: networkStack.lambdaSecurityGroup,
-  auroraSecret: databaseStack.auroraSecret,
-  description: `EduLens AgentCore AI Agents (${config.stage})`,
-  tags: config.tags,
-});
-
-agentCoreStack.addDependency(networkStack);
-agentCoreStack.addDependency(databaseStack);
 
 // Tag all stacks
 cdk.Tags.of(app).add('Project', 'EduLens');
