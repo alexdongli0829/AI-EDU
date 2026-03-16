@@ -94,4 +94,36 @@ echo "✅ Done! Agent code uploaded to s3://$BUCKET/"
 echo "   parent-advisor/code.zip ($ZIP_SIZE)"
 echo "   student-tutor/code.zip ($ZIP_SIZE)"
 echo ""
-echo "To deploy: cd edulens-infrastructure && npx cdk deploy EduLensAgentCoreStack-${STAGE}"
+
+# --- Refresh runtimes so they pick up the new code ---
+echo "🔄 Refreshing AgentCore Runtimes..."
+PA_ID=$(aws bedrock-agentcore-control list-agent-runtimes --region "$REGION" \
+  --query "agentRuntimeSummaries[?starts_with(agentRuntimeName, 'edulens_parent_advisor_${STAGE}')].agentRuntimeId" \
+  --output text 2>/dev/null | head -1)
+ST_ID=$(aws bedrock-agentcore-control list-agent-runtimes --region "$REGION" \
+  --query "agentRuntimeSummaries[?starts_with(agentRuntimeName, 'edulens_student_tutor_${STAGE}')].agentRuntimeId" \
+  --output text 2>/dev/null | head -1)
+
+if [ -n "$PA_ID" ] && [ "$PA_ID" != "None" ]; then
+  echo "   Updating PA runtime: $PA_ID"
+  aws bedrock-agentcore-control update-agent-runtime \
+    --agent-runtime-id "$PA_ID" \
+    --agent-runtime-artifact "{\"codeConfiguration\":{\"code\":{\"s3\":{\"bucket\":\"$BUCKET\",\"prefix\":\"parent-advisor/code.zip\"}},\"runtime\":\"PYTHON_3_12\",\"entryPoint\":[\"agents/parent_advisor.py\"]}}" \
+    --role-arn "arn:aws:iam::${ACCOUNT}:role/edulens-agentcore-runtime-role-${STAGE}" \
+    --network-configuration '{"networkMode":"PUBLIC"}' \
+    --region "$REGION" --query 'status' --output text 2>&1
+fi
+
+if [ -n "$ST_ID" ] && [ "$ST_ID" != "None" ]; then
+  echo "   Updating ST runtime: $ST_ID"
+  aws bedrock-agentcore-control update-agent-runtime \
+    --agent-runtime-id "$ST_ID" \
+    --agent-runtime-artifact "{\"codeConfiguration\":{\"code\":{\"s3\":{\"bucket\":\"$BUCKET\",\"prefix\":\"student-tutor/code.zip\"}},\"runtime\":\"PYTHON_3_12\",\"entryPoint\":[\"agents/student_tutor.py\"]}}" \
+    --role-arn "arn:aws:iam::${ACCOUNT}:role/edulens-agentcore-runtime-role-${STAGE}" \
+    --network-configuration '{"networkMode":"PUBLIC"}' \
+    --region "$REGION" --query 'status' --output text 2>&1
+fi
+
+echo ""
+echo "⏳ Runtimes updating — wait ~30s for READY status before testing."
+echo "   To check: aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id <ID> --region $REGION --query status"
