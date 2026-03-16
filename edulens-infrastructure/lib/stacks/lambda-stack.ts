@@ -459,7 +459,10 @@ export class LambdaStack extends cdk.Stack {
       this.parentChatSendFunction.addToRolePolicy(
         new iam.PolicyStatement({
           actions: ['bedrock-agentcore:InvokeAgentRuntime'],
-          resources: [props.parentAdvisorRuntimeArn],
+          resources: [
+            props.parentAdvisorRuntimeArn,
+            `${props.parentAdvisorRuntimeArn}/*`,
+          ],
         })
       );
     }
@@ -573,7 +576,10 @@ export class LambdaStack extends cdk.Stack {
       this.studentChatSendFunction.addToRolePolicy(
         new iam.PolicyStatement({
           actions: ['bedrock-agentcore:InvokeAgentRuntime'],
-          resources: [props.studentTutorRuntimeArn],
+          resources: [
+            props.studentTutorRuntimeArn,
+            `${props.studentTutorRuntimeArn}/*`,
+          ],
         })
       );
     }
