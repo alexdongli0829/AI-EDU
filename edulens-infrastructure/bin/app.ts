@@ -10,6 +10,7 @@
  *   5. AlbStack                   — ALB + SSE target groups  (wired after Lambda)
  *   6. EventBridge targets        — addTarget() calls using constructed ARNs (no cyclic CFN refs)
  *   7. MonitoringStack            — CloudWatch alarms
+ *   8. AgentCoreStack             — ECR repos + Memory store + Runtime (AI agents)
  *
  * Cyclic dependency strategy:
  *   LambdaStack receives queue/eventBus ARNs as constructed strings (not CDK tokens),
@@ -30,6 +31,7 @@ import { AlbStack } from '../lib/stacks/alb-stack';
 import { JobsStack } from '../lib/stacks/jobs-stack';
 import { LambdaStack } from '../lib/stacks/lambda-stack';
 import { MonitoringStack } from '../lib/stacks/monitoring-stack';
+import { AgentCoreStack } from '../lib/stacks/agentcore-stack';
 import { getConfig } from '../config/environments';
 
 const app = new cdk.App();
@@ -222,6 +224,27 @@ const monitoringStack = new MonitoringStack(app, `EduLensMonitoringStack-${confi
 
 monitoringStack.addDependency(lambdaStack);
 monitoringStack.addDependency(apiGatewayStack);
+
+// ============================================================
+// 11. AgentCore Stack  (ECR + Memory + Runtime for AI agents)
+//
+// Depends on Network (VPC/subnets) and Database (Aurora secret).
+// ECR repos must have images pushed before AgentCore Runtimes
+// can start — push images first, then deploy this stack.
+// ============================================================
+
+const agentCoreStack = new AgentCoreStack(app, `EduLensAgentCoreStack-${config.stage}`, {
+  env,
+  config,
+  vpc: networkStack.vpc,
+  lambdaSecurityGroup: networkStack.lambdaSecurityGroup,
+  auroraSecret: databaseStack.auroraSecret,
+  description: `EduLens AgentCore AI Agents (${config.stage})`,
+  tags: config.tags,
+});
+
+agentCoreStack.addDependency(networkStack);
+agentCoreStack.addDependency(databaseStack);
 
 // Tag all stacks
 cdk.Tags.of(app).add('Project', 'EduLens');
