@@ -20,6 +20,31 @@ import {
   TrendingUp,
   PenLine,
 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LabelList,
+} from 'recharts';
+
+const CHART_TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: '#1C3557',
+    border: '1px solid #B8860B',
+    borderRadius: '4px',
+    fontSize: 12,
+    color: '#D4A017',
+    fontFamily: "'Source Sans 3', sans-serif",
+    padding: '6px 12px',
+  },
+  itemStyle: { color: '#D4A017' },
+  labelStyle: { color: '#e8edf4', fontWeight: 600 as const },
+};
 
 // Stage metadata — maps stage_id to display info and per-subject labels/descriptions
 const STAGE_META: Record<string, {
@@ -89,6 +114,7 @@ export default function StudentDashboard() {
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hiddenSubjects, setHiddenSubjects] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isAuthenticated) { router.push('/login'); return; }
@@ -273,46 +299,129 @@ export default function StudentDashboard() {
               {stageMeta && <span className="text-xs font-medium" style={{ color: '#9ca3af' }}>· {stageMeta.label}</span>}
             </div>
           </CardHeader>
-          <CardContent className="space-y-5">
-            {subjects.map(({ key, label, color }) => {
-              const pts = (analytics.scoreTrend as any)[key] ?? [];
-              if (pts.length === 0) return (
-                <div key={key} className="flex items-center gap-3">
-                  <span className="text-xs font-semibold w-36 flex-shrink-0" style={{ color }}>{label}</span>
-                  <span className="text-xs text-gray-400">No tests yet</span>
-                </div>
+          <CardContent className="pt-4">
+            {(() => {
+              const allPts = subjects.map(({ key }) => (analytics.scoreTrend as any)[key] ?? []);
+              const maxLen = Math.max(...allPts.map((d: any[]) => d.length), 0);
+              if (maxLen === 0) return (
+                <p className="text-sm text-gray-400 italic text-center py-8">No test data yet</p>
               );
-              const n = pts.length;
-              const xS = 8, xE = 492, yT = 8, yB = 42;
-              const xOf = (i: number) => n === 1 ? (xS + xE) / 2 : xS + i * (xE - xS) / (n - 1);
-              const yOf = (s: number) => yB - (Math.min(100, Math.max(0, s)) / 100) * (yB - yT);
-              const poly = pts.map((p, i) => `${xOf(i)},${yOf(p.score)}`).join(' ');
-              const latest = pts[pts.length - 1].score;
+              // Align all subjects by test index; capture date from first subject with data at each index
+              const chartData = Array.from({ length: maxLen }, (_, i) => {
+                const point: any = { idx: i };
+                subjects.forEach(({ key }) => {
+                  const pts = (analytics.scoreTrend as any)[key] ?? [];
+                  if (pts[i]) {
+                    point[key] = pts[i].score;
+                    if (!point.date) point.date = pts[i].date;
+                  }
+                });
+                return point;
+              });
+
+              // Custom x-axis tick: shows test number + date below
+              const CustomTick = ({ x, y, payload }: any) => {
+                const item = chartData[payload.value];
+                return (
+                  <g transform={`translate(${x},${y})`}>
+                    <text x={0} y={0} dy={14} textAnchor="middle" fill="#6B7280" fontSize={12} fontWeight={600}>
+                      {`#${payload.value + 1}`}
+                    </text>
+                    {item?.date && (
+                      <text x={0} y={0} dy={30} textAnchor="middle" fill="#9CA3AF" fontSize={11}>
+                        {item.date}
+                      </text>
+                    )}
+                  </g>
+                );
+              };
+
               return (
-                <div key={key}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-semibold" style={{ color }}>{label}</span>
-                    <span className="text-sm font-extrabold tabular-nums" style={{ color }}>{latest}%</span>
-                  </div>
-                  <svg viewBox="0 0 500 52" className="w-full h-11">
-                    {[25, 50, 75].map(p => (
-                      <line key={p} x1="0" y1={yOf(p)} x2="500" y2={yOf(p)} stroke="#F3F4F6" strokeWidth="1" />
-                    ))}
-                    {n > 1 && <polyline points={poly} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                    {pts.map((p, i) => {
-                      const x = xOf(i), y = yOf(p.score);
-                      return (
-                        <g key={i}>
-                          <circle cx={x} cy={y} r="3" fill={color} />
-                          <text x={x} y={y > yT + 14 ? y - 5 : y + 13} textAnchor="middle" fontSize="8" fontWeight="600" fill="#9CA3AF">{p.score}%</text>
-                          <text x={x} y="51" textAnchor="middle" fontSize="7" fill="#C4B5A0">{p.date}</text>
-                        </g>
-                      );
-                    })}
-                  </svg>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 24, right: 16, left: 0, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="4 3" stroke="#EDE7D9" />
+                      <XAxis
+                        dataKey="idx"
+                        type="number"
+                        domain={[0, maxLen - 1]}
+                        ticks={Array.from({ length: maxLen }, (_, i) => i)}
+                        tick={<CustomTick />}
+                        tickLine={false}
+                        axisLine={{ stroke: '#EDE7D9' }}
+                        height={48}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        ticks={[0, 25, 50, 75, 100]}
+                        tick={{ fontSize: 13, fill: '#6B7280', fontWeight: 600 }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={34}
+                      />
+                      <Tooltip
+                        {...CHART_TOOLTIP_STYLE}
+                        labelFormatter={(idx: number) => {
+                          const item = chartData[idx];
+                          return item?.date ? `Test #${idx + 1} · ${item.date}` : `Test #${idx + 1}`;
+                        }}
+                        formatter={(value: number, name: string) => {
+                          const subj = subjects.find(s => s.key === name);
+                          return [`${value}%`, subj?.label ?? name];
+                        }}
+                      />
+                      <Legend
+                        onClick={(e) => {
+                          const key = e.dataKey as string;
+                          setHiddenSubjects(prev => {
+                            const next = new Set(prev);
+                            next.has(key) ? next.delete(key) : next.add(key);
+                            return next;
+                          });
+                        }}
+                        formatter={(value) => {
+                          const subj = subjects.find(s => s.key === value);
+                          const hidden = hiddenSubjects.has(value);
+                          return (
+                            <span style={{
+                              fontSize: 13, fontWeight: 600,
+                              color: hidden ? '#9CA3AF' : subj?.color,
+                              textDecoration: hidden ? 'line-through' : 'none',
+                              cursor: 'pointer',
+                            }}>
+                              {subj?.label ?? value}
+                            </span>
+                          );
+                        }}
+                        iconType="circle"
+                        iconSize={10}
+                        wrapperStyle={{ paddingTop: '8px', cursor: 'pointer' }}
+                      />
+                      {subjects.map(({ key, color }) => (
+                        <Line
+                          key={key}
+                          type="monotone"
+                          dataKey={key}
+                          stroke={color}
+                          strokeWidth={2.5}
+                          dot={{ r: 5, fill: '#fff', stroke: color, strokeWidth: 2.5 }}
+                          activeDot={{ r: 7, fill: color }}
+                          connectNulls={false}
+                          hide={hiddenSubjects.has(key)}
+                        >
+                          <LabelList
+                            dataKey={key}
+                            position="top"
+                            formatter={(v: number) => `${v}%`}
+                            style={{ fontSize: 11, fontWeight: 700, fill: color }}
+                          />
+                        </Line>
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               );
-            })}
+            })()}
           </CardContent>
         </Card>
 

@@ -139,10 +139,12 @@ function ParentStudentAnalyticsInner() {
   }, [studentId, stageParam, user?.id]);
 
   // Load insights independently so a failure in loadStudentData never blocks them
+  // Re-run whenever stageParam changes so each stage gets its own insight
   useEffect(() => {
     if (!user) return;
+    setInsights(null);
     loadInsights(false);
-  }, [studentId, user?.id]);
+  }, [studentId, stageParam, user?.id]);
 
   const loadStudentData = async () => {
     setLoading(true);
@@ -175,26 +177,25 @@ function ParentStudentAnalyticsInner() {
   const loadInsights = async (forceRefresh: boolean) => {
     setInsightsLoading(true);
     setInsightsError(null);
+    const stage = stageParam ?? undefined;
     try {
       const res = forceRefresh
-        ? await apiClient.regenerateStudentInsights(studentId)
-        : await apiClient.getStudentInsights(studentId);
+        ? await apiClient.regenerateStudentInsights(studentId, stage)
+        : await apiClient.getStudentInsights(studentId, stage);
       if (res.success && res.insights) {
-        // postgres.js may return JSONB as a raw string — always ensure it's a parsed object
         const insightsData = typeof res.insights === 'string' ? JSON.parse(res.insights) : res.insights;
         setInsights({ subjects: [], ...insightsData });
-        // If backend flagged the cache as stale, kick off a background regeneration
-        // so the next GET will return fresh data without making the user wait.
+        // If stale, kick off background regeneration
         if (!forceRefresh && res.stale) {
-          apiClient.regenerateStudentInsights(studentId).then((fresh) => {
+          apiClient.regenerateStudentInsights(studentId, stage).then((fresh) => {
             if (fresh.success && fresh.insights) {
               const freshData = typeof fresh.insights === 'string' ? JSON.parse(fresh.insights) : fresh.insights;
               setInsights({ subjects: [], ...freshData });
             }
-          }).catch(() => {/* silent — stale data is still usable */});
+          }).catch(() => {});
         }
       } else if (res.reason === 'no_tests') {
-        // no sessions yet — not an error
+        // no sessions for this stage yet — not an error
       } else if (!res.insights) {
         setInsightsError('Insights could not be generated. Please try again.');
       }

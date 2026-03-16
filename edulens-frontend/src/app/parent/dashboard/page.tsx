@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Plus, MessageCircle, Trash2, GraduationCap, Loader2,
-  ChevronRight, CheckCircle2, Lock, Clock, BarChart2, X, ChevronDown,
+  ChevronRight, CheckCircle2, Lock, Clock, BarChart2, X, ChevronDown, AlertTriangle,
 } from 'lucide-react';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -337,6 +337,11 @@ export default function ParentDashboard() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
+  } | null>(null);
+
+  const askConfirm = (opts: typeof confirmDialog) => setConfirmDialog(opts);
   const [formData, setFormData] = useState({
     name: '', gradeLevel: 4, dateOfBirth: '', username: '', password: '', initialStage: 'selective',
   });
@@ -387,37 +392,52 @@ export default function ParentDashboard() {
     }
   };
 
-  const handleDeactivateStage = async (studentId: string, stageId: string) => {
+  const handleDeactivateStage = (studentId: string, stageId: string) => {
     const meta = STAGES.find(s => s.id === stageId);
-    if (!window.confirm(`Deactivate "${meta?.label ?? stageId}"?\nThe student's progress is saved and can be re-activated later.`)) return;
-    setActivatingMap(prev => ({ ...prev, [studentId]: stageId }));
-    try {
-      await apiClient.deactivateStudentStage(studentId, stageId);
-      const res = await apiClient.listStudentStages(studentId);
-      if (res.success) setStageMap(prev => ({ ...prev, [studentId]: res.stages || [] }));
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to deactivate stage');
-    } finally {
-      setActivatingMap(prev => ({ ...prev, [studentId]: null }));
-    }
+    askConfirm({
+      title: `Pause ${meta?.label ?? stageId}?`,
+      message: "The student's progress is saved and this stage can be re-activated at any time.",
+      confirmLabel: 'Pause Stage',
+      onConfirm: async () => {
+        setActivatingMap(prev => ({ ...prev, [studentId]: stageId }));
+        try {
+          await apiClient.deactivateStudentStage(studentId, stageId);
+          const res = await apiClient.listStudentStages(studentId);
+          if (res.success) setStageMap(prev => ({ ...prev, [studentId]: res.stages || [] }));
+        } catch (err: any) {
+          setError(err?.response?.data?.error || 'Failed to deactivate stage');
+        } finally {
+          setActivatingMap(prev => ({ ...prev, [studentId]: null }));
+        }
+      },
+    });
   };
 
-  const handleActivateStage = async (studentId: string, stageId: string) => {
+  const handleActivateStage = (studentId: string, stageId: string) => {
     const stages = stageMap[studentId] ?? [];
     const currentActive = stages.find(s => s.status === 'active');
     const meta = STAGES.find(s => s.id === stageId);
+    const doActivate = async () => {
+      setActivatingMap(prev => ({ ...prev, [studentId]: stageId }));
+      try {
+        await apiClient.activateStudentStage(studentId, stageId);
+        const res = await apiClient.listStudentStages(studentId);
+        if (res.success) setStageMap(prev => ({ ...prev, [studentId]: res.stages || [] }));
+      } catch (err: any) {
+        setError(err?.response?.data?.error || 'Failed to activate stage');
+      } finally {
+        setActivatingMap(prev => ({ ...prev, [studentId]: null }));
+      }
+    };
     if (currentActive && currentActive.stage_id !== stageId) {
-      if (!window.confirm(`Switch to "${meta?.label ?? stageId}"? "${currentActive.display_name}" will be paused.`)) return;
-    }
-    setActivatingMap(prev => ({ ...prev, [studentId]: stageId }));
-    try {
-      await apiClient.activateStudentStage(studentId, stageId);
-      const res = await apiClient.listStudentStages(studentId);
-      if (res.success) setStageMap(prev => ({ ...prev, [studentId]: res.stages || [] }));
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to activate stage');
-    } finally {
-      setActivatingMap(prev => ({ ...prev, [studentId]: null }));
+      askConfirm({
+        title: `Switch to ${meta?.label ?? stageId}?`,
+        message: `"${currentActive.display_name}" will be paused. Progress is saved and can be resumed later.`,
+        confirmLabel: 'Switch Stage',
+        onConfirm: doActivate,
+      });
+    } else {
+      doActivate();
     }
   };
 
@@ -551,10 +571,18 @@ export default function ParentDashboard() {
                         </div>
                       </div>
                       <button
-                        onClick={async () => {
-                          if (!user?.id || !confirm('Delete this profile? This cannot be undone.')) return;
-                          try { await apiClient.deleteStudent(student.id, user.id); await loadStudents(); }
-                          catch (err: any) { setError(err.response?.data?.error || 'Failed to delete.'); }
+                        onClick={() => {
+                          if (!user?.id) return;
+                          askConfirm({
+                            title: 'Delete Profile?',
+                            message: `This will permanently delete ${student.name}'s profile and all their test data. This cannot be undone.`,
+                            confirmLabel: 'Delete Profile',
+                            danger: true,
+                            onConfirm: async () => {
+                              try { await apiClient.deleteStudent(student.id, user.id); await loadStudents(); }
+                              catch (err: any) { setError(err.response?.data?.error || 'Failed to delete.'); }
+                            },
+                          });
                         }}
                         className="text-gray-300 hover:text-red-500 transition-colors p-1 flex-shrink-0"
                       >
@@ -665,6 +693,56 @@ export default function ParentDashboard() {
           </div>
         )}
       </div>{/* end max-w-6xl */}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setConfirmDialog(null)}>
+          <div
+            className="w-full max-w-sm rounded-xl shadow-2xl overflow-hidden"
+            style={{ background: '#fff', borderTop: `4px solid ${confirmDialog.danger ? '#8B1A1A' : GOLD}` }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div
+                  className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
+                  style={{ background: confirmDialog.danger ? '#FEF2F2' : '#F5EDD0' }}
+                >
+                  <AlertTriangle className="h-5 w-5" style={{ color: confirmDialog.danger ? '#8B1A1A' : GOLD }} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold mb-1" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>
+                    {confirmDialog.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed" style={{ color: '#6B7280', fontFamily: 'var(--font-body)' }}>
+                    {confirmDialog.message}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmDialog(null)}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg border transition-colors hover:bg-gray-50"
+                  style={{ borderColor: PARCHMENT_MID, color: '#6B7280', fontFamily: 'var(--font-body)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+                  style={{
+                    background: confirmDialog.danger ? '#8B1A1A' : NAVY,
+                    color: confirmDialog.danger ? '#fff' : GOLD_BRIGHT,
+                    fontFamily: 'var(--font-body)',
+                  }}
+                >
+                  {confirmDialog.confirmLabel ?? 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Student Modal */}
       {showCreateForm && (

@@ -241,13 +241,20 @@ export class ApiClient {
   }
 
   // Student Insights (AI-generated per-subject analysis)
-  async getStudentInsights(studentId: string) {
-    const response = await this.client.get(`/students/${studentId}/insights`, { timeout: 90000 });
+  async getStudentInsights(studentId: string, stageId?: string) {
+    const response = await this.client.get(`/students/${studentId}/insights`, {
+      timeout: 90000,
+      params: stageId ? { stageId } : {},
+    });
     return response.data;
   }
 
-  async regenerateStudentInsights(studentId: string) {
-    const response = await this.client.post(`/students/${studentId}/insights`, {}, { timeout: 90000 });
+  async regenerateStudentInsights(studentId: string, stageId?: string) {
+    const response = await this.client.post(
+      `/students/${studentId}/insights`,
+      stageId ? { stageId } : {},
+      { timeout: 90000 }
+    );
     return response.data;
   }
 

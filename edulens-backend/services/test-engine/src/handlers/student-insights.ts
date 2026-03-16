@@ -100,8 +100,19 @@ export async function handler(event: any): Promise<any> {
   // API Gateway
   const studentId = (event as APIGatewayProxyEvent).pathParameters?.studentId;
   if (!studentId) return errResp(400, 'studentId required');
-  const forceRefresh = (event as APIGatewayProxyEvent).httpMethod === 'POST';
-  return handleSingleStudent(studentId, forceRefresh);
+  const method = (event as APIGatewayProxyEvent).httpMethod;
+  const forceRefresh = method === 'POST';
+  // Stage filter: GET → query param; POST → body
+  let stageId: string | undefined;
+  if (method === 'GET') {
+    stageId = (event as APIGatewayProxyEvent).queryStringParameters?.stageId ?? undefined;
+  } else {
+    try {
+      const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
+      stageId = body.stageId ?? undefined;
+    } catch {}
+  }
+  return handleSingleStudent(studentId, forceRefresh, stageId);
 }
 
 // ─── Batch mode (EventBridge daily) ──────────────────────────────────────────
@@ -120,68 +131,102 @@ async function handleBatch(): Promise<void> {
 
 // ─── Single student ───────────────────────────────────────────────────────────
 
-async function handleSingleStudent(studentId: string, forceRefresh: boolean): Promise<APIGatewayProxyResult> {
+async function handleSingleStudent(studentId: string, forceRefresh: boolean, stageId?: string): Promise<APIGatewayProxyResult> {
   const [, sysConfig] = await Promise.all([getDb(), getSystemConfig()]);
   const staleHours = cfgNum(sysConfig, 'testInsightsCacheHours');
 
   // Return cache immediately on GET (stale-while-revalidate).
-  // Even stale cached insights are returned instantly — POST or the daily
-  // scheduled batch handles regeneration when the user explicitly asks.
   if (!forceRefresh) {
-    const rows = await query<any[]>(
-      `SELECT insights_json, last_insights_at FROM student_profiles WHERE student_id = $1::uuid`,
+    const rows = await query(
+      `SELECT insights_json, last_insights_at, stage_insights_json FROM student_profiles WHERE student_id = $1::uuid`,
       studentId
     ) as any[];
-    if (rows.length && rows[0].insights_json) {
-      const ageHours = rows[0].last_insights_at
-        ? (Date.now() - new Date(rows[0].last_insights_at).getTime()) / 3_600_000
-        : Infinity;
-      // postgres.js may return JSONB as a raw string in unsafe() mode — always ensure it's a parsed object
-      const raw = rows[0].insights_json;
-      const insightsObj = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      return ok({
-        success: true,
-        insights: insightsObj,
-        cached: true,
-        stale: ageHours >= staleHours,
-      });
+    if (rows.length) {
+      let cachedInsights: any = null;
+      let lastUpdated: string | null = null;
+      if (stageId) {
+        // Per-stage cache
+        const raw = rows[0].stage_insights_json;
+        const stageMap = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {};
+        const stageData = stageMap[stageId];
+        if (stageData) {
+          cachedInsights = typeof stageData === 'string' ? JSON.parse(stageData) : stageData;
+          lastUpdated = cachedInsights?._updatedAt ?? null;
+        }
+      } else {
+        // Global cache
+        const raw = rows[0].insights_json;
+        if (raw) {
+          cachedInsights = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          lastUpdated = rows[0].last_insights_at;
+        }
+      }
+      if (cachedInsights) {
+        const ageHours = lastUpdated
+          ? (Date.now() - new Date(lastUpdated).getTime()) / 3_600_000
+          : Infinity;
+        return ok({ success: true, insights: cachedInsights, cached: true, stale: ageHours >= staleHours });
+      }
     }
   }
 
-  // Fetch all completed sessions — include both test-based (test_id set) and stage-based (test_id NULL)
-  // For stage-based sessions, infer subject from the first response's question
-  const sessions = await query(
-    `SELECT ts.id, ts.completed_at,
-            COALESCE(t.subject, sq.subject) AS subject,
-            COALESCE(t.title, ts.stage_id || ' Practice') AS title,
-            ts.scaled_score, ts.correct_count, ts.total_items
-     FROM test_sessions ts
-     LEFT JOIN tests t ON ts.test_id = t.id
-     LEFT JOIN LATERAL (
-       SELECT q.subject
-       FROM session_responses sr
-       JOIN questions q ON sr.question_id = q.id
-       WHERE sr.session_id = ts.id
-       LIMIT 1
-     ) sq ON true
-     WHERE ts.student_id = $1::uuid AND ts.status = 'completed'
-     ORDER BY ts.completed_at ASC`,
-    studentId
-  ) as any[];
+  // Fetch completed sessions — optionally filtered to a specific stage
+  const sessions = stageId
+    ? await query(
+        `SELECT ts.id, ts.completed_at,
+                COALESCE(t.subject, sq.subject) AS subject,
+                COALESCE(t.title, ts.stage_id || ' Practice') AS title,
+                ts.scaled_score, ts.correct_count, ts.total_items
+         FROM test_sessions ts
+         LEFT JOIN tests t ON ts.test_id = t.id
+         LEFT JOIN LATERAL (
+           SELECT q.subject FROM session_responses sr
+           JOIN questions q ON sr.question_id = q.id
+           WHERE sr.session_id = ts.id LIMIT 1
+         ) sq ON true
+         WHERE ts.student_id = $1::uuid AND ts.status = 'completed' AND ts.stage_id = $2
+         ORDER BY ts.completed_at ASC`,
+        studentId, stageId
+      ) as any[]
+    : await query(
+        `SELECT ts.id, ts.completed_at,
+                COALESCE(t.subject, sq.subject) AS subject,
+                COALESCE(t.title, ts.stage_id || ' Practice') AS title,
+                ts.scaled_score, ts.correct_count, ts.total_items
+         FROM test_sessions ts
+         LEFT JOIN tests t ON ts.test_id = t.id
+         LEFT JOIN LATERAL (
+           SELECT q.subject FROM session_responses sr
+           JOIN questions q ON sr.question_id = q.id
+           WHERE sr.session_id = ts.id LIMIT 1
+         ) sq ON true
+         WHERE ts.student_id = $1::uuid AND ts.status = 'completed'
+         ORDER BY ts.completed_at ASC`,
+        studentId
+      ) as any[];
 
   if (!sessions.length) {
     return ok({ success: true, insights: null, reason: 'no_tests' });
   }
 
-  // Fetch all responses
-  const responses = await query(
-    `SELECT sr.is_correct, q.skill_tags, q.subject, ts.completed_at
-     FROM session_responses sr
-     JOIN questions q ON sr.question_id = q.id
-     JOIN test_sessions ts ON sr.session_id = ts.id
-     WHERE ts.student_id = $1::uuid AND ts.status = 'completed'`,
-    studentId
-  ) as any[];
+  // Fetch responses for the same scope
+  const responses = stageId
+    ? await query(
+        `SELECT sr.is_correct, q.skill_tags, q.subject, ts.completed_at
+         FROM session_responses sr
+         JOIN questions q ON sr.question_id = q.id
+         JOIN test_sessions ts ON sr.session_id = ts.id
+         WHERE ts.student_id = $1::uuid AND ts.status = 'completed' AND ts.stage_id = $2`,
+        studentId, stageId
+      ) as any[]
+    : await query(
+        `SELECT sr.is_correct, q.skill_tags, q.subject, ts.completed_at
+         FROM session_responses sr
+         JOIN questions q ON sr.question_id = q.id
+         JOIN test_sessions ts ON sr.session_id = ts.id
+         WHERE ts.student_id = $1::uuid AND ts.status = 'completed'`,
+        studentId
+      ) as any[];
 
   // Student grade level
   const studentRow = await query(
@@ -198,8 +243,6 @@ async function handleSingleStudent(studentId: string, forceRefresh: boolean): Pr
       date: new Date(s.completed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }),
       score: Number(s.scaled_score) || 0,
     }));
-
-    // Skill breakdown
     const skillMap: Record<string, { correct: number; total: number }> = {};
     for (const skill of meta.skills) skillMap[skill] = { correct: 0, total: 0 };
     for (const r of responses.filter(r => r.subject === subj)) {
@@ -210,7 +253,6 @@ async function handleSingleStudent(studentId: string, forceRefresh: boolean): Pr
         if (r.is_correct) skillMap[skill].correct++;
       }
     }
-
     subjectStats[subj] = {
       label: meta.label,
       testsCount: subjSessions.length,
@@ -220,41 +262,71 @@ async function handleSingleStudent(studentId: string, forceRefresh: boolean): Pr
         return {
           skill,
           percentage: d.total > 0 ? Math.round((d.correct / d.total) * 100) : null,
-          correct: d.correct,
-          total: d.total,
+          correct: d.correct, total: d.total,
         };
       }),
     };
   }
 
   // Call Claude
-  const prompt = buildPrompt(gradeLevel, sessions.length, subjectStats);
+  const prompt = buildPrompt(gradeLevel, sessions.length, subjectStats, stageId);
   const modelId = cfgStr(sysConfig, 'aiInsightsModelId') || process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0';
   const maxTokens = cfgInt(sysConfig, 'aiMaxTokensInsights');
   const temperature = cfgNum(sysConfig, 'aiTemperatureInsights');
   const insights = await callClaude(prompt, modelId, maxTokens, temperature);
   insights.generatedAt = new Date().toISOString();
+  insights._updatedAt = new Date().toISOString();
   insights.studentId = studentId;
+  insights.stageId = stageId ?? null;
   insights.totalTests = sessions.length;
 
-  // Upsert
-  await query(
-    `INSERT INTO student_profiles (id, student_id, insights_json, last_insights_at, updated_at)
-     VALUES (uuid_generate_v4(), $1::uuid, $2::jsonb, NOW(), NOW())
-     ON CONFLICT (student_id)
-     DO UPDATE SET insights_json = $2::jsonb, last_insights_at = NOW(), updated_at = NOW()`,
-    studentId,
-    JSON.stringify(insights)
-  );
+  if (stageId) {
+    // Read existing stage map, merge in new stage insights, upsert whole column
+    const existingRows = await query(
+      `SELECT stage_insights_json FROM student_profiles WHERE student_id = $1::uuid`,
+      studentId
+    ) as any[];
+    const existingRaw = existingRows[0]?.stage_insights_json;
+    const existingMap = existingRaw
+      ? (typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw)
+      : {};
+    const updatedMap = { ...existingMap, [stageId]: insights };
+    await query(
+      `INSERT INTO student_profiles (id, student_id, stage_insights_json, updated_at)
+       VALUES (uuid_generate_v4(), $1::uuid, $2::jsonb, NOW())
+       ON CONFLICT (student_id)
+       DO UPDATE SET stage_insights_json = $2::jsonb, updated_at = NOW()`,
+      studentId, JSON.stringify(updatedMap)
+    );
+  } else {
+    await query(
+      `INSERT INTO student_profiles (id, student_id, insights_json, last_insights_at, updated_at)
+       VALUES (uuid_generate_v4(), $1::uuid, $2::jsonb, NOW(), NOW())
+       ON CONFLICT (student_id)
+       DO UPDATE SET insights_json = $2::jsonb, last_insights_at = NOW(), updated_at = NOW()`,
+      studentId, JSON.stringify(insights)
+    );
+  }
 
   return ok({ success: true, insights, cached: false });
 }
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
-function buildPrompt(gradeLevel: number, totalTests: number, stats: Record<string, any>): string {
-  return `You are an expert NSW OC (Opportunity Class) exam preparation tutor.
-Analyse this Grade ${gradeLevel} student's performance across ${totalTests} practice tests and return structured insights.
+const STAGE_LABELS: Record<string, string> = {
+  oc_prep: 'OC (Opportunity Class) Preparation',
+  selective: 'Selective High School Preparation',
+  hsc: 'HSC Preparation',
+  lifelong: 'University & Lifelong Learning',
+};
+
+function buildPrompt(gradeLevel: number, totalTests: number, stats: Record<string, any>, stageId?: string): string {
+  const stageContext = stageId
+    ? `The student is currently enrolled in the ${STAGE_LABELS[stageId] ?? stageId} pathway.`
+    : 'This is an overall view across all learning stages.';
+  return `You are an expert NSW exam preparation tutor.
+${stageContext}
+Analyse this Grade ${gradeLevel} student's performance across ${totalTests} practice tests in this stage and return structured insights.
 
 PERFORMANCE DATA:
 ${JSON.stringify(stats, null, 2)}
