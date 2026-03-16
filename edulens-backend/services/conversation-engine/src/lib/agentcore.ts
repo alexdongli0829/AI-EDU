@@ -33,6 +33,7 @@ export interface AgentCoreRequest {
   prompt: string;
   conversationHistory?: ChatMessage[];
   studentId?: string;
+  studentName?: string;
   questionId?: string;
 }
 
@@ -103,8 +104,9 @@ export async function invokeAgent(
   if (request.conversationHistory?.length) {
     payload.conversationHistory = request.conversationHistory;
   }
-  if (request.studentId)  payload.studentId  = request.studentId;
-  if (request.questionId) payload.questionId = request.questionId;
+  if (request.studentId)   payload.studentId   = request.studentId;
+  if (request.studentName) payload.studentName  = request.studentName;
+  if (request.questionId)  payload.questionId   = request.questionId;
 
   const command = new InvokeAgentRuntimeCommand({
     agentRuntimeArn: runtimeArn,

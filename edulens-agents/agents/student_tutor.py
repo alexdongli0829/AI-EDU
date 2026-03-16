@@ -111,18 +111,28 @@ def invoke(payload: dict) -> str:
     # Run the agent (lazy init on first call)
     agent = _get_agent()
 
-    # Build messages list with conversation history for multi-turn context
-    messages = []
-    for msg in conversation_history:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": [{"text": content}]})
+    # Build context-enriched prompt with conversation history
+    parts = []
 
-    # Add current user message
-    messages.append({"role": "user", "content": [{"text": user_input}]})
+    # Inject student/question context
+    parts.append(f"[Context: student_id={student_id}, question_id={question_id}. Use these when calling tools. Never ask the student for IDs.]")
 
-    result = agent(messages=messages)
+    # Include conversation history for multi-turn
+    if conversation_history:
+        parts.append("\n[Previous conversation:]")
+        for msg in conversation_history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role in ("user", "assistant") and content:
+                label = "Student" if role == "user" else "Tutor"
+                parts.append(f"{label}: {content}")
+        parts.append("[End of previous conversation]\n")
+
+    parts.append(f"Student: {user_input}")
+
+    enriched_prompt = "\n".join(parts)
+
+    result = agent(enriched_prompt)
     response_text = result.message["content"][0]["text"]
 
     # Extract signals for analytics

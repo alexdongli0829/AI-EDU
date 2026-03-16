@@ -95,6 +95,7 @@ def invoke(payload: dict) -> str:
     """Parent Advisor agent entry point for AgentCore Runtime."""
     user_input = payload.get("prompt", "")
     student_id = payload.get("studentId", "mock-student-001")
+    student_name = payload.get("studentName", "")
     conversation_history = payload.get("conversationHistory", [])
 
     logger.info("Parent Advisor received: %s (student: %s, history: %d turns)",
@@ -118,18 +119,33 @@ def invoke(payload: dict) -> str:
     # Run the agent (lazy init on first call)
     agent = _get_agent()
 
-    # Build messages list with conversation history for multi-turn context
-    messages = []
-    for msg in conversation_history:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": [{"text": content}]})
+    # Build context-enriched prompt with conversation history
+    # Strands Agent accepts a single prompt string, not messages[]
+    parts = []
 
-    # Add current user message
-    messages.append({"role": "user", "content": [{"text": user_input}]})
+    # Inject student context so agent doesn't ask for student ID
+    context_line = f"[Context: The parent is asking about student_id={student_id}"
+    if student_name:
+        context_line += f", name={student_name}"
+    context_line += ". Use this student_id when calling tools. Never ask the parent for their student ID.]"
+    parts.append(context_line)
 
-    result = agent(messages=messages)
+    # Include conversation history for multi-turn context
+    if conversation_history:
+        parts.append("\n[Previous conversation:]")
+        for msg in conversation_history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role in ("user", "assistant") and content:
+                label = "Parent" if role == "user" else "Advisor"
+                parts.append(f"{label}: {content}")
+        parts.append("[End of previous conversation]\n")
+
+    parts.append(f"Parent: {user_input}")
+
+    enriched_prompt = "\n".join(parts)
+
+    result = agent(enriched_prompt)
     response_text = result.message["content"][0]["text"]
 
     # Post-check output guardrails

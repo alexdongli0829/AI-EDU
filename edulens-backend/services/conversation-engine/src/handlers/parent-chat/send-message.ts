@@ -100,10 +100,21 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (process.env.PARENT_ADVISOR_RUNTIME_ARN) {
       // AgentCore Runtime path — agent handles its own system prompt + tools
+      // Look up student name so agent can address the child by name
+      let studentName: string | undefined;
+      if (studentId) {
+        const nameRows = await query(
+          `SELECT u.name FROM students s JOIN users u ON s.user_id = u.id WHERE s.id = $1::uuid LIMIT 1`,
+          studentId
+        ) as any[];
+        studentName = nameRows?.[0]?.name;
+      }
+
       const agentResult = await invokeAgent('parent-advisor', {
         prompt: message,
         conversationHistory: chatHistory,
         studentId: studentId ?? undefined,
+        studentName,
       });
 
       if (agentResult.blocked) {
