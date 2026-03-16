@@ -1,18 +1,23 @@
 /**
- * AgentCore Stack
+ * AgentCore Stack — Phase 1 (Foundation)
  *
- * Provisions Bedrock AgentCore resources for the EduLens AI agents:
- *   - ECR repositories for agent container images
- *   - AgentCore Memory store (semantic + summary + user preference strategies)
- *   - AgentCore Runtime for Parent Advisor and Student Tutor agents
- *   - IAM roles with Bedrock, Memory, Secrets Manager, and VPC permissions
+ * Provisions Bedrock AgentCore foundation resources:
+ *   - S3 bucket for agent code zip artifacts (direct code deployment)
+ *   - AgentCore Memory (created via CLI, referenced by ID)
+ *   - IAM roles for Memory execution and Runtime execution
+ *   - Security group for VPC-based agent networking
+ *
+ * AgentCore Runtimes are created in Phase 2 after agent code is
+ * packaged and uploaded to S3. Uses direct code deployment (zip)
+ * instead of container-based deployment for faster iteration.
+ *
+ * See: https://aws.amazon.com/blogs/machine-learning/iterate-faster-with-amazon-bedrock-agentcore-runtime-direct-code-deployment/
  */
 
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as agentcore from 'aws-cdk-lib/aws-bedrockagentcore';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { EnvironmentConfig } from '../../config/environments';
@@ -25,54 +30,50 @@ export interface AgentCoreStackProps extends cdk.StackProps {
 }
 
 export class AgentCoreStack extends cdk.Stack {
-  public readonly parentAdvisorRepo: ecr.Repository;
-  public readonly studentTutorRepo: ecr.Repository;
-  public readonly memory: agentcore.CfnMemory;
-  public readonly parentAdvisorRuntime: agentcore.CfnRuntime;
-  public readonly studentTutorRuntime: agentcore.CfnRuntime;
+  public readonly memoryId: string;
+  public readonly codeBucket: s3.Bucket;
 
   constructor(scope: Construct, id: string, props: AgentCoreStackProps) {
     super(scope, id, props);
 
-    const { config, vpc, lambdaSecurityGroup, auroraSecret } = props;
+    const { config, vpc, auroraSecret } = props;
     const region = cdk.Stack.of(this).region;
     const account = cdk.Stack.of(this).account;
-
-    // AgentCore resource names: ^[a-zA-Z][a-zA-Z0-9_]{0,47}$ (underscores only)
     const stageToken = config.stage;
 
     // ================================================================
-    // ECR Repositories
+    // AgentCore Memory (created via CLI, not CloudFormation)
+    // ================================================================
+    // CLI: aws bedrock-agentcore-control create-memory --name edulens_memory_dev ...
+    // CfnMemory has Lambda/SDK compatibility issues in CloudFormation.
+    const memoryIds: Record<string, string> = {
+      dev: 'edulens_memory_dev-fkjwsj2f5b',
+      // prod: 'edulens_memory_prod-XXXXX',
+    };
+    this.memoryId = memoryIds[config.stage] || `edulens_memory_${stageToken}-PLACEHOLDER`;
+
+    // ================================================================
+    // S3 Bucket for Agent Code Artifacts (Direct Code Deployment)
     // ================================================================
 
-    this.parentAdvisorRepo = new ecr.Repository(this, 'ParentAdvisorRepo', {
-      repositoryName: `edulens-parent-advisor-${stageToken}`,
+    this.codeBucket = new s3.Bucket(this, 'AgentCodeBucket', {
+      bucketName: `edulens-agent-code-${stageToken}-${account}`,
       removalPolicy: config.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      emptyOnDelete: config.stage !== 'prod',
+      autoDeleteObjects: config.stage !== 'prod',
+      versioned: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       lifecycleRules: [
         {
-          description: 'Keep last 10 images',
-          maxImageCount: 10,
-          rulePriority: 1,
+          id: 'CleanupOldVersions',
+          noncurrentVersionExpiration: cdk.Duration.days(30),
+          enabled: true,
         },
       ],
     });
 
-    this.studentTutorRepo = new ecr.Repository(this, 'StudentTutorRepo', {
-      repositoryName: `edulens-student-tutor-${stageToken}`,
-      removalPolicy: config.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      emptyOnDelete: config.stage !== 'prod',
-      lifecycleRules: [
-        {
-          description: 'Keep last 10 images',
-          maxImageCount: 10,
-          rulePriority: 1,
-        },
-      ],
-    });
-
     // ================================================================
-    // Memory Execution Role — must trust BOTH bedrock and bedrock-agentcore
+    // Memory Execution Role
     // ================================================================
 
     const memoryExecutionRole = new iam.Role(this, 'MemoryExecutionRole', {
@@ -88,36 +89,6 @@ export class AgentCoreStack extends cdk.Stack {
       actions: ['bedrock:InvokeModel'],
       resources: ['arn:aws:bedrock:*::foundation-model/*'],
     }));
-
-    // ================================================================
-    // AgentCore Memory Store
-    // ================================================================
-
-    this.memory = new agentcore.CfnMemory(this, 'Memory', {
-      name: `edulens_memory_${stageToken}`,
-      eventExpiryDuration: config.stage === 'prod' ? 365 : 90,
-      memoryExecutionRoleArn: memoryExecutionRole.roleArn,
-      memoryStrategies: [
-        { semanticMemoryStrategy: { name: 'edulens_semantic', description: 'Extract student learning insights from conversations' } },
-        { summaryMemoryStrategy: { name: 'edulens_summary', description: 'Summarize conversation sessions' } },
-        { userPreferenceMemoryStrategy: { name: 'edulens_preferences', description: 'Track parent communication preferences' } },
-      ],
-    });
-
-    // ================================================================
-    // Agent Security Group (reuse Lambda SG for Aurora/Redis access)
-    // The Lambda SG already has ingress rules from ALB and egress to
-    // Aurora (5432) and Redis (6379). AgentCore VPC agents need the
-    // same network path.
-    // ================================================================
-
-    const agentSecurityGroup = new ec2.SecurityGroup(this, 'AgentSecurityGroup', {
-      vpc,
-      description: 'Security group for AgentCore runtime agents',
-      allowAllOutbound: true,
-    });
-
-    cdk.Tags.of(agentSecurityGroup).add('Name', `edulens-agentcore-sg-${stageToken}`);
 
     // ================================================================
     // Runtime Execution Role
@@ -149,23 +120,17 @@ export class AgentCoreStack extends cdk.Stack {
       ],
     }));
 
-    // ECR image pull
+    // S3 code artifact access
     runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
-      sid: 'EcrAuth',
-      actions: ['ecr:GetAuthorizationToken'],
-      resources: ['*'],
-    }));
-
-    runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
-      sid: 'EcrPull',
+      sid: 'S3CodeAccess',
       actions: [
-        'ecr:BatchCheckLayerAvailability',
-        'ecr:BatchGetImage',
-        'ecr:GetDownloadUrlForLayer',
+        's3:GetObject',
+        's3:GetObjectVersion',
+        's3:ListBucket',
       ],
       resources: [
-        this.parentAdvisorRepo.repositoryArn,
-        this.studentTutorRepo.repositoryArn,
+        this.codeBucket.bucketArn,
+        `${this.codeBucket.bucketArn}/*`,
       ],
     }));
 
@@ -204,139 +169,52 @@ export class AgentCoreStack extends cdk.Stack {
     }));
 
     // ================================================================
-    // Parent Advisor Runtime
+    // Agent Security Group (for VPC-based Runtime networking)
     // ================================================================
 
-    const privateSubnetIds = vpc.selectSubnets({
-      subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-    }).subnetIds;
-
-    this.parentAdvisorRuntime = new agentcore.CfnRuntime(this, 'ParentAdvisorRuntime', {
-      agentRuntimeName: `edulens_parent_advisor_${stageToken}`,
-      roleArn: runtimeExecutionRole.roleArn,
-      agentRuntimeArtifact: {
-        containerConfiguration: {
-          containerUri: `${account}.dkr.ecr.${region}.amazonaws.com/edulens-parent-advisor-${stageToken}:latest`,
-        },
-      },
-      networkConfiguration: {
-        networkMode: 'VPC',
-        networkModeConfig: {
-          securityGroups: [agentSecurityGroup.securityGroupId],
-          subnets: privateSubnetIds,
-        },
-      },
-      environmentVariables: {
-        AGENT_TYPE: 'parent-advisor',
-        MEMORY_ID: this.memory.attrMemoryId,
-        DB_SECRET_ARN: auroraSecret.secretArn,
-        STAGE: stageToken,
-        AWS_REGION_NAME: config.region,
-        BEDROCK_MODEL_ID: bedrockModelId,
-        IMAGE_VERSION: '1',
-      },
-      lifecycleConfiguration: {
-        idleRuntimeSessionTimeout: config.stage === 'prod' ? 900 : 300,
-        maxLifetime: 28800,
-      },
-      protocolConfiguration: 'HTTP',
+    const agentSecurityGroup = new ec2.SecurityGroup(this, 'AgentSecurityGroup', {
+      vpc,
+      description: 'Security group for AgentCore runtime agents',
+      allowAllOutbound: true,
     });
 
-    // DEFAULT endpoint auto-created; add explicit endpoint for pinned versions
-    new agentcore.CfnRuntimeEndpoint(this, 'ParentAdvisorEndpoint', {
-      name: `edulens_parent_advisor_live_${stageToken}`,
-      agentRuntimeId: this.parentAdvisorRuntime.attrAgentRuntimeId,
-    });
-
-    // ================================================================
-    // Student Tutor Runtime
-    // ================================================================
-
-    this.studentTutorRuntime = new agentcore.CfnRuntime(this, 'StudentTutorRuntime', {
-      agentRuntimeName: `edulens_student_tutor_${stageToken}`,
-      roleArn: runtimeExecutionRole.roleArn,
-      agentRuntimeArtifact: {
-        containerConfiguration: {
-          containerUri: `${account}.dkr.ecr.${region}.amazonaws.com/edulens-student-tutor-${stageToken}:latest`,
-        },
-      },
-      networkConfiguration: {
-        networkMode: 'VPC',
-        networkModeConfig: {
-          securityGroups: [agentSecurityGroup.securityGroupId],
-          subnets: privateSubnetIds,
-        },
-      },
-      environmentVariables: {
-        AGENT_TYPE: 'student-tutor',
-        MEMORY_ID: this.memory.attrMemoryId,
-        DB_SECRET_ARN: auroraSecret.secretArn,
-        STAGE: stageToken,
-        AWS_REGION_NAME: config.region,
-        BEDROCK_MODEL_ID: bedrockModelId,
-        IMAGE_VERSION: '1',
-      },
-      lifecycleConfiguration: {
-        idleRuntimeSessionTimeout: config.stage === 'prod' ? 900 : 300,
-        maxLifetime: 28800,
-      },
-      protocolConfiguration: 'HTTP',
-    });
-
-    new agentcore.CfnRuntimeEndpoint(this, 'StudentTutorEndpoint', {
-      name: `edulens_student_tutor_live_${stageToken}`,
-      agentRuntimeId: this.studentTutorRuntime.attrAgentRuntimeId,
-    });
-
-    // ================================================================
-    // Allow AgentCore agents to connect to Aurora (port 5432)
-    // Reuses the existing RDS security group ingress pattern from
-    // network-stack.ts: RDS SG accepts 5432 from Lambda SG.
-    // We also need RDS SG to accept from agentSecurityGroup.
-    // NOTE: We don't modify the NetworkStack — just add ingress here.
-    // ================================================================
-
-    // The RDS security group ID is not directly available as a prop,
-    // but agents in VPC with allowAllOutbound can reach Aurora through
-    // the existing Lambda SG rules since they share the same VPC.
-    // For explicit access, the deployer should add an ingress rule on
-    // the RDS SG for agentSecurityGroup. We output the SG ID below.
+    cdk.Tags.of(agentSecurityGroup).add('Name', `edulens-agentcore-sg-${stageToken}`);
 
     // ================================================================
     // Outputs
     // ================================================================
 
     new cdk.CfnOutput(this, 'MemoryId', {
-      value: this.memory.attrMemoryId,
-      description: 'AgentCore Memory Store ID',
+      value: this.memoryId,
+      description: 'AgentCore Memory Store ID (created via CLI)',
       exportName: `edulens-agentcore-memory-id-${stageToken}`,
     });
 
-    new cdk.CfnOutput(this, 'ParentAdvisorRuntimeId', {
-      value: this.parentAdvisorRuntime.attrAgentRuntimeId,
-      description: 'Parent Advisor Runtime ID',
-      exportName: `edulens-parent-advisor-runtime-id-${stageToken}`,
+    new cdk.CfnOutput(this, 'CodeBucketName', {
+      value: this.codeBucket.bucketName,
+      description: 'S3 bucket for agent code zip artifacts',
+      exportName: `edulens-agentcore-code-bucket-${stageToken}`,
     });
 
-    new cdk.CfnOutput(this, 'StudentTutorRuntimeId', {
-      value: this.studentTutorRuntime.attrAgentRuntimeId,
-      description: 'Student Tutor Runtime ID',
-      exportName: `edulens-student-tutor-runtime-id-${stageToken}`,
+    new cdk.CfnOutput(this, 'RuntimeExecutionRoleArn', {
+      value: runtimeExecutionRole.roleArn,
+      description: 'Runtime execution role ARN',
+      exportName: `edulens-agentcore-runtime-role-${stageToken}`,
     });
 
-    new cdk.CfnOutput(this, 'ParentAdvisorRepoUri', {
-      value: this.parentAdvisorRepo.repositoryUri,
-      description: 'Parent Advisor ECR Repository URI',
-    });
-
-    new cdk.CfnOutput(this, 'StudentTutorRepoUri', {
-      value: this.studentTutorRepo.repositoryUri,
-      description: 'Student Tutor ECR Repository URI',
+    new cdk.CfnOutput(this, 'MemoryExecutionRoleArn', {
+      value: memoryExecutionRole.roleArn,
+      description: 'Memory execution role ARN',
     });
 
     new cdk.CfnOutput(this, 'AgentSecurityGroupId', {
       value: agentSecurityGroup.securityGroupId,
-      description: 'AgentCore runtime security group ID (add to RDS SG ingress for Aurora access)',
+      description: 'AgentCore runtime security group ID',
+    });
+
+    new cdk.CfnOutput(this, 'BedrockModelId', {
+      value: bedrockModelId,
+      description: 'Bedrock model ID for agents',
     });
   }
 }

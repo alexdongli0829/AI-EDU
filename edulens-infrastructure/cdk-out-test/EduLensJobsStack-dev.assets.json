@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "84cc173759ca92e9ee707584ba44c87881ed68f980d5f3a8cfdee7b8db407e1f": {
+      "displayName": "EduLensJobsStack-dev Template",
+      "source": {
+        "path": "EduLensJobsStack-dev.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "534409838809-us-west-2-40303143": {
+          "bucketName": "cdk-hnb659fds-assets-534409838809-us-west-2",
+          "objectKey": "84cc173759ca92e9ee707584ba44c87881ed68f980d5f3a8cfdee7b8db407e1f.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::534409838809:role/cdk-hnb659fds-file-publishing-role-534409838809-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

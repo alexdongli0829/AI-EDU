@@ -226,11 +226,11 @@ monitoringStack.addDependency(lambdaStack);
 monitoringStack.addDependency(apiGatewayStack);
 
 // ============================================================
-// 11. AgentCore Stack  (ECR + Memory + Runtime for AI agents)
+// 11. AgentCore Stack  (S3 + IAM + Memory for AI agents)
 //
 // Depends on Network (VPC/subnets) and Database (Aurora secret).
-// ECR repos must have images pushed before AgentCore Runtimes
-// can start — push images first, then deploy this stack.
+// Phase 1: S3 bucket, IAM roles, SG, Memory reference
+// Phase 2: Package agent code, upload zip to S3, create Runtimes via CLI
 // ============================================================
 
 const agentCoreStack = new AgentCoreStack(app, `EduLensAgentCoreStack-${config.stage}`, {
