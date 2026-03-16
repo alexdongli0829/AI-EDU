@@ -13,6 +13,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../../lib/database';
+import { invokeAgent } from '../../lib/agentcore';
 import { getChatCompletion, Message } from '../../lib/bedrock';
 
 const MAX_HISTORY_TURNS = 10;
@@ -68,7 +69,21 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       sessionId
     );
 
-    const aiResponse = await getChatCompletion(chatHistory, systemPrompt);
+    let aiResponse: string;
+
+    if (process.env.STUDENT_TUTOR_RUNTIME_ARN) {
+      // AgentCore Runtime path — agent handles its own system prompt + tools
+      const questionId = questionContext?.questionId ?? undefined;
+      const agentResult = await invokeAgent('student-tutor', {
+        prompt: message,
+        studentId,
+        questionId,
+      });
+      aiResponse = agentResult.response;
+    } else {
+      // Fallback: direct Bedrock Converse (legacy path)
+      aiResponse = await getChatCompletion(chatHistory, systemPrompt);
+    }
 
     // Persist assistant message
     const assistantMessageId = uuidv4();

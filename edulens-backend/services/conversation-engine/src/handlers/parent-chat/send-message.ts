@@ -11,6 +11,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../../lib/database';
+import { invokeAgent } from '../../lib/agentcore';
 import { getChatCompletion, Message } from '../../lib/bedrock';
 
 // How many recent turns to keep verbatim in the context window
@@ -87,13 +88,33 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // ----------------------------------------------------------------
     // 6. Call the AI — transition PROCESSING → RESPONDING
+    //    Uses AgentCore Runtime (Strands Python agent) when configured,
+    //    otherwise falls back to direct Bedrock Converse.
     // ----------------------------------------------------------------
     await query(
       `UPDATE chat_sessions SET agent_state = 'responding' WHERE id = $1::uuid`,
       sessionId
     );
 
-    const aiResponse = await getChatCompletion(chatHistory, systemPrompt);
+    let aiResponse: string;
+
+    if (process.env.PARENT_ADVISOR_RUNTIME_ARN) {
+      // AgentCore Runtime path — agent handles its own system prompt + tools
+      const agentResult = await invokeAgent('parent-advisor', {
+        prompt: message,
+        studentId: studentId ?? undefined,
+      });
+
+      if (agentResult.blocked) {
+        // Agent guardrails blocked the input
+        aiResponse = agentResult.response || 'I can only help with educational topics. Please ask about your child\'s learning progress.';
+      } else {
+        aiResponse = agentResult.response;
+      }
+    } else {
+      // Fallback: direct Bedrock Converse (legacy path)
+      aiResponse = await getChatCompletion(chatHistory, systemPrompt);
+    }
 
     // ----------------------------------------------------------------
     // 7. Persist the assistant message
