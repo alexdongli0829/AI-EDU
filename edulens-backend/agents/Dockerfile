@@ -41,4 +41,5 @@ ENV NODE_ENV=production
 EXPOSE 8080
 
 # Entry point — AgentCore invokes via HTTP
-CMD ["node", "dist/agents/${AGENT_TYPE}.js"]
+# Shell form required for env var expansion
+CMD node dist/agents/${AGENT_TYPE}.js
