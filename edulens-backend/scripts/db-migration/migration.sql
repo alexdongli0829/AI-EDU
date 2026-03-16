@@ -287,8 +287,9 @@ CREATE TABLE IF NOT EXISTS student_profiles (
     overall_mastery FLOAT DEFAULT 0.0,
     strengths       TEXT[] DEFAULT '{}',
     weaknesses      TEXT[] DEFAULT '{}',
-    insights_json   JSONB DEFAULT NULL,
-    last_insights_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    insights_json        JSONB DEFAULT NULL,
+    last_insights_at     TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    stage_insights_json  JSONB DEFAULT '{}'::jsonb,
     last_calculated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
