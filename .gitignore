@@ -55,3 +55,4 @@ samconfig.toml
 
 #Claude
 .claude
+cdk-out-test/
