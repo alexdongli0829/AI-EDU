@@ -16,6 +16,7 @@ import {
   Calendar,
   Target,
   ChevronDown,
+  Lock,
 } from 'lucide-react';
 
 import { ErrorPatternAnalytics, ErrorTrendData } from '@/types/error-analysis';
@@ -90,6 +91,18 @@ function ErrorAnalysisInner() {
         }
       }
 
+      // Skip data fetch for a specific inactive stage — nothing to show
+      const selectedStageStatus = stageFilter !== 'active' && stageFilter !== 'all'
+        ? enrolledStages.find(s => s.stage_id === stageFilter)?.status
+        : 'active';
+      if (selectedStageStatus && selectedStageStatus !== 'active') {
+        setAnalytics(null);
+        setTrendData(null);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       // Resolve the stageId to pass to the API
       // 'active' → pass 'active' (backend resolves to current active stage)
       // 'all' → pass undefined
@@ -137,6 +150,17 @@ function ErrorAnalysisInner() {
 
   const activeStage = enrolledStages.find(s => s.status === 'active');
 
+  // 'active' and 'all' filters are always allowed; a specific stageId is only
+  // allowed when that stage is currently active.
+  const isFilteredStageActive =
+    stageFilter === 'active' ||
+    stageFilter === 'all' ||
+    enrolledStages.find(s => s.stage_id === stageFilter)?.status === 'active';
+
+  const filteredStageMeta = stageFilter !== 'active' && stageFilter !== 'all'
+    ? enrolledStages.find(s => s.stage_id === stageFilter)
+    : null;
+
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
@@ -160,7 +184,8 @@ function ErrorAnalysisInner() {
     </div>
   );
 
-  if (!student || !analytics) return null;
+  if (!student) return null;
+  if (!analytics && isFilteredStageActive) return null;
 
   return (
     <div
@@ -298,79 +323,110 @@ function ErrorAnalysisInner() {
         </div>
       )}
 
-      {/* Summary Stats */}
+      {/* Summary Stats / Locked state */}
       <div className="max-w-7xl mx-auto px-4 pb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Target className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-              <div className="text-2xl font-bold text-gray-900">{analytics.totalResponses}</div>
-              <p className="text-sm text-gray-500">Total Responses</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 text-center">
-              <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-600" />
-              <div className="text-2xl font-bold text-gray-900">{analytics.incorrectResponses}</div>
-              <p className="text-sm text-gray-500">Incorrect Answers</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {analytics.totalResponses > 0
-                  ? Math.round((analytics.incorrectResponses / analytics.totalResponses) * 100)
-                  : 0}% error rate
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Calendar className="h-8 w-8 mx-auto mb-2 text-green-600" />
-              <div className="text-2xl font-bold text-gray-900">{analytics.errorPatterns.length}</div>
-              <p className="text-sm text-gray-500">Error Patterns</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {analytics.errorPatterns.filter(p => p.severity === 'high').length} high priority
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 text-center">
-              {trendData?.improvement_indicators?.some(i => i.type === 'improvement') ? (
-                <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-600" />
-              ) : trendData?.improvement_indicators?.some(i => i.type === 'concern') ? (
-                <TrendingDown className="h-8 w-8 mx-auto mb-2 text-red-600" />
-              ) : (
-                <Minus className="h-8 w-8 mx-auto mb-2 text-gray-600" />
-              )}
-              <div className="text-2xl font-bold text-gray-900">
-                {Math.round(analytics.timeAnalysis.averageTimePerQuestion)}s
+        {!isFilteredStageActive ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center max-w-sm">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{ background: '#F5EDD0' }}
+              >
+                <Lock className="h-7 w-7" style={{ color: '#9CA3AF' }} />
               </div>
-              <p className="text-sm text-gray-500">Avg Time/Question</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {Math.round(analytics.timeAnalysis.rushingIndicator * 100)}% rushed
+              <h3 className="text-base font-bold mb-2" style={{ fontFamily: 'var(--font-heading)', color: '#1C3557' }}>
+                Stage Not Active
+              </h3>
+              <p className="text-sm mb-4" style={{ color: '#6B7280' }}>
+                Error Analysis is only available for the student's currently active stage.
+                {filteredStageMeta && (
+                  <> Activate <strong>{filteredStageMeta.display_name}</strong> on the dashboard to unlock this view.</>
+                )}
               </p>
-            </CardContent>
-          </Card>
-        </div>
+              <button
+                onClick={() => handleStageChange('active')}
+                className="px-4 py-2 text-sm font-semibold rounded-lg"
+                style={{ background: '#1C3557', color: '#D4A017' }}
+              >
+                Switch to Active Stage
+              </button>
+            </div>
+          </div>
+        ) : analytics ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <Target className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                  <div className="text-2xl font-bold text-gray-900">{analytics.totalResponses}</div>
+                  <p className="text-sm text-gray-500">Total Responses</p>
+                </CardContent>
+              </Card>
 
-        {/* Main Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <ErrorPatternsOverview patterns={analytics.errorPatterns} timeAnalysis={analytics.timeAnalysis} />
-          </div>
-          <div className="lg:col-span-2">
-            <ErrorTimelineAnalysis trendData={trendData} dateRange={analytics.dateRange} />
-          </div>
-          <SkillErrorCorrelation
-            skillErrorMapping={analytics.skillErrorMapping}
-            errorPatterns={analytics.errorPatterns}
-          />
-          <ActionableInsights
-            recommendations={analytics.recommendations}
-            improvementIndicators={trendData?.improvement_indicators || []}
-            studentId={studentId}
-          />
-        </div>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-600" />
+                  <div className="text-2xl font-bold text-gray-900">{analytics.incorrectResponses}</div>
+                  <p className="text-sm text-gray-500">Incorrect Answers</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {analytics.totalResponses > 0
+                      ? Math.round((analytics.incorrectResponses / analytics.totalResponses) * 100)
+                      : 0}% error rate
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <Calendar className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                  <div className="text-2xl font-bold text-gray-900">{analytics.errorPatterns.length}</div>
+                  <p className="text-sm text-gray-500">Error Patterns</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {analytics.errorPatterns.filter(p => p.severity === 'high').length} high priority
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4 text-center">
+                  {trendData?.improvement_indicators?.some(i => i.type === 'improvement') ? (
+                    <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                  ) : trendData?.improvement_indicators?.some(i => i.type === 'concern') ? (
+                    <TrendingDown className="h-8 w-8 mx-auto mb-2 text-red-600" />
+                  ) : (
+                    <Minus className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+                  )}
+                  <div className="text-2xl font-bold text-gray-900">
+                    {Math.round(analytics.timeAnalysis.averageTimePerQuestion)}s
+                  </div>
+                  <p className="text-sm text-gray-500">Avg Time/Question</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {Math.round(analytics.timeAnalysis.rushingIndicator * 100)}% rushed
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Main Dashboard Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <div className="lg:col-span-2">
+                <ErrorPatternsOverview patterns={analytics.errorPatterns} timeAnalysis={analytics.timeAnalysis} />
+              </div>
+              <div className="lg:col-span-2">
+                <ErrorTimelineAnalysis trendData={trendData} dateRange={analytics.dateRange} />
+              </div>
+              <SkillErrorCorrelation
+                skillErrorMapping={analytics.skillErrorMapping}
+                errorPatterns={analytics.errorPatterns}
+              />
+              <ActionableInsights
+                recommendations={analytics.recommendations}
+                improvementIndicators={trendData?.improvement_indicators || []}
+                studentId={studentId}
+              />
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
