@@ -27,6 +27,7 @@ import {
   Lightbulb,
   BookOpen,
   PenLine,
+  Lock,
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
@@ -132,19 +133,25 @@ function ParentStudentAnalyticsInner() {
   const [insightsError, setInsightsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeStage, setActiveStage] = useState<{ stage_id: string; display_name: string } | null>(null);
+  // Maps stageId → enrollment status for the viewed student
+  const [stageStatusMap, setStageStatusMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!user) return; // wait for Zustand to hydrate from localStorage
     loadStudentData();
   }, [studentId, stageParam, user?.id]);
 
-  // Load insights independently so a failure in loadStudentData never blocks them
-  // Re-run whenever stageParam changes so each stage gets its own insight
+  // Load insights independently; skip entirely if the viewed stage is not active
   useEffect(() => {
     if (!user) return;
     setInsights(null);
+    // If a specific stage is being viewed and it is not currently active, skip the fetch
+    if (stageParam && stageStatusMap[stageParam] && stageStatusMap[stageParam] !== 'active') {
+      setInsightsLoading(false);
+      return;
+    }
     loadInsights(false);
-  }, [studentId, stageParam, user?.id]);
+  }, [studentId, stageParam, stageStatusMap, user?.id]);
 
   const loadStudentData = async () => {
     setLoading(true);
@@ -159,11 +166,16 @@ function ParentStudentAnalyticsInner() {
           setStudent(foundStudent);
         }
       }
-      // Load active stage for context
+      // Load all enrolled stages and derive the active one
       const stagesRes = await apiClient.listStudentStages(studentId).catch(() => null);
       if (stagesRes?.success) {
-        const active = stagesRes.stages?.find((s: any) => s.status === 'active') ?? null;
+        const stageList: any[] = stagesRes.stages ?? [];
+        const active = stageList.find((s: any) => s.status === 'active') ?? null;
         setActiveStage(active);
+        // Build a map of stageId → status for quick lookup
+        const statusMap: Record<string, string> = {};
+        stageList.forEach((s: any) => { statusMap[s.stage_id] = s.status; });
+        setStageStatusMap(statusMap);
       }
       const studentAnalytics = await studentAnalyticsService.getStudentAnalytics(studentId, stageParam ?? undefined);
       setAnalytics(studentAnalytics);
@@ -209,6 +221,7 @@ function ParentStudentAnalyticsInner() {
   };
 
   const handleRegenerateInsights = () => {
+    if (stageParam && stageStatusMap[stageParam] && stageStatusMap[stageParam] !== 'active') return;
     setInsightsRegenerating(true);
     setInsightsLoading(true);
     loadInsights(true);
@@ -233,6 +246,10 @@ function ParentStudentAnalyticsInner() {
   );
 
   const effectiveStageId = stageParam ?? activeStage?.stage_id ?? null;
+  // When viewing a specific stage, AI features are only available if that stage is active
+  const isViewedStageActive = stageParam
+    ? stageStatusMap[stageParam] === 'active'
+    : true; // no stage filter = global view, always allow
   const subjectUI = buildSubjectUI(effectiveStageId);
 
   // Derived arrays used in Skill Analysis, Error Analysis, and Recent Tests
@@ -276,14 +293,25 @@ function ParentStudentAnalyticsInner() {
             </p>
           </div>
         </div>
-        <Button
-          size="sm"
-          onClick={() => router.push(`/parent/chat?studentId=${studentId}`)}
-          className="bg-teal-600 hover:bg-teal-700"
-        >
-          <MessageCircle className="h-4 w-4 mr-2" />
-          AI Advisor
-        </Button>
+        {isViewedStageActive ? (
+          <Button
+            size="sm"
+            onClick={() => router.push(`/parent/chat?studentId=${studentId}`)}
+            className="bg-teal-600 hover:bg-teal-700"
+          >
+            <MessageCircle className="h-4 w-4 mr-2" />
+            AI Advisor
+          </Button>
+        ) : (
+          <div
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold"
+            style={{ background: '#F5EDD0', color: '#9CA3AF', border: '1px solid #EDE7D9' }}
+            title="AI Advisor is only available for the active stage"
+          >
+            <Lock className="h-3.5 w-3.5" />
+            AI Advisor
+          </div>
+        )}
       </div>
 
       {/* Navigation Tabs */}
@@ -338,25 +366,49 @@ function ParentStudentAnalyticsInner() {
           {/* Section header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4" style={{ color: GOLD }} />
-              <h2 className="text-sm font-bold" style={{ fontFamily: 'var(--font-heading)', color: NAVY }}>{t.analytics.aiInsights}</h2>
-              {insights && (
+              <Sparkles className="h-4 w-4" style={{ color: isViewedStageActive ? GOLD : '#9CA3AF' }} />
+              <h2 className="text-sm font-bold" style={{ fontFamily: 'var(--font-heading)', color: isViewedStageActive ? NAVY : '#9CA3AF' }}>{t.analytics.aiInsights}</h2>
+              {isViewedStageActive && insights && (
                 <span className="text-[10px] text-gray-400">
                   · Updated {new Date(insights.generatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
                 </span>
               )}
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRegenerateInsights}
-              disabled={insightsRegenerating || insightsLoading}
-              className="h-7 text-xs"
-            >
-              <RefreshCw className={`h-3 w-3 mr-1 ${insightsRegenerating ? 'animate-spin' : ''}`} />
-              {insightsRegenerating ? t.analytics.analysing : t.analytics.refresh}
-            </Button>
+            {isViewedStageActive && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRegenerateInsights}
+                disabled={insightsRegenerating || insightsLoading}
+                className="h-7 text-xs"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${insightsRegenerating ? 'animate-spin' : ''}`} />
+                {insightsRegenerating ? t.analytics.analysing : t.analytics.refresh}
+              </Button>
+            )}
           </div>
+
+          {/* Inactive stage notice — replaces the whole insights body */}
+          {!isViewedStageActive ? (
+            <Card style={{ border: '1px solid #EDE7D9', background: '#FDFBF7' }}>
+              <CardContent className="py-10 text-center">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: '#F5EDD0' }}>
+                  <Lock className="h-5 w-5" style={{ color: '#9CA3AF' }} />
+                </div>
+                <p className="text-sm font-semibold mb-1" style={{ color: NAVY, fontFamily: 'var(--font-heading)' }}>
+                  Stage Not Active
+                </p>
+                <p className="text-xs" style={{ color: '#6B7280', maxWidth: '320px', margin: '0 auto' }}>
+                  AI Performance Insights and the AI Advisor are only available for the student's currently active stage.
+                  {stageParam && STAGE_META[stageParam] && (
+                    <> Activate <strong>{STAGE_META[stageParam].label}</strong> on the dashboard to unlock these features.</>
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {isViewedStageActive && (<>
 
           {insightsLoading ? (
             <Card>
@@ -520,6 +572,7 @@ function ParentStudentAnalyticsInner() {
               </Button>
             </div>
           )}
+          </>)}
         </div>
 
         {/* Detailed Skill Analysis — OC-aligned 3-subject breakdown */}
