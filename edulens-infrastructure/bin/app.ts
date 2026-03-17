@@ -32,6 +32,7 @@ import { JobsStack } from '../lib/stacks/jobs-stack';
 import { LambdaStack } from '../lib/stacks/lambda-stack';
 import { MonitoringStack } from '../lib/stacks/monitoring-stack';
 import { AgentCoreStack } from '../lib/stacks/agentcore-stack';
+import { AgentCoreContainerStack } from '../lib/stacks/agentcore-stack-container';
 import { getConfig } from '../config/environments';
 
 const app = new cdk.App();
@@ -124,17 +125,18 @@ const insightsQueueArn      = `arn:aws:sqs:${config.region}:${config.account}:ed
 const eventBusArn           = `arn:aws:events:${config.region}:${config.account}:event-bus/default`;
 
 // ============================================================
-// AgentCore Stack  (S3 + IAM + Runtime + Endpoints)
+// AgentCore Stack  (ECR + IAM + Runtime + Endpoints)
+// Container deployment: TypeScript agents on ARM64 Node.js containers.
 // Created before Lambda stack so runtime ARNs can be passed to chat Lambdas.
 // ============================================================
 
-const agentCoreStack = new AgentCoreStack(app, `EduLensAgentCoreStack-${config.stage}`, {
+const agentCoreStack = new AgentCoreContainerStack(app, `EduLensAgentCoreStack-${config.stage}`, {
   env,
   config,
   vpc: networkStack.vpc,
   lambdaSecurityGroup: networkStack.lambdaSecurityGroup,
   auroraSecret: databaseStack.auroraSecret,
-  description: `EduLens AgentCore AI Agents (${config.stage})`,
+  description: `EduLens AgentCore AI Agents - Container (${config.stage})`,
   tags: config.tags,
 });
 agentCoreStack.addDependency(networkStack);

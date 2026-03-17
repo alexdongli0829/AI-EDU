@@ -213,7 +213,7 @@ export class AgentCoreContainerStack extends cdk.Stack {
       description: 'EduLens Parent Advisor Agent - TypeScript Container (ARM64)',
       agentRuntimeArtifact: {
         containerConfiguration: {
-          imageUri: `${account}.dkr.ecr.${region}.amazonaws.com/${this.parentAdvisorEcrRepo.repositoryName}:latest`,
+          containerUri: `${account}.dkr.ecr.${region}.amazonaws.com/${this.parentAdvisorEcrRepo.repositoryName}:latest`,
         },
       },
       roleArn: runtimeExecutionRole.roleArn,
@@ -240,7 +240,7 @@ export class AgentCoreContainerStack extends cdk.Stack {
       description: 'EduLens Student Tutor Agent - TypeScript Container (ARM64)',
       agentRuntimeArtifact: {
         containerConfiguration: {
-          imageUri: `${account}.dkr.ecr.${region}.amazonaws.com/${this.studentTutorEcrRepo.repositoryName}:latest`,
+          containerUri: `${account}.dkr.ecr.${region}.amazonaws.com/${this.studentTutorEcrRepo.repositoryName}:latest`,
         },
       },
       roleArn: runtimeExecutionRole.roleArn,

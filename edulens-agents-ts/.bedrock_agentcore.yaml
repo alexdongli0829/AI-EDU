@@ -1,0 +1,182 @@
+default_agent: parent-advisor
+agents:
+  parent-advisor:
+    name: edulens_parent_advisor_dev
+    language: typescript
+    node_version: '20'
+    entrypoint: dist/agents/parent-advisor.js
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: null
+    source_path: null
+    aws:
+      execution_role: arn:aws:iam::534409838809:role/edulens-agentcore-runtime-role-dev
+      execution_role_auto_create: false
+      account: '534409838809'
+      region: us-west-2
+      ecr_repository: 534409838809.dkr.ecr.us-west-2.amazonaws.com/edulens-parent-advisor-dev
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: null
+      agent_arn: null
+      agent_session_id: null
+    codebuild:
+      project_name: ''
+      execution_role: null
+      source_bucket: null
+    memory:
+      mode: NO_MEMORY
+      memory_id: null
+      memory_arn: null
+      memory_name: null
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+      was_created_by_toolkit: false
+    identity:
+      credential_providers: []
+      workload: null
+    aws_jwt:
+      enabled: false
+      audiences: []
+      signing_algorithm: ES384
+      issuer_url: null
+      duration_seconds: 300
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
+    api_key_env_var_name: null
+    api_key_credential_provider_name: null
+    is_generated_by_agentcore_create: false
+  student-tutor:
+    name: edulens_student_tutor_dev
+    language: typescript
+    node_version: '20'
+    entrypoint: dist/agents/student-tutor.js
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: null
+    source_path: null
+    aws:
+      execution_role: arn:aws:iam::534409838809:role/edulens-agentcore-runtime-role-dev
+      execution_role_auto_create: false
+      account: '534409838809'
+      region: us-west-2
+      ecr_repository: edulens-student-tutor-dev
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: null
+      agent_arn: null
+      agent_session_id: null
+    codebuild:
+      project_name: ''
+      execution_role: null
+      source_bucket: null
+    memory:
+      mode: NO_MEMORY
+      memory_id: null
+      memory_arn: null
+      memory_name: null
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+      was_created_by_toolkit: false
+    identity:
+      credential_providers: []
+      workload: null
+    aws_jwt:
+      enabled: false
+      audiences: []
+      signing_algorithm: ES384
+      issuer_url: null
+      duration_seconds: 300
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
+    api_key_env_var_name: null
+    api_key_credential_provider_name: null
+    is_generated_by_agentcore_create: false
+  edulens_parent_advisor_dev:
+    name: edulens_parent_advisor_dev
+    language: typescript
+    node_version: '20'
+    entrypoint: dist/agents/parent-advisor.js
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: null
+    source_path: null
+    aws:
+      execution_role: arn:aws:iam::534409838809:role/edulens-agentcore-runtime-role-dev
+      execution_role_auto_create: false
+      account: '534409838809'
+      region: us-west-2
+      ecr_repository: 534409838809.dkr.ecr.us-west-2.amazonaws.com/edulens-parent-advisor-dev
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: null
+      agent_arn: null
+      agent_session_id: null
+    codebuild:
+      project_name: ''
+      execution_role: null
+      source_bucket: null
+    memory:
+      mode: NO_MEMORY
+      memory_id: null
+      memory_arn: null
+      memory_name: null
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+      was_created_by_toolkit: false
+    identity:
+      credential_providers: []
+      workload: null
+    aws_jwt:
+      enabled: false
+      audiences: []
+      signing_algorithm: ES384
+      issuer_url: null
+      duration_seconds: 300
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
+    api_key_env_var_name: null
+    api_key_credential_provider_name: null
+    is_generated_by_agentcore_create: false
