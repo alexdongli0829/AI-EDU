@@ -29,11 +29,18 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ChildInfo {
+  id: string;
+  name: string;
+  gradeLevel: number;
+}
+
 export interface AgentCoreRequest {
   prompt: string;
   conversationHistory?: ChatMessage[];
   studentId?: string;
   studentName?: string;
+  children?: ChildInfo[];
   questionId?: string;
 }
 
@@ -106,6 +113,7 @@ export async function invokeAgent(
   }
   if (request.studentId)   payload.studentId   = request.studentId;
   if (request.studentName) payload.studentName  = request.studentName;
+  if (request.children)    payload.children     = request.children;
   if (request.questionId)  payload.questionId   = request.questionId;
 
   const command = new InvokeAgentRuntimeCommand({

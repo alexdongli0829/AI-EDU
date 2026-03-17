@@ -100,21 +100,38 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (process.env.PARENT_ADVISOR_RUNTIME_ARN) {
       // AgentCore Runtime path — agent handles its own system prompt + tools
-      // Look up student name so agent can address the child by name
-      let studentName: string | undefined;
-      if (studentId) {
+      // Look up ALL children for this parent so agent can handle multi-child families
+      const parentId = meta.parentId || null;
+      let children: Array<{ id: string; name: string; gradeLevel: number }> = [];
+      let currentStudentName: string | undefined;
+
+      if (parentId) {
+        const childRows = await query(
+          `SELECT s.id, u.name, s.grade_level as "gradeLevel"
+           FROM students s JOIN users u ON s.user_id = u.id
+           WHERE s.parent_id = $1::uuid
+           ORDER BY u.name`,
+          parentId
+        ) as any[];
+        children = childRows || [];
+        // Find current student's name
+        const current = children.find(c => c.id === studentId);
+        currentStudentName = current?.name;
+      } else if (studentId) {
+        // Fallback: just look up the one student
         const nameRows = await query(
           `SELECT u.name FROM students s JOIN users u ON s.user_id = u.id WHERE s.id = $1::uuid LIMIT 1`,
           studentId
         ) as any[];
-        studentName = nameRows?.[0]?.name;
+        currentStudentName = nameRows?.[0]?.name;
       }
 
       const agentResult = await invokeAgent('parent-advisor', {
         prompt: message,
         conversationHistory: chatHistory,
         studentId: studentId ?? undefined,
-        studentName,
+        studentName: currentStudentName,
+        children: children.length > 0 ? children : undefined,
       });
 
       if (agentResult.blocked) {

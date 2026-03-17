@@ -96,10 +96,11 @@ def invoke(payload: dict) -> str:
     user_input = payload.get("prompt", "")
     student_id = payload.get("studentId", "mock-student-001")
     student_name = payload.get("studentName", "")
+    children = payload.get("children", [])
     conversation_history = payload.get("conversationHistory", [])
 
-    logger.info("Parent Advisor received: %s (student: %s, history: %d turns)",
-                user_input[:100], student_id, len(conversation_history))
+    logger.info("Parent Advisor received: %s (student: %s, children: %d, history: %d turns)",
+                user_input[:100], student_id, len(children), len(conversation_history))
 
     # Lazy import guardrails
     from guardrails.input_guardrail import check_input_guardrails
@@ -123,12 +124,27 @@ def invoke(payload: dict) -> str:
     # Strands Agent accepts a single prompt string, not messages[]
     parts = []
 
-    # Inject student context so agent doesn't ask for student ID
-    context_line = f"[Context: The parent is asking about student_id={student_id}"
-    if student_name:
-        context_line += f", name={student_name}"
-    context_line += ". Use this student_id when calling tools. Never ask the parent for their student ID.]"
-    parts.append(context_line)
+    # Inject family context — agent knows who the parent's children are
+    if children:
+        child_list = ", ".join(
+            f"{c['name']} (student_id={c['id']}, grade {c.get('gradeLevel', '?')})"
+            for c in children
+        )
+        parts.append(f"[Family context: This parent has {len(children)} child(ren): {child_list}.")
+        if student_name:
+            parts.append(f" Current chat session is about {student_name} (student_id={student_id}).")
+        if len(children) == 1:
+            parts.append(" Since there is only one child, always use their data without asking.")
+        else:
+            parts.append(" If the parent asks about a specific child by name, match to the correct student_id. If unclear which child, ask politely.")
+        parts.append(" NEVER show student IDs to the parent — use names only.]")
+    else:
+        # Fallback: single student context
+        context_line = f"[Context: The parent is asking about student_id={student_id}"
+        if student_name:
+            context_line += f", name={student_name}"
+        context_line += ". Use this student_id when calling tools. Never ask the parent for their student ID.]"
+        parts.append(context_line)
 
     # Include conversation history for multi-turn context
     if conversation_history:
