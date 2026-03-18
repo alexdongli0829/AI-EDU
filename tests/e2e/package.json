@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "End-to-end tests for EduLens AI chatbot functionality",
   "scripts": {
-    "test": "jest",
-    "test:verbose": "jest --verbose",
-    "test:watch": "jest --watch"
+    "test": "NODE_OPTIONS=\"--experimental-vm-modules\" jest",
+    "test:verbose": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --verbose",
+    "test:watch": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",
