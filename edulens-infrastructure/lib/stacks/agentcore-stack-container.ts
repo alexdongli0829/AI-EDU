@@ -33,8 +33,8 @@ export interface AgentCoreContainerStackProps extends cdk.StackProps {
 
 export class AgentCoreContainerStack extends cdk.Stack {
   public readonly memoryId: string;
-  public readonly parentAdvisorEcrRepo: ecr.Repository;
-  public readonly studentTutorEcrRepo: ecr.Repository;
+  public readonly parentAdvisorEcrRepo: ecr.IRepository;
+  public readonly studentTutorEcrRepo: ecr.IRepository;
   public readonly parentAdvisorRuntimeArn: string;
   public readonly studentTutorRuntimeArn: string;
 
@@ -61,31 +61,13 @@ export class AgentCoreContainerStack extends cdk.Stack {
     // ECR Repositories for Agent Container Images
     // ================================================================
 
-    this.parentAdvisorEcrRepo = new ecr.Repository(this, 'ParentAdvisorEcrRepo', {
-      repositoryName: `edulens-parent-advisor-${stageToken}`,
-      removalPolicy: config.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      imageScanOnPush: true,
-      lifecycleRules: [
-        {
-          rulePriority: 1,
-          description: 'Keep only 10 most recent images',
-          maxImageCount: 10,
-        },
-      ],
-    });
+    this.parentAdvisorEcrRepo = ecr.Repository.fromRepositoryName(
+      this, 'ParentAdvisorEcrRepo', `edulens-parent-advisor-${stageToken}`
+    );
 
-    this.studentTutorEcrRepo = new ecr.Repository(this, 'StudentTutorEcrRepo', {
-      repositoryName: `edulens-student-tutor-${stageToken}`,
-      removalPolicy: config.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      imageScanOnPush: true,
-      lifecycleRules: [
-        {
-          rulePriority: 1,
-          description: 'Keep only 10 most recent images',
-          maxImageCount: 10,
-        },
-      ],
-    });
+    this.studentTutorEcrRepo = ecr.Repository.fromRepositoryName(
+      this, 'StudentTutorEcrRepo', `edulens-student-tutor-${stageToken}`
+    );
 
     // ================================================================
     // Memory Execution Role
@@ -135,11 +117,19 @@ export class AgentCoreContainerStack extends cdk.Stack {
       ],
     }));
 
-    // ECR image pull access
+    // ECR auth token (needs * resource)
+    runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'ECRAuth',
+      actions: [
+        'ecr:GetAuthorizationToken',
+      ],
+      resources: ['*'],
+    }));
+
+    // ECR image pull (scoped to specific repos)
     runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
       sid: 'ECRImagePull',
       actions: [
-        'ecr:GetAuthorizationToken',
         'ecr:BatchCheckLayerAvailability',
         'ecr:GetDownloadUrlForLayer',
         'ecr:BatchGetImage',
@@ -208,8 +198,8 @@ export class AgentCoreContainerStack extends cdk.Stack {
     //   - Runtime env will set AGENT_TYPE environment variable
     //   - Container startup time should be < 30s (cold start limit)
 
-    const parentAdvisorRuntime = new bedrockagentcore.CfnRuntime(this, 'ParentAdvisorRuntime', {
-      agentRuntimeName: `edulens_parent_advisor_${stageToken}`,
+    const parentAdvisorRuntime = new bedrockagentcore.CfnRuntime(this, 'ParentAdvisorContainerRuntime', {
+      agentRuntimeName: `edulens_parent_advisor_container_${stageToken}`,
       description: 'EduLens Parent Advisor Agent - TypeScript Container (ARM64)',
       agentRuntimeArtifact: {
         containerConfiguration: {
@@ -235,8 +225,8 @@ export class AgentCoreContainerStack extends cdk.Stack {
       },
     });
 
-    const studentTutorRuntime = new bedrockagentcore.CfnRuntime(this, 'StudentTutorRuntime', {
-      agentRuntimeName: `edulens_student_tutor_${stageToken}`,
+    const studentTutorRuntime = new bedrockagentcore.CfnRuntime(this, 'StudentTutorContainerRuntime', {
+      agentRuntimeName: `edulens_student_tutor_container_${stageToken}`,
       description: 'EduLens Student Tutor Agent - TypeScript Container (ARM64)',
       agentRuntimeArtifact: {
         containerConfiguration: {
@@ -262,17 +252,19 @@ export class AgentCoreContainerStack extends cdk.Stack {
       },
     });
 
-    // Ensure runtimes are created after the ECR repositories and IAM role
-    parentAdvisorRuntime.addDependency(this.parentAdvisorEcrRepo.node.defaultChild as cdk.CfnResource);
-    studentTutorRuntime.addDependency(this.studentTutorEcrRepo.node.defaultChild as cdk.CfnResource);
+    // ECR repos are imported (already exist) — no dependency needed
+    // Runtimes MUST wait for IAM policy update (ECR permissions) before CFN validates container URI
+    const iamPolicy = runtimeExecutionRole.node.findChild('DefaultPolicy').node.defaultChild as cdk.CfnResource;
+    parentAdvisorRuntime.addDependency(iamPolicy);
+    studentTutorRuntime.addDependency(iamPolicy);
 
     // ================================================================
     // AgentCore Runtime Endpoints
     // ================================================================
 
-    const parentAdvisorEndpoint = new bedrockagentcore.CfnRuntimeEndpoint(this, 'ParentAdvisorEndpoint', {
+    const parentAdvisorEndpoint = new bedrockagentcore.CfnRuntimeEndpoint(this, 'ParentAdvisorContainerEndpoint', {
       agentRuntimeId: parentAdvisorRuntime.attrAgentRuntimeId,
-      name: `edulens_parent_advisor_ep_${stageToken}`,
+      name: `edulens_parent_advisor_container_ep_${stageToken}`,
       description: 'EduLens Parent Advisor Endpoint (Container)',
       tags: {
         Project: 'EduLens',
@@ -283,9 +275,9 @@ export class AgentCoreContainerStack extends cdk.Stack {
     });
     parentAdvisorEndpoint.addDependency(parentAdvisorRuntime);
 
-    const studentTutorEndpoint = new bedrockagentcore.CfnRuntimeEndpoint(this, 'StudentTutorEndpoint', {
+    const studentTutorEndpoint = new bedrockagentcore.CfnRuntimeEndpoint(this, 'StudentTutorContainerEndpoint', {
       agentRuntimeId: studentTutorRuntime.attrAgentRuntimeId,
-      name: `edulens_student_tutor_ep_${stageToken}`,
+      name: `edulens_student_tutor_container_ep_${stageToken}`,
       description: 'EduLens Student Tutor Endpoint (Container)',
       tags: {
         Project: 'EduLens',
@@ -356,7 +348,7 @@ export class AgentCoreContainerStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'ParentAdvisorEndpointName', {
-      value: `edulens_parent_advisor_ep_${stageToken}`,
+      value: `edulens_parent_advisor_container_ep_${stageToken}`,
       description: 'Parent Advisor Endpoint Name (qualifier for invoke)',
       exportName: `edulens-parent-advisor-endpoint-name-${stageToken}`,
     });
@@ -374,7 +366,7 @@ export class AgentCoreContainerStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'StudentTutorEndpointName', {
-      value: `edulens_student_tutor_ep_${stageToken}`,
+      value: `edulens_student_tutor_container_ep_${stageToken}`,
       description: 'Student Tutor Endpoint Name (qualifier for invoke)',
       exportName: `edulens-student-tutor-endpoint-name-${stageToken}`,
     });

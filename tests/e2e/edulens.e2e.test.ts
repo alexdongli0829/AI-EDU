@@ -16,10 +16,10 @@ const ADMIN_API_KEY = '4ufbnf9yed7pNhTasnVpK64zCVgqACQp6AqMdQkI';
 const AWS_REGION = 'us-west-2';
 
 // AgentCore Runtime ARNs and endpoint names
-const PARENT_ADVISOR_RUNTIME_ARN = 'arn:aws:bedrock-agentcore:us-west-2:534409838809:runtime/edulens_parent_advisor_dev-5KSGKX4ah8';
-const STUDENT_TUTOR_RUNTIME_ARN = 'arn:aws:bedrock-agentcore:us-west-2:534409838809:runtime/edulens_student_tutor_dev-2amG664Tev';
-const PARENT_ADVISOR_ENDPOINT = 'edulens_parent_advisor_ep_dev';
-const STUDENT_TUTOR_ENDPOINT = 'edulens_student_tutor_ep_dev';
+const PARENT_ADVISOR_RUNTIME_ARN = 'arn:aws:bedrock-agentcore:us-west-2:534409838809:runtime/edulens_parent_advisor_container_dev-BPpiT44QYs';
+const STUDENT_TUTOR_RUNTIME_ARN = 'arn:aws:bedrock-agentcore:us-west-2:534409838809:runtime/edulens_student_tutor_container_dev-trKDvXAzH4';
+const PARENT_ADVISOR_ENDPOINT = 'edulens_parent_advisor_container_ep_dev';
+const STUDENT_TUTOR_ENDPOINT = 'edulens_student_tutor_container_ep_dev';
 
 // Initialize AWS SDK client
 const agentCoreClient = new BedrockAgentCoreClient({ region: AWS_REGION });

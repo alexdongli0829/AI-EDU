@@ -138,6 +138,25 @@ export class AgentCoreStack extends cdk.Stack {
       ],
     }));
 
+    // ECR image pull access (for container-based deployment migration)
+    runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'ECRAuth',
+      actions: ['ecr:GetAuthorizationToken'],
+      resources: ['*'],
+    }));
+    runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'ECRImagePull',
+      actions: [
+        'ecr:BatchCheckLayerAvailability',
+        'ecr:GetDownloadUrlForLayer',
+        'ecr:BatchGetImage',
+      ],
+      resources: [
+        `arn:aws:ecr:${region}:${account}:repository/edulens-parent-advisor-${stageToken}`,
+        `arn:aws:ecr:${region}:${account}:repository/edulens-student-tutor-${stageToken}`,
+      ],
+    }));
+
     // CloudWatch Logs
     runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
       sid: 'CloudWatchLogs',

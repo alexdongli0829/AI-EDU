@@ -5,7 +5,7 @@
  * understand questions they got wrong on NSW OC or Selective School practice tests.
  */
 
-import { BedrockAgentCoreApp } from 'bedrock-agentcore/runtime';
+import Fastify from 'fastify';
 import { Agent, BedrockModel } from '@strands-agents/sdk';
 import { z } from 'zod';
 
@@ -60,104 +60,121 @@ const agent = new Agent({
   systemPrompt: STUDENT_TUTOR_SYSTEM_PROMPT,
 });
 
-// ---- BedrockAgentCoreApp setup ----
-const app = new BedrockAgentCoreApp({
-  invocationHandler: {
-    requestSchema: z.object({
-      prompt: z.string().default("I don't know how to solve this."),
-      studentId: z.string().optional().default('mock-student-001'),
-      questionId: z.string().optional().default('mock-q-001'),
-      conversationHistory: z.array(z.object({
-        role: z.enum(['user', 'assistant']),
-        content: z.string(),
-      })).optional().default([]),
-    }),
-
-    process: async function* (request, context) {
-      const { prompt: userInput, studentId, questionId, conversationHistory } = request;
-
-      console.log(`Student Tutor received: ${userInput.slice(0, 100)} (student: ${studentId}, question: ${questionId}, history: ${conversationHistory.length} turns)`);
-
-      // Pre-check input guardrails (students need content filtering too)
-      const guardrailResult = checkInputGuardrails(userInput);
-      if (guardrailResult.blocked) {
-        console.log(`Input blocked by guardrail: ${guardrailResult.reason}`);
-
-        const blockedResponse: AgentResponse = {
-          response: guardrailResult.redirect_message || 'Your message was blocked by our safety filters.',
-          blocked: true,
-          reason: guardrailResult.reason,
-        };
-
-        yield { event: 'message', data: { text: JSON.stringify(blockedResponse) } };
-        return;
-      }
-
-      // Build context-enriched prompt with conversation history
-      const parts: string[] = [];
-
-      // Inject student/question context
-      parts.push(`[Context: student_id=${studentId}, question_id=${questionId}. Use these when calling tools. Never ask the student for IDs.]`);
-
-      // Include conversation history for multi-turn
-      if (conversationHistory && conversationHistory.length > 0) {
-        parts.push('\n[Previous conversation:]');
-        for (const msg of conversationHistory) {
-          const { role, content } = msg;
-          if ((role === 'user' || role === 'assistant') && content) {
-            const label = role === 'user' ? 'Student' : 'Tutor';
-            parts.push(`${label}: ${content}`);
-          }
-        }
-        parts.push('[End of previous conversation]\n');
-      }
-
-      parts.push(`Student: ${userInput}`);
-      const enrichedPrompt = parts.join('\n');
-
-      try {
-        // Stream agent response
-        let responseText = '';
-
-        for await (const agentEvent of agent.stream(enrichedPrompt)) {
-          if (agentEvent.type === 'modelStreamUpdateEvent') {
-            const modelEvent = agentEvent.event;
-            if (modelEvent.type === 'modelContentBlockDeltaEvent' && modelEvent.delta.type === 'textDelta') {
-              const text = modelEvent.delta.text;
-              responseText += text;
-              yield { event: 'message', data: { text } };
-            }
-          }
-        }
-
-        // Extract signals for analytics
-        const signals = extractSignals(userInput + ' ' + responseText);
-        if (signals.length > 0) {
-          console.log(
-            `Extracted ${signals.length} signals: ${signals.map(s => `${s.type}:${s.value}`).join(', ')}`
-          );
-        }
-
-        // Final response with signals
-        const finalResponse: AgentResponse = {
-          response: responseText,
-          signals: signals.map(s => ({
-            type: s.type,
-            value: s.value,
-            confidence: s.confidence,
-          })),
-        };
-
-        yield { event: 'message', data: { text: JSON.stringify({ signals: finalResponse.signals }) } };
-
-      } catch (error) {
-        console.error('Error in student tutor agent:', error);
-        yield { event: 'message', data: { text: 'I apologize, but I encountered an error. Please try again.' } };
-      }
-    },
-  },
+// ---- Zod schema for request validation ----
+const requestSchema = z.object({
+  prompt: z.string().default("I don't know how to solve this."),
+  studentId: z.string().optional().default('mock-student-001'),
+  questionId: z.string().optional().default('mock-q-001'),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+  })).optional().default([]),
 });
 
-// Run the application
-console.log('Student Tutor Agent listening on port 8080...');
-app.run();
+// ---- Fastify server setup ----
+const server = Fastify({ logger: false });
+
+// Health check endpoint
+server.get('/ping', async () => ({ status: 'healthy' }));
+
+// Main invocation endpoint
+server.post('/invocations', async (request, reply) => {
+  try {
+    // Parse and validate the request body
+    const requestBody = requestSchema.parse(request.body);
+    const { prompt: userInput, studentId, questionId, conversationHistory } = requestBody;
+
+    console.log(`Student Tutor received: ${userInput.slice(0, 100)} (student: ${studentId}, question: ${questionId}, history: ${conversationHistory.length} turns)`);
+
+    // Pre-check input guardrails (students need content filtering too)
+    const guardrailResult = checkInputGuardrails(userInput);
+    if (guardrailResult.blocked) {
+      console.log(`Input blocked by guardrail: ${guardrailResult.reason}`);
+
+      const blockedResponse: AgentResponse = {
+        response: guardrailResult.redirect_message || 'Your message was blocked by our safety filters.',
+        blocked: true,
+        reason: guardrailResult.reason,
+      };
+
+      reply.header('Content-Type', 'application/json');
+      return blockedResponse;
+    }
+
+    // Build context-enriched prompt with conversation history
+    const parts: string[] = [];
+
+    // Inject student/question context
+    parts.push(`[Context: student_id=${studentId}, question_id=${questionId}. Use these when calling tools. Never ask the student for IDs.]`);
+
+    // Include conversation history for multi-turn
+    if (conversationHistory && conversationHistory.length > 0) {
+      parts.push('\n[Previous conversation:]');
+      for (const msg of conversationHistory) {
+        const { role, content } = msg;
+        if ((role === 'user' || role === 'assistant') && content) {
+          const label = role === 'user' ? 'Student' : 'Tutor';
+          parts.push(`${label}: ${content}`);
+        }
+      }
+      parts.push('[End of previous conversation]\n');
+    }
+
+    parts.push(`Student: ${userInput}`);
+    const enrichedPrompt = parts.join('\n');
+
+    // Stream agent response and collect all text
+    let responseText = '';
+
+    for await (const agentEvent of agent.stream(enrichedPrompt)) {
+      if (agentEvent.type === 'modelStreamUpdateEvent') {
+        const modelEvent = agentEvent.event;
+        if (modelEvent.type === 'modelContentBlockDeltaEvent' && modelEvent.delta.type === 'textDelta') {
+          const text = modelEvent.delta.text;
+          responseText += text;
+        }
+      }
+    }
+
+    // Extract signals for analytics
+    const signals = extractSignals(userInput + ' ' + responseText);
+    if (signals.length > 0) {
+      console.log(
+        `Extracted ${signals.length} signals: ${signals.map(s => `${s.type}:${s.value}`).join(', ')}`
+      );
+    }
+
+    // Return final response with signals
+    const finalResponse: AgentResponse = {
+      response: responseText,
+      signals: signals.map(s => ({
+        type: s.type,
+        value: s.value,
+        confidence: s.confidence,
+      })),
+    };
+
+    reply.header('Content-Type', 'application/json');
+    return finalResponse;
+
+  } catch (error) {
+    console.error('Error in student tutor agent:', error);
+    const errorResponse: AgentResponse = {
+      response: 'I apologize, but I encountered an error. Please try again.',
+      blocked: true,
+      reason: 'Internal error'
+    };
+
+    reply.header('Content-Type', 'application/json');
+    return errorResponse;
+  }
+});
+
+// Start the server
+server.listen({ host: '0.0.0.0', port: 8080 }, (err, address) => {
+  if (err) {
+    console.error(err);
+    process.exit(1);
+  }
+  console.log(`Student Tutor Agent listening on ${address}`);
+});

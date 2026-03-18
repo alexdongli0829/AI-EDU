@@ -125,18 +125,18 @@ const insightsQueueArn      = `arn:aws:sqs:${config.region}:${config.account}:ed
 const eventBusArn           = `arn:aws:events:${config.region}:${config.account}:event-bus/default`;
 
 // ============================================================
-// AgentCore Stack  (ECR + IAM + Runtime + Endpoints)
-// Container deployment: TypeScript agents on ARM64 Node.js containers.
-// Created before Lambda stack so runtime ARNs can be passed to chat Lambdas.
+// AgentCore Stack  (S3 + IAM + Runtime + Endpoints)
+// Phase 1: Keep existing Python runtimes, add ECR IAM permissions
+// Phase 2 (next deploy): Switch to AgentCoreContainerStack
 // ============================================================
 
-const agentCoreStack = new AgentCoreContainerStack(app, `EduLensAgentCoreStack-${config.stage}`, {
+const agentCoreStack = new AgentCoreStack(app, `EduLensAgentCoreStack-${config.stage}`, {
   env,
   config,
   vpc: networkStack.vpc,
   lambdaSecurityGroup: networkStack.lambdaSecurityGroup,
   auroraSecret: databaseStack.auroraSecret,
-  description: `EduLens AgentCore AI Agents - Container (${config.stage})`,
+  description: `EduLens AgentCore AI Agents (${config.stage})`,
   tags: config.tags,
 });
 agentCoreStack.addDependency(networkStack);
