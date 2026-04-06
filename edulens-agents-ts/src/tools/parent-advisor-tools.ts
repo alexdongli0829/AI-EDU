@@ -4,21 +4,20 @@
  */
 
 import { tool } from '@strands-agents/sdk';
-import { MOCK_STUDENT } from './mock-data.js';
+import { getMockStudent } from './mock-data.js';
 
 /**
  * Get the student's Learning DNA overview including mastery level, strengths, weaknesses, and recent trends.
  */
 export function queryStudentProfile(studentId: string): string {
-  // Only return data for known mock student — unknown students get empty results
-  if (studentId !== MOCK_STUDENT.studentId && studentId !== 'stu_emily') {
+  const s = getMockStudent(studentId);
+  if (!s) {
     return JSON.stringify({
       studentId,
       error: 'no_data',
       message: 'No test data available for this student yet. They may need to complete their first practice test.',
     }, null, 2);
   }
-  const s = MOCK_STUDENT;
   const history = s.testHistory;
 
   let trend: string;
@@ -45,7 +44,8 @@ export function queryStudentProfile(studentId: string): string {
  * Get recent test scores and details for a student.
  */
 export function queryTestResults(studentId: string, limit = 5): string {
-  if (studentId !== MOCK_STUDENT.studentId && studentId !== 'stu_emily') {
+  const s = getMockStudent(studentId);
+  if (!s) {
     return JSON.stringify({
       studentName: 'Unknown',
       testCount: 0,
@@ -53,10 +53,10 @@ export function queryTestResults(studentId: string, limit = 5): string {
       message: 'No test history available for this student yet.',
     }, null, 2);
   }
-  const tests = MOCK_STUDENT.testHistory.slice(0, limit);
+  const tests = s.testHistory.slice(0, limit);
 
   return JSON.stringify({
-    studentName: MOCK_STUDENT.name,
+    studentName: s.name,
     testCount: tests.length,
     tests: tests.map(t => ({
       ...t,
@@ -70,7 +70,8 @@ export function queryTestResults(studentId: string, limit = 5): string {
  * Get per-skill mastery percentages for a given subject.
  */
 export function querySkillBreakdown(studentId: string, subject: string): string {
-  if (studentId !== MOCK_STUDENT.studentId && studentId !== 'stu_emily') {
+  const s = getMockStudent(studentId);
+  if (!s) {
     return JSON.stringify({
       studentName: 'Unknown',
       subject,
@@ -78,7 +79,7 @@ export function querySkillBreakdown(studentId: string, subject: string): string 
       message: 'No skill data available for this student yet.',
     }, null, 2);
   }
-  const breakdown = MOCK_STUDENT.skillBreakdown[subject] || {};
+  const breakdown = s.skillBreakdown[subject] || {};
   const skills = [];
 
   for (const [skillName, mastery] of Object.entries(breakdown)) {
@@ -91,7 +92,7 @@ export function querySkillBreakdown(studentId: string, subject: string): string 
   }
 
   return JSON.stringify({
-    studentName: MOCK_STUDENT.name,
+    studentName: s.name,
     subject,
     skills,
   }, null, 2);
@@ -101,10 +102,17 @@ export function querySkillBreakdown(studentId: string, subject: string): string 
  * Get time management analysis including average time per question, rushing indicators, and stamina curve.
  */
 export function queryTimeBehavior(studentId: string): string {
-  const tb = MOCK_STUDENT.timeBehavior;
+  const s = getMockStudent(studentId);
+  if (!s) {
+    return JSON.stringify({
+      studentName: 'Unknown',
+      message: 'No time behavior data available for this student yet.',
+    }, null, 2);
+  }
+  const tb = s.timeBehavior;
 
   return JSON.stringify({
-    studentName: MOCK_STUDENT.name,
+    studentName: s.name,
     avgTimePerQuestion: `${tb.avgTimePerQuestion} seconds`,
     rushingIndicator: `${(tb.rushingIndicator * 100).toFixed(0)}% of answers show rushing`,
     staminaCurve: tb.staminaCurve,
@@ -116,11 +124,20 @@ export function queryTimeBehavior(studentId: string): string {
  * Get error classification breakdown showing error types and their frequencies.
  */
 export function queryErrorPatterns(studentId: string): string {
-  const patterns = MOCK_STUDENT.errorPatterns;
+  const s = getMockStudent(studentId);
+  if (!s) {
+    return JSON.stringify({
+      studentName: 'Unknown',
+      totalErrors: 0,
+      patterns: [],
+      message: 'No error pattern data available for this student yet.',
+    }, null, 2);
+  }
+  const patterns = s.errorPatterns;
   const totalErrors = patterns.reduce((sum, e) => sum + e.frequency, 0);
 
   return JSON.stringify({
-    studentName: MOCK_STUDENT.name,
+    studentName: s.name,
     totalErrors,
     patterns: patterns.map(e => ({
       type: e.type,
@@ -180,7 +197,7 @@ export const parentAdvisorTools = [
         },
         subject: {
           type: 'string',
-          description: 'The subject — one of "reading", "math", or "thinking".',
+          description: 'The subject — one of "reading", "math", "thinking", or "writing".',
         },
       },
       required: ['studentId', 'subject'],

@@ -3,13 +3,20 @@
  */
 
 import { tool } from '@strands-agents/sdk';
-import { MOCK_STUDENT, MOCK_QUESTION } from './mock-data.js';
+import { getMockStudent, getMockQuestion } from './mock-data.js';
 
 /**
  * Load the question text, the correct answer, and the student's wrong answer for the current tutoring session.
  */
 export function loadQuestionContext(questionId: string): string {
-  const q = MOCK_QUESTION;
+  const q = getMockQuestion(questionId);
+  if (!q) {
+    return JSON.stringify({
+      questionId,
+      error: 'not_found',
+      message: 'Question not found. The student may be asking about a new question not in the system.',
+    }, null, 2);
+  }
   const correctOption = q.options.find(o => o.isCorrect);
   const studentOption = q.options.find(o => o.label === q.studentAnswer);
 
@@ -31,14 +38,25 @@ export function loadQuestionContext(questionId: string): string {
 /**
  * Get the student's current overall mastery level and mastery for skills relevant to the current question.
  */
-export function queryStudentLevel(studentId: string): string {
+export function queryStudentLevel(studentId: string, questionId?: string): string {
+  const student = getMockStudent(studentId);
+  if (!student) {
+    return JSON.stringify({
+      studentId,
+      error: 'no_data',
+      message: 'No mastery data available for this student yet.',
+    }, null, 2);
+  }
+
+  const q = getMockQuestion(questionId);
+  const skillTags = q?.skillTags || [];
   const relevantSkills = [];
 
-  for (const tag of MOCK_QUESTION.skillTags) {
+  for (const tag of skillTags) {
     const parts = tag.split('.');
     if (parts.length === 2) {
       const [subject, skill] = parts;
-      const breakdown = MOCK_STUDENT.skillBreakdown[subject] || {};
+      const breakdown = student.skillBreakdown[subject] || {};
       const mastery = breakdown[skill];
       relevantSkills.push({
         tag,
@@ -48,8 +66,8 @@ export function queryStudentLevel(studentId: string): string {
   }
 
   return JSON.stringify({
-    studentName: MOCK_STUDENT.name,
-    overallMastery: `${(MOCK_STUDENT.overallMastery * 100).toFixed(0)}%`,
+    studentName: student.name,
+    overallMastery: `${(student.overallMastery * 100).toFixed(0)}%`,
     relevantSkills,
   }, null, 2);
 }
@@ -100,10 +118,14 @@ export const studentTutorTools = [
           type: 'string',
           description: 'The student ID.',
         },
+        questionId: {
+          type: 'string',
+          description: 'The question ID for relevant skill lookup.',
+        },
       },
       required: ['studentId'],
     },
-    callback: (input: any) => queryStudentLevel(input.studentId),
+    callback: (input: any) => queryStudentLevel(input.studentId, input.questionId),
   }),
   tool({
     name: 'record_understanding',

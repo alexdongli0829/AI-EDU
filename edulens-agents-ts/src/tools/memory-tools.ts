@@ -8,7 +8,7 @@
  */
 
 import { tool } from '@strands-agents/sdk';
-import { MOCK_MEMORY_RECORDS } from './mock-data.js';
+import { getMockMemoryRecords, MOCK_MEMORY_RECORDS } from './mock-data.js';
 import type { MemoryMetadata, MemoryRecord } from '../shared/types.js';
 
 /** Build the canonical student learning namespace. */
@@ -55,12 +55,9 @@ export function retrieveMemories(
   const queryLower = query.toLowerCase();
   const words = queryLower.split(/\s+/);
 
-  let candidates = MOCK_MEMORY_RECORDS as MemoryRecord[];
-
-  // Namespace filter
-  if (namespace) {
-    candidates = candidates.filter(r => r.namespace === namespace);
-  }
+  let candidates: MemoryRecord[] = namespace
+    ? getMockMemoryRecords(namespace)
+    : MOCK_MEMORY_RECORDS;
 
   // Metadata filter
   if (metadataFilters) {
