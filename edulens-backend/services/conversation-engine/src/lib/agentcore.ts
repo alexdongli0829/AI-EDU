@@ -42,6 +42,7 @@ export interface AgentCoreRequest {
   studentName?: string;
   children?: ChildInfo[];
   questionId?: string;
+  stage?: 'oc_prep' | 'selective_prep';
 }
 
 export interface AgentCoreResponse {
@@ -115,6 +116,7 @@ export async function invokeAgent(
   if (request.studentName) payload.studentName  = request.studentName;
   if (request.children)    payload.children     = request.children;
   if (request.questionId)  payload.questionId   = request.questionId;
+  if (request.stage)       payload.stage        = request.stage;
 
   const command = new InvokeAgentRuntimeCommand({
     agentRuntimeArn: runtimeArn,

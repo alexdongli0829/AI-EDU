@@ -132,7 +132,8 @@ export class AgentCoreMemory {
   }
 
   // -------------------------------------------------------------------------
-  // Seed with realistic mock long-term memories for Mia
+  // Seed with realistic mock long-term memories
+  // Includes: Mia (legacy), Family Wang (Emily + Lucas), Family Chen (Sophie)
   // -------------------------------------------------------------------------
   private seedMockRecords(): void {
     const seeds: Array<{
@@ -140,6 +141,7 @@ export class AgentCoreMemory {
       namespace: string;
       metadata: Record<string, string>;
     }> = [
+      // --- Mia (legacy single-student) ---
       {
         content:
           "Mia's parent asked about math performance on 2026-02-15. " +
@@ -179,6 +181,143 @@ export class AgentCoreMemory {
           "by step on paper.",
         namespace: "tutoring-sessions",
         metadata: { studentId: "mock-student-001", skill: "spatial" },
+      },
+
+      // --- Family Wang: Emily (oc_prep, Grade 4) ---
+      {
+        content:
+          "Emily scored 72% on OC Reading Test 1 (10/14 correct). " +
+          "Inference questions were weakest — 3/6 correct. " +
+          "Vocabulary and literal comprehension strong.",
+        namespace: "/students/stu_emily/learning/",
+        metadata: {
+          studentId: "stu_emily",
+          stage: "oc_prep",
+          subject: "reading",
+          skill: "inference",
+        },
+      },
+      {
+        content:
+          "Emily scored 65% on OC Math Test 1 (23/35 correct). " +
+          "Careless errors in 40% of wrong answers — rushing through early items. " +
+          "Number patterns weakest area at 50% accuracy.",
+        namespace: "/students/stu_emily/learning/",
+        metadata: {
+          studentId: "stu_emily",
+          stage: "oc_prep",
+          subject: "math",
+          skill: "number_patterns",
+          error_type: "careless",
+        },
+      },
+      {
+        content:
+          "Emily scored 58% on OC Thinking Skills Test 1 (17/30 correct). " +
+          "Spatial reasoning strongest sub-skill (7/8). " +
+          "Abstract patterns and sequences need work.",
+        namespace: "/students/stu_emily/learning/",
+        metadata: {
+          studentId: "stu_emily",
+          stage: "oc_prep",
+          subject: "thinking_skills",
+          skill: "abstract_patterns",
+        },
+      },
+      {
+        content:
+          "Emily's reading improved to 78% on OC Reading Test 2 (11/14). " +
+          "Inference improved from 3/6 to 5/6 after targeted practice.",
+        namespace: "/students/stu_emily/learning/",
+        metadata: {
+          studentId: "stu_emily",
+          stage: "oc_prep",
+          subject: "reading",
+          skill: "inference",
+        },
+      },
+      {
+        content:
+          "Parent Wang discussed Emily's careless errors in math on 2026-04-01. " +
+          "40% error rate from rushing. Advisor suggested pacing strategy.",
+        namespace: "/families/fam_wang/insights/",
+        metadata: {
+          studentId: "stu_emily",
+          stage: "oc_prep",
+          subject: "math",
+          error_type: "careless",
+        },
+      },
+
+      // --- Family Wang: Lucas (selective_prep, Grade 6) ---
+      {
+        content:
+          "Lucas scored 82% on Selective Reading Test (including Writing component). " +
+          "Strong analytical reading; persuasive writing needs more structured arguments.",
+        namespace: "/students/stu_lucas/learning/",
+        metadata: {
+          studentId: "stu_lucas",
+          stage: "selective_prep",
+          subject: "reading",
+          skill: "analytical_reading",
+        },
+      },
+      {
+        content:
+          "Lucas scored 75% on Selective Math Test. " +
+          "Algebra and problem-solving strong. " +
+          "Geometry proofs need more practice — missed 4/6 proof questions.",
+        namespace: "/students/stu_lucas/learning/",
+        metadata: {
+          studentId: "stu_lucas",
+          stage: "selective_prep",
+          subject: "math",
+          skill: "geometry_proofs",
+        },
+      },
+      {
+        content:
+          "Parent Wang asked about both children's overall progress. " +
+          "Emily improving in reading, math careless errors persist. " +
+          "Lucas performing well but needs geometry focus.",
+        namespace: "/families/fam_wang/insights/",
+        metadata: { stage: "mixed" },
+      },
+
+      // --- Family Chen: Sophie (oc_prep, Grade 4) ---
+      {
+        content:
+          "Sophie scored 88% on OC Reading Test — top of her cohort. " +
+          "Strong across all sub-skills. Vocabulary exceptionally advanced.",
+        namespace: "/students/stu_sophie/learning/",
+        metadata: {
+          studentId: "stu_sophie",
+          stage: "oc_prep",
+          subject: "reading",
+        },
+      },
+      {
+        content:
+          "Sophie's OC Math performance at 70%. " +
+          "Conceptual understanding good but speed needs improvement. " +
+          "Time management is main area for growth.",
+        namespace: "/students/stu_sophie/learning/",
+        metadata: {
+          studentId: "stu_sophie",
+          stage: "oc_prep",
+          subject: "math",
+          error_type: "slow_pace",
+        },
+      },
+      {
+        content:
+          "Parent Chen discussed Sophie's preparation timeline. " +
+          "OC test in 6 weeks. Focus on math speed and thinking skills.",
+        namespace: "/families/fam_chen/insights/",
+        metadata: {
+          studentId: "stu_sophie",
+          stage: "oc_prep",
+        },
       },
     ];
 

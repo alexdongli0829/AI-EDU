@@ -129,5 +129,39 @@ export async function retrieveMemoryRecords(input: {
     score: r.score ?? 0,
     namespace: r.namespace ?? '',
     createdAt: r.createdAt?.toISOString() ?? new Date().toISOString(),
+    metadata: parseMetadata(r.metadata),
   }));
+}
+
+// -------------------------------------------------------------------------
+// Parse metadata from AgentCore API response attributes
+// -------------------------------------------------------------------------
+
+function parseMetadata(
+  attrs: Array<{ key?: string; value?: string }> | undefined | null,
+): Record<string, string> | undefined {
+  if (!attrs || attrs.length === 0) return undefined;
+  const result: Record<string, string> = {};
+  for (const attr of attrs) {
+    if (attr.key) {
+      result[attr.key] = attr.value ?? '';
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+// -------------------------------------------------------------------------
+// Client-side metadata filtering helper
+// -------------------------------------------------------------------------
+
+export function filterByMetadata(
+  records: readonly MemoryRecord[],
+  filters: Record<string, string>,
+): MemoryRecord[] {
+  return records.filter((r) => {
+    if (!r.metadata) return false;
+    return Object.entries(filters).every(
+      ([key, value]) => r.metadata?.[key] === value,
+    );
+  });
 }
