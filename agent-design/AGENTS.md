@@ -466,3 +466,144 @@ These changes are needed in the existing `feat/ai-chatbot-redesign` branch:
 | `prototype/edulens-agent/src/memory/agentcore-memory.ts` | Update mock data with multi-child family scenarios and stage-aware namespace patterns |
 | `edulens-infrastructure/lib/stacks/agentcore-stack.ts` | Update Memory namespace config if hierarchical namespace support is available |
 | Cedar Policy | New — create policy for cross-student retrieve blocking (not yet in branch) |
+
+---
+
+## 12. Environment Variables
+
+All configurable values must be sourced from environment variables to support multi-environment deployments (dev, staging, production). Hardcoded defaults are provided for local development only.
+
+### Memory Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EDULENS_MEMORY_STORE_ID` | `edulens-memory-store` | AgentCore Memory store identifier |
+| `MEMORY_ID` | *(required)* | Memory instance ID for the active environment |
+
+### Model Routing
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EDULENS_MODEL_CLASSIFICATION` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | Model for error classification, intent detection, FAQ routing |
+| `EDULENS_MODEL_CONVERSATION` | `global.anthropic.claude-sonnet-4-6` | Model for daily conversation, study plans, parent communication |
+| `EDULENS_MODEL_DEEP_ANALYSIS` | `global.anthropic.claude-opus-4-6-v1` | Model for deep diagnostic reports, Writing feedback, trend analysis |
+
+### AgentCore Runtime
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PARENT_ADVISOR_RUNTIME_ARN` | *(required)* | ARN of the parent-advisor AgentCore Runtime |
+| `STUDENT_TUTOR_RUNTIME_ARN` | *(required)* | ARN of the student-tutor AgentCore Runtime |
+| `AGENTCORE_REGION` | `us-west-2` | AWS region for AgentCore API calls |
+
+### Validation at Startup
+
+Agents **must** validate that all required env vars (those without defaults) are present during initialization. If a required variable is missing, the agent should:
+1. Log a clear error identifying the missing variable
+2. Fail fast — do not start the agent with incomplete configuration
+3. Return a non-zero exit code for container health check detection
+
+Optional variables with defaults should log a warning at INFO level when falling back to the default value, so operators can verify intentional usage.
+
+---
+
+## 13. Error Handling & Graceful Degradation
+
+Every failure mode must be anticipated and handled without exposing raw errors to users. The agent must remain conversational and helpful even when backend dependencies are degraded.
+
+### AgentCore Memory Unavailable (timeout / 503)
+
+```
+Trigger: Memory retrieval times out (>5s) or returns 503/5xx
+Behaviour:
+  1. Log: { event: "memory_unavailable", latency_ms, error_code, session_id }
+  2. Respond WITHOUT historical context — use only current session STM
+  3. Inform user naturally:
+     Parent: "I can't access previous session history right now, but I can help with your current question."
+     Student: "I'm having trouble loading our past sessions, but let's keep working!"
+  4. Set session flag: memory_degraded = true
+  5. Retry memory access on next turn (with exponential backoff: 1s, 2s, 4s, max 3 retries)
+  6. If memory recovers mid-session, silently resume using LTM context
+```
+
+### LTM Extraction Lambda Fails
+
+```
+Trigger: Post-session extraction job throws error or times out
+Behaviour:
+  1. Log: { event: "extraction_failed", session_id, error, attempt }
+  2. Push failed message to Dead Letter Queue (DLQ) for retry
+  3. Retry policy: 3 attempts with exponential backoff (30s, 120s, 300s)
+  4. NEVER block the active conversation — extraction is fully async
+  5. If all retries exhausted: flag session for manual review
+  6. Alert: CloudWatch alarm if DLQ depth > 10
+```
+
+### Parent References Unknown Child
+
+```
+Trigger: NLU resolves a child name that doesn't match any student in the family roster
+Behaviour:
+  1. Respond: "I don't see a child with that name in your account. Your children are: [list names]."
+  2. If fuzzy match exists (edit distance ≤ 2 or partial match):
+     "Did you mean [closest match]?"
+  3. Log: { event: "unknown_child_reference", input_name, family_id, roster_names }
+  4. Do NOT hallucinate data for the unrecognised name
+```
+
+### Invalid or Corrupt Learning DNA
+
+```
+Trigger: Learning DNA retrieved from LTM fails schema validation
+         (missing required fields, invalid types, version mismatch)
+Behaviour:
+  1. Log: { event: "invalid_learning_dna", student_id, validation_errors, version }
+  2. Fall back to generic advice (no skill-specific data):
+     "I have limited diagnostic data available right now. Let me give you
+      general guidance, and we can review detailed insights next session."
+  3. Flag record for investigation (write to admin alerts namespace)
+  4. Do NOT use partially valid DNA — either full schema or generic fallback
+  5. If schema_version mismatch: attempt migration; if migration fails, treat as corrupt
+```
+
+### AgentCore Runtime Unavailable
+
+```
+Trigger: InvokeAgentRuntimeCommand fails (timeout, 503, connection refused)
+Behaviour:
+  1. Log: { event: "runtime_unavailable", agent_type, error_code, latency_ms }
+  2. Fall back to direct Bedrock Converse API (legacy path)
+     — This path already exists in send-message.ts (the `else` branch when
+       PARENT_ADVISOR_RUNTIME_ARN is not set)
+  3. Use the same buildSystemPrompt() to construct a grounded prompt
+  4. Inform user only if latency is noticeable (>10s):
+     "Sorry for the slight delay — I'm working on your question."
+  5. Metric: increment runtime_fallback_count counter
+```
+
+### Token Budget Exceeded
+
+```
+Trigger: Context window approaches model limit during long conversations
+Behaviour:
+  1. When STM token count exceeds 80% of maxTokens (128,000):
+     a. Summarise oldest turns into a compressed summary paragraph
+     b. Keep the most recent 10 turns verbatim
+     c. Preserve all [INSIGHT] tagged entries regardless of age
+  2. When assembled prompt (system + LTM + STM) exceeds model input limit:
+     a. Reduce LTM entries from 20 → 10 → 5 (most recent/relevant)
+     b. Truncate Learning DNA to summary fields only (drop sub_skills detail)
+     c. If still over: drop family insights, keep only student learning data
+  3. Log: { event: "token_budget_exceeded", session_id, strategy_applied, tokens_before, tokens_after }
+  4. Never silently drop context — always log what was truncated
+```
+
+### General Error Response Rules
+
+| Principle | Implementation |
+|-----------|---------------|
+| **Never expose stack traces** | Catch all errors; return user-friendly messages |
+| **Never hallucinate on failure** | If data is unavailable, say so — don't fabricate |
+| **Log everything server-side** | Every error includes session_id, timestamp, error details |
+| **Reset agent state on error** | On unhandled error, transition agent_state back to `idle` |
+| **Fail open for reads, fail closed for writes** | Missing data = proceed cautiously; write failure = retry + DLQ |

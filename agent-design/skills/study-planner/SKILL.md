@@ -1,325 +1,515 @@
-# Study Planner Skill Pack
-
-> **Skill ID:** `study-planner`
-> **Version:** 1.0
-> **Trigger:** Study plan generation, schedule adjustment, or practice prioritisation is requested
-> **Agent:** Parent Agent (primary), Student Agent (simplified view)
-> **Model:** Sonnet (plan generation), Haiku (schedule formatting)
-
+---
+name: study-planner
+description: Generates personalised study plans based on Learning DNA, target test date, and available study time
+version: 1.0
+trigger:
+  - Parent or student requests a study plan
+  - Agent detects planning intent ("what should I practice?", "make me a plan")
+  - Diagnostic results suggest a new focus area
+metadata:
+  input: Learning DNA + test_date + available_hours_per_week
+  output: weekly study plan with daily session templates
+depends_on:
+  - MEMORY-DESIGN.md §6 (Learning DNA schema)
+  - KNOWLEDGE.md §L (preparation strategy), §F (skill taxonomy)
+  - skills/diagnostic/SKILL.md (identifying priority areas)
+  - SOUL.md (age-appropriate communication, ZPD principle)
 ---
 
-## Description
+# Study Plan Generation Skill
 
-This skill pack generates personalised study plans based on the student's Learning DNA profile, target test date, and available study time. It produces weekly and daily schedules that target weak areas using the Zone of Proximal Development principle, adapt intensity based on proximity to the test date, and include built-in review cycles.
+## Overview
 
-Study plans are NOT static documents — they evolve as the student's Learning DNA updates. After each diagnostic test, the plan should be reassessed and adjusted.
+This skill generates personalised, time-aware study plans by combining three inputs:
+
+```
+Learning DNA (where the student IS)
+     +
+Target Test Date (how much TIME remains)
+     +
+Available Study Time (how many HOURS per week)
+     ↓
+Weekly Study Plan (what to DO each day)
+```
+
+Plans follow the Zone of Proximal Development: practice at the edge of current ability.
 
 ---
 
 ## Trigger Conditions
 
 Load this skill when ANY of the following are true:
-- A parent or student asks for a study plan, schedule, or practice recommendation
-- A parent asks "What should we focus on this week?"
-- After a diagnostic analysis, the agent recommends a focus area
-- The phrase "plan," "schedule," "what to practise," or "how to prepare" appears
-- A parent mentions available study time or days-until-test
+- Parent or student asks for a study plan or schedule
+- Parent asks "What should we focus on this week?"
+- After a diagnostic, the agent recommends a focus area
+- Parent mentions available study time or days-until-test
 
 ---
 
-## Input Requirements
+## 1. Input Requirements
 
-To generate a study plan, the agent needs:
+### Required Inputs
 
-| Input | Source | Required? |
-|-------|--------|-----------|
-| Learning DNA profile | AgentCore LTM | Yes |
-| Active stage | Student profile | Yes |
-| Target test date | System config or parent input | Yes |
-| Available study time per day | Parent input | Yes (ask if not known) |
-| Available study days per week | Parent input | Recommended (default: 5) |
-| Current study routine (if any) | Parent input or memory | Optional |
-| Specific parent preferences | Family insights LTM | Optional |
+| Input | Source | Example |
+|---|---|---|
+| **Learning DNA** | Retrieved from LTM | See MEMORY-DESIGN.md §6 |
+| **Target test date** | Student profile or parent input | "8 May 2026" (OC) or "1 May 2026" (Selective) |
+| **Available study time** | Asked from parent/student | "30 min/day, 5 days/week" |
 
-**If inputs are missing, ask:**
-- "How many minutes per day can [child name] dedicate to practice?"
-- "How many days per week are available for structured practice?"
-- "Is there a specific area you'd like me to prioritise, or should I base it on the diagnostic data?"
-
----
-
-## Plan Generation Algorithm
-
-### Step 1: Determine Preparation Phase
+### When Inputs Are Missing
 
 ```
-months_until_test = (test_date - today).months
+IF Learning DNA is null (new student):
+  → "I don't have diagnostic data yet. Let's start with a baseline test.
+     In the meantime, here's a balanced general plan."
+  → Generate default balanced plan
 
-IF months_until_test > 6:
-  phase = "foundation"
-  intensity = "low"
-  mock_test_frequency = "monthly"
+IF test date unknown:
+  → Ask: "When is the test? OC is 8-9 May 2026, Selective is 1-2 May 2026."
 
-ELIF months_until_test > 3:
-  phase = "intensification"
-  intensity = "medium"
-  mock_test_frequency = "biweekly"
-
-ELIF months_until_test > 1:
-  phase = "sharpening"
-  intensity = "high"
-  mock_test_frequency = "weekly"
-
-ELIF months_until_test > 0.5:
-  phase = "taper"
-  intensity = "light"
-  mock_test_frequency = "one_final"
-
-ELSE:
-  phase = "test_week"
-  intensity = "rest"
-  mock_test_frequency = "none"
-```
-
-### Step 2: Prioritise Skill Areas
-
-Using the Learning DNA, rank skills by priority:
-
-```
-priority_score = (1 - mastery) × weight_by_trend × weight_by_improvement_potential
-
-where:
-  weight_by_trend:
-    declining  = 1.5  (urgent — getting worse)
-    stable     = 1.0  (expected baseline)
-    improving  = 0.7  (already moving in right direction)
-
-  weight_by_improvement_potential:
-    mastery < 0.4  = 1.2  (significant room to grow)
-    mastery 0.4-0.7 = 1.0  (sweet spot for improvement)
-    mastery > 0.7  = 0.6  (diminishing returns)
-    mastery > 0.85 = 0.3  (maintenance only)
-```
-
-Sort by `priority_score` descending. Top 2-3 become the primary focus areas.
-
-### Step 3: Allocate Time
-
-```
-Total weekly time = daily_minutes × days_per_week
-
-Allocation:
-  Primary focus areas (top 2-3):  60% of time
-  Secondary skills:               25% of time
-  Maintenance (strong areas):     10% of time
-  Review/mock tests:               5% of time
-```
-
-Adjust by phase:
-- **Foundation:** More even distribution across all areas (50/30/15/5)
-- **Intensification:** Concentrated on weak areas (65/20/10/5)
-- **Sharpening:** Heavy focus on weak + timed practice (55/20/10/15)
-- **Taper:** Light review only (20/20/30/30)
-
-### Step 4: Build Weekly Schedule
-
-Distribute across available days, considering:
-- **No subject on consecutive days** (interleaving promotes retention)
-- **Harder subjects when fresh** (earlier in the week or at the start of a session)
-- **Review day** at the end of the week (revisit what was practised)
-- **Mock test day** on weekends if possible (simulate real conditions)
-
-### Step 5: Add Review Cycles
-
-Apply spaced repetition:
-- Concepts practised today → revisit in 2-3 days
-- Concepts revisited → revisit again in 1 week
-- If still solid after 2 reviews → move to maintenance
-
----
-
-## Output Format
-
-### Weekly Plan (Parent-Facing)
-
-```
-## Weekly Study Plan: [Student Name]
-### Week of [Date] | Phase: [Foundation/Intensification/Sharpening/Taper]
-### Available: [X] minutes/day, [Y] days/week
-
----
-
-**Priority Focus Areas This Week:**
-1. 🎯 Thinking — Spatial Reasoning (mastery: 38% ↓)
-2. 🎯 Reading — Author's Purpose (mastery: 50% ↓)
-3. 📈 Math — Multi-Step Reasoning (mastery: 48% →)
-
-**Maintenance:** Reading Literal Comprehension, Math Number & Algebra
-
----
-
-| Day | Subject | Focus | Activity | Duration |
-|-----|---------|-------|----------|----------|
-| Mon | Thinking | Spatial Reasoning | 2D rotation exercises — identify transformed shapes | 25 min |
-| Tue | Reading | Author's Purpose | Read 2 passages, identify purpose for each paragraph | 25 min |
-| Wed | Math | Multi-Step Reasoning | 10 word problems requiring 2+ steps | 25 min |
-| Thu | Thinking | Spatial Reasoning | 3D nets and folding — which face is opposite? | 25 min |
-| Fri | Reading | Review | Re-do 5 questions from Tuesday that were incorrect | 20 min |
-| Sat | Mock | Full mock test | Timed, simulating real conditions | 110 min |
-| Sun | Review | Error analysis | Review mock test results, classify errors | 20 min |
-
----
-
-**This Week's Goal:** Improve spatial reasoning accuracy from 38% to 45%+
-**Check-in:** After Saturday's mock test, we'll assess if the focus areas need adjusting.
-```
-
-### Daily Plan (Student-Facing, Simplified)
-
-```
-## Today's Practice: Monday
-
-🧩 **Thinking Skills — Spatial Reasoning** (25 minutes)
-
-What to do:
-1. Start with 5 easy rotation questions (warm-up)
-2. Then try 5 harder ones with reflections
-3. For each one: pick ONE corner, track where it goes
-4. If you get stuck for 30 seconds, draw it on paper!
-
-Goal: Get 7 out of 10 right ✨
-
-When you're done, tell me how it went!
+IF available hours not specified:
+  → Default: 30 min/day, 5 days/week
+  → Note: "This plan assumes ~30 min/day. Let me know to adjust."
 ```
 
 ---
 
-## Plan Adaptation Rules
+## 2. Time-Based Intensity Scaling
 
-### After Each Diagnostic Test
+| Phase | Time to Test | Daily Practice | Focus | Mock Tests |
+|---|---|---|---|---|
+| **Foundation** | 6-12 months | 20-30 min | Concepts, broad coverage | Monthly |
+| **Building** | 3-6 months | 25-35 min | Target weak areas, timed practice | Biweekly |
+| **Sharpening** | 1-3 months | 30-45 min | Consolidate, reduce errors, pacing | Weekly |
+| **Taper** | Final 2 weeks | 15-20 min | Light review, confidence, rest | One final, then stop |
 
-```
-1. Compare new Learning DNA against the plan's assumptions
-2. IF a priority area has improved significantly (mastery +10%):
-   → Reduce its time allocation
-   → Promote next priority area
-3. IF a priority area has NOT improved after 2 weeks:
-   → Check: is the practice type appropriate for the error pattern?
-   → Adjust: maybe the student needs concept teaching, not more practice
-4. IF a new weakness has emerged:
-   → Add to priority list
-   → Rebalance time allocation
-```
-
-### Phase Transitions
-
-When the preparation phase changes (e.g., intensification → sharpening):
-
-"We're entering the sharpening phase — the test is [X] weeks away. I'm adjusting the plan:
-- Weekly timed mock tests start now (every Saturday)
-- Practice sessions shift from learning new strategies to applying them under time pressure
-- Careless error reduction becomes a priority (currently 30% of errors)
-- No new concepts — we consolidate what you've learned"
-
----
-
-## Stage-Specific Adjustments
-
-### OC Prep Plans
-
-- 3 sections only: Reading, Math, Thinking
-- Equal time distribution (33.3% each) adjusted by priority
-- No Writing component
-- Emphasise Thinking Skills (often the weakest section)
-- Total daily practice: 20-30 minutes recommended
-
-### Selective Prep Plans
-
-- 4 sections: Reading, Math, Thinking, Writing
-- Writing MUST be included at least once per week
-- For students transitioning from OC: Writing gets priority time initially
-- Writing practice format: one full piece per week + editing practice
-- Total daily practice: 25-40 minutes recommended (older students can sustain longer)
-
-**Writing integration example:**
+### Scaling Rules
 
 ```
-| Day | Subject | Focus | Duration |
-|-----|---------|-------|----------|
-| Mon | Thinking | Spatial Reasoning | 30 min |
-| Tue | Reading | Inference + Synthesis | 30 min |
-| Wed | Writing | Narrative writing — plan + draft | 35 min |
-| Thu | Math | Multi-step + Word problems | 30 min |
-| Fri | Review | Revisit Wed's writing — edit + improve | 25 min |
-| Sat | Mock | Full Selective mock test (timed) | 155 min |
-| Sun | Review | Error analysis + Writing feedback review | 25 min |
+months_remaining = (test_date - today).days / 30
+
+Foundation (6-12 months):
+  weak_area: 40%  |  strength: 30%  |  mixed: 30%
+
+Building (3-6 months):
+  weak_area: 55%  |  strength: 20%  |  mixed: 25%
+
+Sharpening (1-3 months):
+  weak_area: 45%  |  strength: 15%  |  timed: 25%  |  error_reduction: 15%
+
+Taper (final 2 weeks):
+  light_review: 40%  |  confidence: 40%  |  rest: 20%
 ```
 
 ---
 
-## Special Scenarios
+## 3. Zone of Proximal Development
 
-### "We only have 15 minutes a day"
+### Difficulty Selection
 
-Reduce scope, not quality:
+| Mastery Level | Practice Difficulty | Target Accuracy |
+|---|---|---|
+| Below 40% (emerging) | Level 1-2 questions | Build to 50% |
+| 40-65% (developing) | Level 2-3 questions | Build to 70% |
+| 65-85% (confident) | Level 3-4 questions | Build to 85% |
+| Above 85% (mastered) | Occasional Level 3-4; shift time elsewhere | Maintain |
 
-"15 minutes is workable — let's make every minute count. We'll focus on ONE skill per day with high-intensity practice:
+### The 70% Success Rate Target
 
-| Day | Focus | Activity | Duration |
-|-----|-------|----------|----------|
-| Mon | Spatial Reasoning | 8 targeted questions | 15 min |
-| Tue | Word Problems | 5 multi-step problems | 15 min |
-| Wed | Inference | 1 passage + 4 questions | 15 min |
-| Thu | Careless Error Drill | 10 quick-fire math with checking | 15 min |
-| Fri | Review | Re-do 5 hardest questions from the week | 15 min |
+Sessions should aim for ~70% accuracy — the optimal learning zone:
 
-This won't cover everything, but it targets the highest-impact areas."
-
-### "The test is in 2 weeks — help!"
-
-Emergency plan — focus on quick wins:
-
-"With 2 weeks left, we focus on three things:
-1. **Careless error reduction** — biggest quick win. Practise checking your work. Potential gain: 3-5 marks.
-2. **Time management** — do 2 timed mock tests this week to build pacing confidence.
-3. **Confidence building** — practise areas you're GOOD at too, not just weak areas. Go into the test feeling strong.
-
-Do NOT try to learn new concepts. Work with what you know. Sharpen, don't build."
-
-### "My child refuses to practise"
-
-This is a motivation/wellbeing issue, not a study plan issue:
-
-"Forcing practice when a child is resistant usually backfires. A few suggestions:
-- Reduce session length drastically (even 10 minutes of willing practice beats 30 minutes of resentful practice)
-- Let them choose what to practise (within the priority areas)
-- Gamify it: 'Can you beat your score from yesterday?'
-- Take a 2-3 day break if needed — sometimes a reset helps
-- If the resistance persists, it might be worth talking to your child about what's really going on. This process can create anxiety, and wellbeing comes first.
-
-I can adjust the plan to be shorter and more flexible. Would that help?"
+- Below 50%: Questions too hard → step down difficulty
+- 50-70%: Optimal learning zone → maintain difficulty
+- Above 85%: Questions too easy → step up or shift to weaker skill
 
 ---
 
-## Review Cycle Integration
+## 4. Weekly Plan Output Format
 
-Every study plan includes built-in review checkpoints:
+### Structured Output (JSON)
 
-| Checkpoint | Frequency | Action |
-|------------|-----------|--------|
-| **Daily review** | End of each session | Student self-rates: "How did that feel? Easy / OK / Hard" |
-| **Weekly review** | End of each week | Quick 5-question check on the week's focus areas |
-| **Biweekly diagnostic** | Every 2 weeks | Short diagnostic test (not full mock) on priority areas |
-| **Monthly mock** | Monthly (foundation phase) or weekly (sharpening phase) | Full timed mock test under real conditions |
-| **Plan adjustment** | After each diagnostic/mock | Review Learning DNA changes, adjust plan priorities |
+```json
+{
+  "plan_id": "plan_20260406",
+  "student_name": "Ethan",
+  "stage": "oc_prep",
+  "phase": "sharpening",
+  "test_date": "2026-05-08",
+  "days_remaining": 32,
+  "weekly_hours": 2.5,
+
+  "priority_areas": [
+    { "area": "thinking.spatial_reasoning", "mastery": 0.38, "weight": 0.30 },
+    { "area": "math.multi_step_reasoning", "mastery": 0.50, "weight": 0.25 },
+    { "area": "reading.inference", "mastery": 0.65, "weight": 0.20 },
+    { "area": "maintenance", "weight": 0.15 },
+    { "area": "mock_test_review", "weight": 0.10 }
+  ],
+
+  "weekly_schedule": {
+    "monday": {
+      "duration": 30,
+      "focus": "thinking.spatial_reasoning",
+      "session": {
+        "warmup": "3 min — 3 single-rotation questions (Level 1)",
+        "core": "20 min — 8 mixed rotation/reflection (Level 2)",
+        "review": "7 min — Error review with visual anchoring"
+      },
+      "zpd_level": "1-2",
+      "target_accuracy": "60-70%"
+    },
+    "tuesday": {
+      "duration": 30,
+      "focus": "math.multi_step_reasoning",
+      "session": {
+        "warmup": "3 min — 3 single-step problems",
+        "core": "20 min — 6 multi-step word problems (Level 2-3)",
+        "review": "7 min — Check-your-work practice"
+      }
+    },
+    "wednesday": {
+      "duration": 30,
+      "focus": "reading.inference",
+      "session": {
+        "warmup": "3 min — 2 literal comprehension questions",
+        "core": "20 min — 1 passage with 5 inference questions",
+        "review": "7 min — Evidence identification practice"
+      }
+    },
+    "thursday": {
+      "duration": 30,
+      "focus": "mixed_maintenance",
+      "session": {
+        "warmup": "3 min — Quick mental math drill",
+        "core": "20 min — 10 mixed questions across strong areas",
+        "review": "7 min — Timed pacing practice"
+      }
+    },
+    "friday": {
+      "duration": 30,
+      "focus": "spatial_reasoning + weekly_review",
+      "session": {
+        "warmup": "3 min — Review Monday's errors",
+        "core": "15 min — 6 new spatial questions (Level 2)",
+        "review": "12 min — Review all week's errors"
+      }
+    }
+  },
+
+  "diagnostic_checkpoint": {
+    "frequency": "every 2 weeks",
+    "next": "2026-04-20"
+  }
+}
+```
+
+### Natural Language Plan (For Parents)
+
+```
+"Here's Ethan's study plan for this week (6-12 April):
+
+Sharpening Phase — 32 days until the test. Focus on three priority areas.
+
+Monday: Spatial Reasoning (30 min)
+  8 rotation/reflection questions. Visual anchoring technique. Target: 60-70%.
+
+Tuesday: Math Multi-Step Problems (30 min)
+  6 word problems requiring 2-3 steps. 'Break it into pieces' strategy.
+
+Wednesday: Reading Inference (30 min)
+  One passage with 5 inference questions. Find text evidence first.
+
+Thursday: Mixed Maintenance (30 min)
+  10 questions across strong areas. Timed pacing practice.
+
+Friday: Spatial Reasoning + Weekly Review (30 min)
+  Review Monday's errors + new spatial questions + week's error review.
+
+Diagnostic check: April 20 — we'll reassess and adjust.
+
+Tip: 30 focused minutes > 60 unfocused minutes. If Ethan is tired, stop early."
+```
+
+---
+
+## 5. Built-In Diagnostic Review Cycles
+
+| Phase | Checkpoint Frequency | What Happens |
+|---|---|---|
+| Foundation | Every 4 weeks | Full diagnostic + DNA update + plan revision |
+| Building | Every 2-3 weeks | Full diagnostic + plan revision |
+| Sharpening | Every 1-2 weeks | Timed mock + error review + minor adjustment |
+| Taper | No checkpoints | Light review only; preserve confidence |
+
+### Plan Adjustment Rules
+
+```
+After each diagnostic:
+
+IF mastery improved > 10%:
+  → Reduce area's weight, promote next weakest
+  → Celebrate improvement with student
+
+IF mastery declined > 5%:
+  → Increase area's weight immediately
+  → Investigate: bad day or real decline?
+  → Consider stepping DOWN difficulty
+
+IF error pattern shifted:
+  → Adjust practice type (more checking if careless rose)
+
+IF plateau for 2+ checkpoints:
+  → Change practice format (different question styles)
+  → Consider that student may need a break
+  → Discuss with parent
+```
+
+---
+
+## 6. Practice Session Templates
+
+### 15-Minute Quick Session
+
+```
+- 2 min warm-up (2-3 recall questions)
+- 10 min core (5 focused questions on one skill)
+- 3 min review (check errors, one takeaway)
+Best for: Short on time, maintaining momentum
+```
+
+### 30-Minute Standard Session
+
+```
+- 3 min warm-up (activate prior knowledge)
+- 20 min core (8-10 questions, Socratic review on errors)
+- 7 min review (summarise, preview next session)
+Best for: Regular daily practice
+```
+
+### 45-Minute Deep Session
+
+```
+- 3 min warm-up
+- 30 min core (full section practice OR Writing exercise)
+- 12 min review (detailed error analysis, strategy discussion)
+Best for: Weekend or intensive, Selective Writing practice
+```
+
+### 90-Minute Mock Test Session
+
+```
+OC: Reading (40 min) + Math (40 min) + Thinking (30 min) = 110 min
+  OR: OC mini-mock — 2 sections at half length (~50 min)
+
+Selective: All 4 sections = 155 min (full mock)
+  OR: Selective mini-mock — 2-3 sections (~75-100 min)
+
++ 15-30 min review session (can be next day)
+```
+
+---
+
+## 7. Example Plans for Different Profiles
+
+### Profile A: Strong Reader, Weak Math + Thinking
+
+```
+Student: Year 4, OC Prep, 4 months to test
+DNA: Reading 78%, Math 52%, Thinking 48%
+Error pattern: concept_gap dominant in Math
+
+Plan:
+  Math: 35% (concept building, Level 1-2 → 2-3)
+  Thinking: 30% (Spatial Reasoning emphasis)
+  Reading: 20% (maintain + push critical evaluation)
+  Mixed/mock: 15%
+
+Mon=Math, Tue=Thinking, Wed=Reading, Thu=Math, Fri=Thinking+review
+```
+
+### Profile B: Balanced but Careless
+
+```
+Student: Year 4, OC Prep, 2 months to test
+DNA: Reading 68%, Math 70%, Thinking 65%
+Error pattern: 40% careless errors across all sections
+
+Plan:
+  Accuracy drills: 40% (checking strategies)
+  Weakest (Thinking): 25%
+  Timed practice: 20%
+  Mock tests: 15%
+
+Mon=Accuracy(Math), Tue=Thinking, Wed=Accuracy(Reading),
+Thu=Timed mixed, Fri=Review+mock section
+```
+
+### Profile C: OC → Selective Transition, Writing Beginner
+
+```
+Student: Year 6, Selective Prep, 6 months to test
+DNA: Reading 75%, Math 72%, Thinking 68%, Writing null
+Error pattern: time_pressure in Thinking
+
+Plan:
+  Writing: 35% (intensive ramp-up from scratch)
+  Thinking: 25% (pacing strategies + spatial)
+  Reading: 20% (adapt to harder passages)
+  Math: 10% (maintain)
+  Mock: 10%
+
+Mon=Writing, Tue=Thinking, Wed=Writing, Thu=Reading, Fri=Mixed+review
+Writing focus: Structure first (wks 1-4) → Language (5-8) → Ideas+Engagement (9-12)
+```
+
+### Profile D: Final Month, Performance Dip
+
+```
+Student: Year 4, OC Prep, 3 weeks to test
+DNA: Reading 70%, Math 65%, Thinking 55% (was 62%)
+Error pattern: time_pressure + careless rising (possible anxiety)
+
+Plan:
+  Confidence building: 30% (comfortable level to rebuild)
+  Thinking consolidation: 25% (familiar question types)
+  Test strategy: 25% (pacing, elimination, skip-and-return)
+  Light mock: 20% (shorter mocks, process over score)
+
+Mon=Confidence(mix), Tue=Thinking(familiar), Wed=Strategy drills,
+Thu=Mini-mock, Fri=Light review + rest
+
+PARENT NOTE: "Scores often dip before stabilising. Keep practice light,
+ensure good sleep, and remind [child] they've prepared well."
+```
+
+### Profile E: Top Performer Maintaining Edge
+
+```
+Student: Year 6, Selective Prep, 2 months to test
+DNA: Reading 88%, Math 85%, Thinking 82%, Writing 75%
+Error pattern: elimination_failure on hardest questions
+
+Plan:
+  Writing (polish): 30% (Engagement + Audience focus)
+  Level 4 challenge questions: 30% (push ceiling)
+  Timed full mocks: 25% (stamina + consistency)
+  Light maintenance: 15%
+
+Mon=Writing, Tue=Level 4 Math+Thinking, Wed=Full mock,
+Thu=Writing, Fri=Mock review + strategy
+```
+
+---
+
+## 8. Plan Communication
+
+### To Students
+
+```
+"Here's your practice plan for this week:
+
+Monday: Math puzzles (the multi-step ones we've been working on)
+Tuesday: Thinking Skills — Spatial Reasoning practice
+Wednesday: Reading — a new passage to explore together
+Thursday: Mixed questions — a bit of everything
+Friday: Review + retry the tricky ones from this week
+
+You're doing great. Let's keep building on last week!"
+```
+
+### To Parents
+
+```
+"Based on [child]'s Learning DNA and 32 days until the test:
+
+Priority areas (from diagnostic):
+1. Spatial Reasoning (38% → target 50%)
+2. Multi-step Math (50% → target 65%)
+3. Reading inference (65% → maintain)
+
+[Detailed daily schedule]
+
+Diagnostic checkpoint: April 20 — we'll reassess.
+Let me know if daily time needs adjusting."
+```
 
 ---
 
 ## Integration Points
 
-- **Diagnostic input:** Study plans are generated from `diagnostic` skill output — specifically the `skill_gaps` and `recommendations` sections
+- **Diagnostic input:** Plans generated from `diagnostic` output (skill_gaps + recommendations)
 - **Learning DNA:** Primary data source for priority scoring and mastery levels
-- **Parent communication:** Plans are communicated through the `parent-advisor` skill communication style
-- **OC/Selective context:** Section composition and time allocations differ by stage
-- **Memory:** Previous plans and their outcomes stored in family insights namespace for continuity
-- **Test dates:** System configuration provides target test dates for phase calculation
+- **Parent communication:** Plans delivered through `parent-advisor` style
+- **OC/Selective context:** Section composition differs by stage (3 vs 4 sections)
+- **Memory:** Previous plans stored in family insights namespace for continuity
+- **Test dates:** System config provides target dates for phase calculation
+
+---
+
+## Input Validation & Safety
+
+### Max Input Sizes
+
+| Input | Limit | Rejection Behaviour |
+|-------|-------|---------------------|
+| Parent/student message length | 3,000 chars | Truncate to 3,000; inform user message was shortened |
+| Learning DNA input | 50 KB | Reject; likely corrupt — flag for investigation |
+| Priority areas list | 10 max | Cap at 10; focus on top priorities |
+| Weekly schedule days | 7 max | Reject >7; invalid calendar data |
+| Session templates per day | 3 max | Cap at 3; warn against over-scheduling |
+| Session metadata JSON | 10 KB | Reject; return `INVALID_INPUT` error |
+
+### Required Fields Validation
+
+Before generating any study plan, validate:
+
+```
+REQUIRED:
+  - student_id: non-empty string, valid UUID format
+  - active_stage: must be "oc_prep" or "selective_prep"
+  - Learning DNA or indication that DNA is unavailable (triggers default plan)
+
+REQUIRED if user-specified:
+  - test_date: valid ISO 8601 date, must be in the future
+  - available_hours_per_week: float > 0, max 40 (sanity check)
+  - days_per_week: integer 1-7
+
+VALIDATION for generated plans:
+  - Total weekly hours must not exceed available_hours_per_week
+  - Each session duration: 10-90 minutes (reject outside range)
+  - Priority area weights must sum to ~1.0 (±0.05 tolerance)
+  - ZPD levels must be consistent with mastery levels in DNA
+  - Selective plans MUST include Writing allocation if stage = selective_prep
+
+ON VALIDATION FAILURE:
+  - Return structured error (see format below)
+  - Log: { event: "input_validation_failed", student_id, invalid_fields }
+  - For missing optional inputs: use defaults and note assumptions
+```
+
+### Rate Limits
+
+| Operation | Limit | Enforcement |
+|-----------|-------|-------------|
+| Tool calls per turn | 10 max | Agent framework enforces; excess calls queued |
+| Timeout per tool call | 30 seconds | Hard timeout; return partial result or error |
+| Plan generation requests per session | 5 max | Prevents regeneration loops |
+| LTM retrieval calls per plan | 3 max | Prevents over-fetching |
+| LTM writes per session | 20 max | Prevents memory flooding |
+
+### Error Response Format
+
+All validation errors return a consistent structure:
+
+```json
+{
+  "error": "VALIDATION_FAILED",
+  "code": "STUDY_PLANNER_INVALID_INPUT",
+  "fields": [
+    { "field": "test_date", "reason": "date is in the past: 2025-01-15" },
+    { "field": "available_hours_per_week", "reason": "exceeds maximum of 40 (received: 60)" }
+  ],
+  "message": "Study plan request rejected: 2 validation errors found.",
+  "request_id": "req_abc123",
+  "timestamp": "2026-04-06T10:30:00Z"
+}

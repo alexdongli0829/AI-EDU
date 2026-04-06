@@ -1,22 +1,36 @@
-# Selective Prep Skill Pack
-
-> **Skill ID:** `selective-prep`
-> **Version:** 1.0
-> **Trigger:** Student is in `selective_prep` stage and engaging in practice, review, or test preparation
-> **Agent:** Student Agent (primary), Parent Agent (when discussing Selective preparation)
-> **Model:** Sonnet (default), Haiku (error classification), Opus (Writing feedback, deep diagnostic)
-
+---
+name: selective-prep
+description: Helps students prepare for the NSW Selective High School Placement Test, including Writing assessment
+version: 1.0
+trigger:
+  - Student is in selective_prep stage
+  - Student requests Selective test practice
+  - Writing feedback requested
+metadata:
+  stage: selective_prep
+  target_age: 11-12 (Year 6)
+  sections: [reading, math, thinking, writing]
+  test_format: 4 sections, MCQ + Writing, ~155 minutes
+depends_on:
+  - skills/oc-prep/SKILL.md (inherits all MCQ strategies)
+  - SOUL.md (teaching philosophy)
+  - KNOWLEDGE.md §C (Selective format), §F (skill taxonomy), §M (writing guide)
+  - MEMORY-DESIGN.md §6 (Learning DNA)
 ---
 
-## Description
+# Selective Test Preparation Skill
 
-This skill pack guides the EduLens Student Agent when helping Year 5-6 students prepare for the NSW Selective High School Placement Test. It covers all four test sections — Reading (17Q/45min), Mathematical Reasoning (35Q/40min), Thinking Skills (40Q/40min), and Writing (1Q/30min) — with age-appropriate Socratic tutoring strategies.
+## Overview
 
-This skill extends everything in the `oc-prep` skill pack with:
-- **Writing section** preparation and structured feedback (the major addition)
-- Harder question types and longer test format strategies
-- More sophisticated meta-cognitive strategies (Year 6 students = 11-12 years old)
-- Explicit preparation for the four Writing genres
+This skill builds on everything in [oc-prep/SKILL.md](../oc-prep/SKILL.md) and adds preparation for the NSW Selective High School Placement Test. The Selective test is longer (155 min vs 110 min), harder, and adds a Writing section worth 25%.
+
+**Key differences from OC:**
+- 4 sections instead of 3 (adds Writing at 25% weight)
+- Each section weighted 25% (not 33.3%)
+- Reading: 17Q/45min (more questions, more time, harder passages)
+- Thinking: 40Q/40min (10 more questions, more complex items)
+- Writing: 1 extended response/30min (entirely new section)
+- Target students are Year 6 (11-12 years old) — more sophisticated reasoning
 
 ---
 
@@ -24,268 +38,376 @@ This skill extends everything in the `oc-prep` skill pack with:
 
 Load this skill when ANY of the following are true:
 - Student's `active_stage == "selective_prep"`
-- Conversation involves Selective test preparation, practice, or review
-- Parent asks about Selective-specific preparation for a child in `selective_prep` stage
-- Test results from a Selective-format test are being discussed
+- Conversation involves Selective test preparation or review
 - Writing practice or feedback is requested
+- Test results from a Selective-format test are being discussed
 
 ---
 
-## Section Strategies
+## Section Adjustments from OC
 
-### Reading (17 Questions / 45 Minutes / 25%)
+### Reading (17Q / 45 min / 25%)
 
-**Differences from OC Reading:**
-- 17 questions (vs 14 in OC), with 3 having multiple parts
-- 45 minutes (vs 40 in OC) — slightly more time per question
-- Passages are more complex — approaching high school level
-- Greater emphasis on critical evaluation and synthesis across passages
-- 25% weighting (vs 33.3% in OC)
+**Time budget:** ~2.6 minutes per question (3 have multiple parts).
 
-**Advanced reading strategies for Year 6:**
-- **Annotation:** Mentally note or mark key arguments, turning points, and author's technique
-- **Cross-passage comparison:** For synthesis questions, identify where passages agree, disagree, or complement each other
-- **Tone analysis:** Pay attention to the author's attitude — is the writing objective, biased, ironic, sympathetic?
-- **Structure as meaning:** How the text is organised IS part of the message (chronological = narrative, problem-solution = persuasive, etc.)
+Selective Reading adds:
+- Longer, more complex passages approaching high school level
+- Greater emphasis on critical evaluation and synthesis
+- Multi-paragraph arguments requiring sustained comprehension
+- Academic and literary vocabulary
 
-**Socratic approach for advanced reading:**
-- "This passage uses irony. Can you find a sentence where the author says one thing but means another?"
-- "Compare how Passage A and Passage B discuss the same topic. Do they agree? Where do they diverge?"
-- "The author structures this as a problem-solution text. What's the problem? What solution is proposed? Does the author think it will work?"
+**Additional strategies for Year 6:**
+- Teach skimming: first/last sentence of each paragraph to get the gist
+- Annotation: mentally tag arguments, turning points, and author's technique
+- Cross-passage comparison: identify agreement, disagreement, complementary views
+- Tone analysis: recognise irony, bias, objectivity, sympathy
 
-### Mathematical Reasoning (35 Questions / 40 Minutes / 25%)
+**Socratic prompts (advanced):**
+- "This passage uses irony. Find a sentence where the author says one thing but means another."
+- "Compare how Passage A and B discuss the same topic. Where do they diverge?"
+- "The author structures this as problem-solution. What's the problem? What solution is proposed?"
 
-**Differences from OC Math:**
-- Same number of questions and time (35Q/40min)
-- Significantly harder content — more multi-step problems, algebraic reasoning
-- Questions may combine multiple mathematical concepts in a single problem
-- Greater emphasis on strategic problem selection under time pressure
+### Mathematical Reasoning (35Q / 40 min / 25%)
 
-**Advanced math strategies for Year 6:**
-- **Two-pass strategy:** First pass — answer every question you can solve in under 60 seconds. Second pass — tackle the harder problems with remaining time.
-- **Algebraic thinking:** Start building the habit of using variables: "Let the number of apples be x..."
-- **Ratio and proportion mastery:** These appear heavily at the Selective level
-- **Back-solving:** When stuck, substitute each answer option into the problem to check
+**Time budget:** ~1.14 minutes per question. Same pace as OC.
 
-**Socratic approach for harder math:**
-- "This problem has three steps hidden in it. Can you find the first one?"
-- "If you called the unknown number 'x', how would you write this problem as an equation?"
-- "The question gives you a ratio. What does that ratio actually mean in this situation?"
+Selective Math adds:
+- More Level 3-4 questions requiring strategic thinking
+- Questions combining multiple mathematical domains
+- Greater emphasis on algebraic reasoning and ratio/proportion
+- Harder multi-step problems
 
-### Thinking Skills (40 Questions / 40 Minutes / 25%)
+**Additional strategies for Year 6:**
+- Two-pass strategy: first pass = answer everything solvable in <60 seconds; second pass = harder problems
+- Algebraic thinking: "Let the number of apples be x..."
+- Ratio and proportion mastery (appears heavily at Selective level)
+- Back-solving: substitute each answer option to check
 
-**Differences from OC Thinking:**
-- 40 questions (vs 30 in OC) — 1 minute per question (same pace)
-- 10 more questions means more opportunity but also more fatigue
-- Questions are more complex — deeper spatial transformations, more constraints in logic problems
-- Section fatigue is a real issue at this length
+### Thinking Skills (40Q / 40 min / 25%)
 
-**Advanced Thinking strategies for Year 6:**
-- **Spatial Reasoning — systematic approach:**
-  - For 3D nets: Count faces, identify opposite faces, check edge connections
-  - For rotations: Track TWO reference points, not just one
-  - For complex transformations: Break into steps (rotate, THEN reflect)
-  - Draw intermediate states on scratch paper
+**Time budget:** 1 minute per question. Same per-question pace, 10 more questions.
 
-- **Logical Reasoning — constraint management:**
-  - Write down ALL given constraints before starting
-  - Use elimination grids for scheduling/ordering problems
-  - Check: does your answer satisfy EVERY constraint?
+Selective Thinking adds:
+- Complex spatial transformations (multiple rotations/reflections combined)
+- Harder logical reasoning with more constraints
+- Level 4 questions requiring synthesis across data sources
+- Greater working memory demands
+- Section fatigue is a real issue at 40 questions
 
-- **Pattern Recognition — rule extraction:**
-  - Examine at least 3 consecutive items before proposing a rule
-  - Check: does your rule work for ALL given items, not just the last two?
-  - Beware of red herrings — not every visible change is part of the rule
+**Additional strategies for Year 6:**
+- Spatial: track TWO reference points, not just one; break compound transformations into steps
+- Logic: use elimination grids for scheduling/ordering; write ALL constraints before starting
+- Patterns: examine 3+ items; verify rule against ALL items
+- Fatigue management: questions 1-15 (fresh), 16-30 (steady), 31-40 (push through)
 
-**Fatigue management (unique to Selective Thinking):**
-- "You're 25 questions in — this is where most students slow down. Take one deep breath before the next question."
-- Plan your energy: questions 1-15 (fresh), 16-30 (steady), 31-40 (push through)
-- If you feel stuck, skip immediately — don't waste energy on one question when fresh thinking could get you 3 easier ones
+---
 
-### Writing (1 Question / 30 Minutes / 25%)
+## Section 4: Writing (1Q / 30 min / 25%)
 
-**This section does not exist in OC and is the major differentiator.**
+Writing is the critical new section. At 25% weight, it equals any MCQ section. For borderline candidates, Writing is often the deciding factor.
 
-**Writing is assessed on 6 criteria:**
+### The Four Writing Types
 
-| Criterion | Weight | What Markers Look For |
-|-----------|--------|----------------------|
-| **Ideas & Content** | High | Depth, originality, relevance to prompt, development |
-| **Structure** | High | Organisation, paragraphing, cohesion, transitions |
-| **Language** | Medium-High | Vocabulary range, sentence variety, literary techniques |
-| **Conventions** | Medium | Spelling, grammar, punctuation |
-| **Audience & Purpose** | Medium | Reader awareness, appropriate voice and register |
-| **Engagement** | Medium | Compelling opening, sustained interest, satisfying ending |
-
-**The Four Writing Types:**
+Students must be prepared for any prompt type:
 
 #### Narrative Writing
-- Tells a story with characters, setting, conflict, resolution
-- Structure: orientation → complication → climax → resolution
-- Key techniques: show-don't-tell, dialogue, sensory detail, figurative language
-- Common weakness: "and then... and then..." flat narration without tension
-
-**Coaching prompts:**
-- "Your story needs a PROBLEM. What goes wrong for your character? That's what makes it interesting."
-- "Instead of saying 'She was scared,' can you SHOW me she was scared? What does her body do? What does she see and hear?"
-- "Your ending resolves the problem, but does it feel satisfying? Does the character learn or change?"
+- **Goal:** Tell a compelling story with characters, setting, conflict, resolution
+- **Structure:** Hook → Rising action → Climax → Resolution
+- **Key techniques:** Show-don't-tell, dialogue, sensory detail, figurative language
+- **Common pitfall:** "And then... and then..." flat narration without tension
+- **Coaching:**
+  ```
+  "Instead of 'She was scared,' SHOW me what scared looks like.
+   What does her body do? What does she hear? How does her stomach feel?"
+  ```
 
 #### Persuasive Writing
-- Argues a position with evidence and reasoning
-- Structure: thesis → argument 1 → argument 2 → counterargument → rebuttal → conclusion
-- Key techniques: rhetorical questions, statistics/evidence, emotive language, expert opinion
-- Common weakness: stating opinions without supporting evidence
-
-**Coaching prompts:**
-- "You've said [X] is important. But WHY? Give me a reason. Now give me another one."
-- "A strong argument also addresses the other side. What would someone who disagrees say? How would you respond?"
-- "Your conclusion should do more than repeat your introduction. What's the strongest single sentence you can end with?"
+- **Goal:** Argue a position convincingly with evidence and logic
+- **Structure:** Thesis → Argument 1 (strongest) → Argument 2 → Counterargument & rebuttal → Conclusion
+- **Key techniques:** Rhetorical questions, evidence/statistics, emotive language, expert opinion
+- **Common pitfall:** Stating opinions without supporting evidence
+- **Coaching:**
+  ```
+  "You said 'homework should be banned.' That's your opinion. Now CONVINCE me.
+   Give me a reason. Then give me evidence for that reason."
+  ```
 
 #### Descriptive Writing
-- Creates a vivid picture using sensory language
-- Structure: establish setting → zoom in on details → create atmosphere → leave an impression
-- Key techniques: five senses, figurative language (simile, metaphor, personification), precise word choice
-- Common weakness: telling instead of describing ("It was pretty" vs. "Sunlight fractured through the stained glass...")
-
-**Coaching prompts:**
-- "You've described what you can SEE. What about the other senses? What would you HEAR? SMELL?"
-- "The word 'nice' doesn't paint a picture. Can you find a more specific, interesting word?"
-- "Read your first sentence. Does it make me want to keep reading? A great description hooks you immediately."
+- **Goal:** Create a vivid, immersive picture using sensory language
+- **Structure:** Opening image → Layers of detail → Mood/atmosphere → Closing image
+- **Key techniques:** Five senses, figurative language (simile, metaphor, personification), precise word choice
+- **Common pitfall:** Telling instead of describing ("It was pretty" vs "Sunlight fractured through the stained glass...")
+- **Coaching:**
+  ```
+  "Close your eyes and imagine the scene. What do you see first?
+   What do you hear? What does the air smell like?
+   Write what your senses tell you."
+  ```
 
 #### Reflective Writing
-- Explores personal thoughts, feelings, and meaning from experiences
-- Structure: describe the experience → explore feelings → draw broader insight → conclude with what was learned
-- Key techniques: honest introspection, connection to universal themes, showing vulnerability
-- Common weakness: recounting events without reflecting on their significance
+- **Goal:** Explore personal thoughts and connect experience to broader themes
+- **Structure:** Experience → Thoughts/feelings → Deeper insight → What was learned
+- **Key techniques:** Honest introspection, universal themes, showing vulnerability
+- **Common pitfall:** Recounting events without reflecting on their significance
+- **Coaching:**
+  ```
+  "You told me WHAT happened. Now tell me what it MEANT to you.
+   How did it change the way you think?"
+  ```
 
-**Coaching prompts:**
-- "You've told me WHAT happened. Now tell me what it MEANT to you. How did it change how you think?"
-- "Can you connect your personal experience to something bigger? Does it say something about friendship, growing up, or overcoming fear?"
-- "The most powerful reflective writing is honest. You don't have to have a perfect lesson — sometimes the learning is still happening."
+### Writing Assessment Rubric (6 Criteria)
 
-**Writing Time Management (30 minutes):**
+| # | Criterion | What Markers Look For | Common Issues | Feedback Focus |
+|---|---|---|---|---|
+| 1 | **Ideas & Content** | Depth of thinking, originality, relevance, development of ideas | Surface-level ideas, lack of detail | "Your idea is interesting — now go deeper. What happens if we explore this?" |
+| 2 | **Structure** | Logical organisation, paragraphing, cohesion, effective transitions | No paragraphs, random ordering, abrupt ending | "Let's plan before writing. 3 dot points: beginning, middle, end." |
+| 3 | **Language** | Vocabulary range, sentence variety, literary techniques | Simple repetitive sentences, overused words | "You wrote 'nice' three times. What other words could describe this?" |
+| 4 | **Conventions** | Spelling accuracy, grammar, punctuation | Spelling errors, run-on sentences, missing commas | "Read this sentence aloud. Does it sound right? Where would you pause?" |
+| 5 | **Audience & Purpose** | Reader awareness, appropriate voice, consistent register | Inconsistent tone, forgetting the reader | "Who is reading this? How do you want them to feel?" |
+| 6 | **Engagement** | Compelling hook, sustained interest, satisfying ending | Flat opening, trailing off | "Your first sentence is the most important. It needs to grab the reader." |
+
+### Writing Feedback Approach
+
+Use the **2+1+1 pattern** — structured and encouraging:
 
 ```
-Minutes 1-3:   READ the prompt carefully. Decide the writing type.
-               PLAN: 5-6 dot points for your structure.
+1. TWO specific strengths (with quotes from the student's writing)
+   "Your opening line — 'The door groaned like an old man' — is brilliant
+    personification. And your dialogue in paragraph 3 feels natural."
 
-Minutes 3-5:   Write your OPENING — make it strong. Hook the reader.
+2. ONE priority area for improvement (with a specific suggestion)
+   "The ending feels rushed — only one sentence. Can you add 2-3 more
+    sentences showing how the character felt after everything that happened?"
 
-Minutes 5-23:  Write the body. Follow your plan. Don't stop to edit.
+3. ONE stretch challenge (for next time)
+   "Next time, try varying your sentence lengths. Mix short punchy sentences
+    with longer flowing ones. It creates rhythm."
+```
+
+**Never do:**
+- List every spelling mistake (focus on patterns, not individual errors)
+- Rewrite the student's work for them
+- Compare to other students' writing
+- Say "this is wrong" without explaining why or how to improve
+
+### Writing Time Management (30 Minutes)
+
+```
+Minutes 1-3:   READ the prompt carefully. Decide writing type.
+               PLAN: 5-6 dot points for structure.
+               Note 3-5 strong vocabulary words to use.
+
+Minutes 3-25:  WRITE the piece following the plan.
+               Don't stop to edit — keep moving forward.
                Aim for 350-500 words.
 
-Minutes 23-27: Write your ENDING — don't rush it.
-               The ending is what markers remember.
-
-Minutes 27-30: RE-READ and edit:
+Minutes 25-30: RE-READ and edit:
                - Fix spelling mistakes
                - Check paragraph breaks
                - Strengthen one weak sentence
-               - Make sure the ending works
+               - Make sure the ending is complete and satisfying
 ```
 
-**The single biggest Writing mistake:** Diving in without a plan, writing freely until time runs out, and submitting a piece with no ending. **ALWAYS plan. ALWAYS leave time for an ending.**
+**Planning template (teach students to use this):**
+
+```
+Prompt: [what the question asks]
+Type: [narrative / persuasive / descriptive / reflective]
+Main idea: [one sentence]
+Beginning: [what happens first / opening hook]
+Middle: [key events / arguments / details]
+End: [resolution / conclusion / final image]
+Key words: [3-5 strong vocabulary words to use]
+```
+
+**The single biggest Writing mistake:** Diving in without planning, writing freely until time runs out, submitting with no ending. **ALWAYS plan. ALWAYS leave time for an ending.**
 
 ---
 
-## Writing Feedback Framework
+## Test Stamina (155 Minutes)
 
-When reviewing a student's writing, provide structured feedback across all 6 criteria. Use this format:
+### Stamina Strategies
+
+1. **Break utilisation:** Use breaks between sections to reset — deep breaths, stretch, refocus
+2. **Energy management:** Reading and Writing are the most cognitively demanding
+3. **Practice full-length:** Experience the full 155 minutes at least 3-4 times before the real test
+4. **Build up gradually:** 90 min → 120 min → 155 min mock tests
+
+### Performance Fade Detection
 
 ```
-## Writing Feedback: [Prompt topic]
-
-**Overall impression:** [1-2 sentences on the piece as a whole]
-
-### Strengths ✓
-- [Specific strength with a quote from the text]
-- [Another specific strength]
-
-### Growth Areas →
-1. **[Criterion]:** [Specific, actionable feedback]
-   - Current: "[Quote from their writing]"
-   - Suggestion: "[How it could be improved]"
-
-2. **[Criterion]:** [Specific, actionable feedback]
-   - Current: "[Quote from their writing]"
-   - Suggestion: "[How it could be improved]"
-
-### One Thing to Focus On Next Time
-[Single, clear, memorable takeaway]
+IF accuracy_first_half > accuracy_second_half by > 15%:
+  → Student shows significant fatigue
+  → Strategies:
+    - Practise back-half sections in isolation
+    - Build up duration gradually
+    - Ensure good sleep, nutrition, hydration
+    - Teach mental reset technique between sections
 ```
-
-**Writing feedback principles:**
-- Always find at least 2 genuine strengths before discussing improvements
-- Quote directly from the student's writing (shows you actually read it)
-- Limit growth areas to 2-3 (not overwhelming — improvement is incremental)
-- Provide concrete "before and after" examples
-- End with ONE actionable focus point for next time
-- Use Opus model for Writing feedback (requires nuanced analysis)
 
 ---
 
-## Selective-Specific Test Strategy
+## OC → Selective Transition
 
-### Score Optimisation Across 4 Sections
+### What Carries Over
+- All MCQ strategies from Reading, Math, and Thinking
+- Error pattern awareness and self-correction habits
+- Time management fundamentals
+- Test-taking confidence
 
-With 4 sections at 25% each, students should think strategically about where to invest preparation effort:
+### What Changes
+- Section weighting: 33.3% → 25% per section
+- New section: Writing (25%)
+- Higher difficulty across all MCQ sections
+- Longer test: 110 → 155 minutes
+- More Thinking questions: 30 → 40
+
+### Transition Coaching
 
 ```
-If current scores are:
-  Reading: 75%   Math: 80%   Thinking: 55%   Writing: 60%
-
-The highest-ROI investment is:
-  1. Thinking Skills (lowest score, most room to gain)
-  2. Writing (undertrained area, high improvement potential)
-  3. Reading (solid foundation, targeted sub-skill work)
-  4. Math (already strong, maintain with light practice)
+"You already know how to do well on Reading, Math, and Thinking from OC.
+ Those skills carry over directly. The biggest change is Writing — it's
+ brand new and worth 25% of your score. We'll start building Writing skills
+ alongside maintaining everything you've already learned."
 ```
 
-### The Writing Advantage
+### Recommended Transition Schedule
 
-Many students preparing for Selective neglect Writing because:
-- OC test doesn't have it (so Writing practice starts late)
-- It's harder to practise alone (needs feedback)
-- MCQ prep feels more "productive" (immediate right/wrong feedback)
+```
+First 4 weeks:
+  40% Writing (intensive ramp-up from scratch)
+  20% Reading (adapt to harder passages)
+  20% Math (level up to harder problems)
+  20% Thinking (adjust to 40-question pace)
 
-This creates an opportunity: students who invest in Writing can gain a significant competitive edge because the field is weaker in this area overall.
+Weeks 5-12:
+  30% Writing (continued development)
+  25% weakest MCQ section
+  25% second weakest MCQ section
+  20% strongest MCQ section (maintenance)
+
+Final 4 weeks before test:
+  25% each section (balanced)
+  Full-length timed mock tests weekly
+  Writing under timed conditions every session
+```
 
 ---
 
-## OC → Selective Transition Guidance
+## Writing Practice Variations
 
-When a student transitions from OC Prep:
-
-1. **Acknowledge what carries over:**
-   "Great news — everything you learned for the OC test still applies. Reading, Math, and Thinking Skills are all part of the Selective test too. You have a strong foundation."
-
-2. **Introduce what's new:**
-   "The big change is WRITING — it counts for 25% of your Selective score. We'll need to start building that skill. The other sections are also a bit harder and longer."
-
-3. **Adjust expectations:**
-   "The Selective test is designed for Year 6 students who have had 2 more years of learning. Your OC-level scores are a starting point — they'll improve as we work through harder material."
-
-4. **Start Writing early:**
-   "Let's not wait to start Writing practice. Even one piece per week will build your confidence. We'll try different types — narrative, persuasive, descriptive, reflective."
+| Exercise | Duration | Focus |
+|---|---|---|
+| Full piece (plan → write → review) | 30 min | Complete writing under test conditions |
+| Opening paragraph only | 10 min | Hook writing, first impressions |
+| Planning drill | 5 min | Speed planning from prompt to dot points |
+| Vocabulary building | 10 min | Collect strong words for specific themes |
+| Editing exercise | 15 min | Improve a draft piece (own or provided) |
+| Prompt type identification | 5 min | Read 5 prompts, identify the writing type required |
 
 ---
 
-## Common Pitfalls — Selective Specific
+## Adapting to the Student (Selective)
 
-| Pitfall | Section | Coaching Response |
-|---------|---------|-------------------|
-| Ignoring Writing prep | Writing | "Writing is 25% of your score — the same as Math. Would you skip Math practice? Let's treat Writing the same way." |
-| OC-level time expectations | All | "The Selective test is longer — 155 minutes total. We need to build your stamina. Let's practise sitting through a full mock test." |
-| Same difficulty level as OC | All | "These questions are harder than what you saw in OC. That's expected — you've grown as a learner. Let's tackle the challenge." |
-| Writing without planning | Writing | "I noticed you started writing immediately. Next time, spend 3 minutes making a plan. It saves time overall and makes your writing much stronger." |
-| Incomplete Writing piece | Writing | "Running out of time is the #1 Writing mistake. Always plan your ending BEFORE you start writing. A complete short piece beats an incomplete long one." |
+```
+IF writing.mastery is null (new to Writing):
+  → Start with basics: What is a paragraph? What makes a good opening?
+  → Focus on Structure first — ideas and language come after
+  → Use 2+1+1 feedback very gently
+
+IF writing.mastery < 0.40:
+  → Focus on Structure and Conventions (most teachable)
+  → Provide templates and planning frameworks
+  → Celebrate any complete piece with beginning, middle, and end
+
+IF writing.mastery 0.40-0.65:
+  → Push on Language and Ideas (higher-order criteria)
+  → Introduce literary techniques: simile, metaphor, personification
+  → Challenge: "Rewrite this paragraph using more vivid language"
+
+IF writing.mastery > 0.65:
+  → Focus on Engagement and Audience (polish criteria)
+  → Work on voice consistency and stylistic choices
+  → Introduce time pressure — write to the 30-minute clock
+```
 
 ---
 
 ## Integration Points
 
-- **Error classification:** Use `diagnostic` skill pack for per-question analysis
-- **Study planning:** Use `study-planner` skill pack — must include Writing time allocation
-- **Parent communication:** Use `parent-advisor` skill pack when discussing Selective strategy with parents
-- **Writing feedback:** Route to Opus model for detailed Writing assessment
-- **OC foundation:** Reference `oc-prep` skill pack for base strategies that carry over
+- **Error classification:** Use `diagnostic` skill for per-question analysis
+- **Study planning:** Use `study-planner` — must include Writing time allocation
+- **Parent communication:** Use `parent-advisor` for Selective strategy discussions
+- **Writing feedback:** Route to Opus model for detailed multi-criteria assessment
+- **OC foundation:** Reference `oc-prep` skill for base strategies that carry over
+
+---
+
+## Input Validation & Safety
+
+### Max Input Sizes
+
+| Input | Limit | Rejection Behaviour |
+|-------|-------|---------------------|
+| Student message length | 2,000 chars | Truncate to 2,000; warn student to shorten |
+| Writing submission text | 5,000 chars | Hard limit (~800 words); reject above with clear message |
+| Questions per practice session | 100 max | Cap at 100; inform student session is full |
+| Question text/stem (Reading passages) | 8,000 chars | Accept (Selective passages are longer than OC) |
+| Answer options per MCQ question | 10 max | Reject if >10; likely malformed data |
+| Session metadata JSON | 10 KB | Reject; return `INVALID_INPUT` error |
+
+### Required Fields Validation
+
+Before starting any Selective practice session, validate:
+
+```
+REQUIRED:
+  - student_id: non-empty string, valid UUID format
+  - active_stage: must be "selective_prep"
+  - session context must include at least one of:
+    - subject: must be one of ["reading", "math", "thinking", "writing"]
+    - OR: free-form question (Socratic mode)
+
+VALIDATION for Writing submissions:
+  - text: non-empty string, 1-5,000 chars
+  - prompt_type: must be one of ["narrative", "persuasive", "descriptive", "reflective"]
+    (if not provided, agent identifies from content — no hard rejection)
+  - word_count: calculated server-side, logged for analytics
+
+VALIDATION for MCQ practice:
+  - Same as oc-prep skill (question_id, subject, type, options, correct_answer)
+  - subject: must include "writing" as a valid option (unlike OC)
+
+ON VALIDATION FAILURE:
+  - Return structured error (see format below)
+  - Log: { event: "input_validation_failed", student_id, invalid_fields }
+  - Do NOT serve malformed questions or process invalid Writing submissions
+```
+
+### Rate Limits
+
+| Operation | Limit | Enforcement |
+|-----------|-------|-------------|
+| Tool calls per turn | 10 max | Agent framework enforces; excess calls queued |
+| Timeout per tool call | 30 seconds | Hard timeout; return partial result or error |
+| Student messages per session | 200 max | Warn at 180; close session at 200 |
+| Writing feedback requests per session | 5 max | Opus calls are expensive; cap usage |
+| LTM writes per session | 20 max | Prevents memory flooding |
+| Question generation calls per session | 15 max | Prevents runaway model costs |
+
+### Error Response Format
+
+All validation errors return a consistent structure:
+
+```json
+{
+  "error": "VALIDATION_FAILED",
+  "code": "SELECTIVE_PREP_INVALID_INPUT",
+  "fields": [
+    { "field": "writing.text", "reason": "exceeds 5,000 char limit (received: 6,243)" },
+    { "field": "active_stage", "reason": "expected 'selective_prep', got 'oc_prep'" }
+  ],
+  "message": "Selective prep session rejected: 2 validation errors found.",
+  "request_id": "req_abc123",
+  "timestamp": "2026-04-06T10:30:00Z"
+}
