@@ -56,7 +56,18 @@ export interface QuestionOption {
 export interface MemoryRecord {
   content: string;
   namespace: string;
-  metadata: Record<string, any>;
+  metadata: MemoryMetadata & Record<string, any>;
+}
+
+export interface MemoryMetadata {
+  stage?: 'oc_prep' | 'selective_prep';
+  subject?: 'reading' | 'math' | 'thinking' | 'writing';
+  skill?: string;
+  error_type?: 'concept_gap' | 'careless' | 'time_pressure' | 'misread' | 'elimination_failure';
+  cognitive_depth?: 1 | 2 | 3 | 4;
+  session_id?: string;
+  timestamp?: string;
+  confidence?: number;
 }
 
 export interface GuardrailResult {
@@ -83,6 +94,7 @@ export interface AgentPayload {
   studentId?: string;
   studentName?: string;
   questionId?: string;
+  stage?: 'oc_prep' | 'selective_prep';
   children?: ChildInfo[];
   conversationHistory?: ConversationMessage[];
 }
@@ -91,6 +103,9 @@ export interface ChildInfo {
   id: string;
   name: string;
   gradeLevel?: number;
+  familyId?: string;
+  chineseName?: string;
+  nickname?: string;
 }
 
 export interface ConversationMessage {

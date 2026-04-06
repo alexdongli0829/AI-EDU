@@ -1,6 +1,7 @@
 /**
  * Input guardrails — validates user messages before sending to the agent.
- * Blocks medical/psychological content, inappropriate language, off-topic, and overly long messages.
+ * Blocks medical/psychological content, inappropriate language, off-topic,
+ * admission prediction requests, and overly long messages.
  */
 
 import { GuardrailResult } from '../shared/types.js';
@@ -20,17 +21,28 @@ const INAPPROPRIATE_PATTERNS = [
   /\b(sex|porn|nude|naked)\b/i,
 ];
 
+// Admission prediction request patterns — redirect without blocking
+const ADMISSION_PREDICTION_PATTERNS = [
+  /will (my child|he|she|they) (get into|make it|be accepted|be selected)/i,
+  /what (score|mark) (does|do) (my child|he|she|they) need to get into/i,
+  /chance.{0,20}(getting in|accepted|selected|admission)/i,
+  /guarantee.{0,20}(place|spot|entry|admission)/i,
+  /predict.{0,20}(result|outcome|admission|placement)/i,
+];
+
 // Educational topic indicators
 const EDUCATIONAL_KEYWORDS = [
-  'test', 'score', 'math', 'reading', 'thinking', 'practice', 'study',
+  'test', 'score', 'math', 'reading', 'thinking', 'writing', 'practice', 'study',
   'learn', 'exam', 'question', 'homework', 'school', 'grade', 'skill',
   'mastery', 'tutor', 'performance', 'improve', 'weakness', 'strength',
   'subject', 'pattern', 'vocabulary', 'inference', 'geometry', 'fraction',
   'spatial', 'oc', 'selective', 'mia', 'result', 'time', 'speed', 'error',
   'mistake', 'focus', 'prepare', 'preparation', 'rushing', 'stamina',
   'progress', 'how is', 'how are', 'what should', 'report', 'analyse',
-  'analyze', 'chinese',
-  '她', '他', '数学', '成绩', '考试', '学习', '练习', '阅读',
+  'analyze', 'chinese', 'plan', 'strategy', 'review', 'mock', 'stage',
+  'writing', 'narrative', 'persuasive', 'spelling', 'grammar',
+  'james ruse', 'north sydney', 'kogarah', 'hornsby', 'opportunity class',
+  '她', '他', '数学', '成绩', '考试', '学习', '练习', '阅读', '写作',
 ];
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -67,7 +79,23 @@ export function checkInputGuardrails(message: string): GuardrailResult {
     }
   }
 
-  // Rule 3: Message too long → ask to shorten
+  // Rule 3: Admission prediction requests → soft redirect (not blocked, but flagged)
+  for (const pattern of ADMISSION_PREDICTION_PATTERNS) {
+    if (pattern.test(message)) {
+      return {
+        blocked: false,
+        reason: 'admission_prediction_redirect',
+        redirect_message: (
+          'I can\'t predict specific admission outcomes because cut-off scores change each year ' +
+          'based on the applicant pool. What I can do is show you where your child\'s current ' +
+          'performance sits relative to the skill levels that typically correspond to different ' +
+          'school tiers. Would you like me to break that down?'
+        ),
+      };
+    }
+  }
+
+  // Rule 4: Message too long → ask to shorten
   if (message.length > MAX_MESSAGE_LENGTH) {
     return {
       blocked: true,
@@ -80,7 +108,7 @@ export function checkInputGuardrails(message: string): GuardrailResult {
     };
   }
 
-  // Rule 4: Off-topic detection (only for messages with 3+ words)
+  // Rule 5: Off-topic detection (only for messages with 3+ words)
   const words = message.trim().split(/\s+/);
   if (words.length >= 3) {
     const hasEducational = EDUCATIONAL_KEYWORDS.some(kw => lower.includes(kw));
