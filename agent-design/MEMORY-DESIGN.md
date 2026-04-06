@@ -160,9 +160,25 @@ Using `/students/{id}/learning/oc_prep/reading/` would create deep, fragmented n
 - Make the OC → Selective transition harder (data lives in different trees)
 
 With flat namespaces + rich metadata:
-- Single retrieval call with metadata filters covers any query
-- Cross-stage queries are trivial: filter by `stage` or omit the filter entirely
+- Single retrieval call returns all student data; application-layer metadata filter narrows to specific stage/subject
+- Cross-stage queries are trivial: omit the metadata filter entirely
 - OC → Selective transition requires zero data migration
+
+> **⚠️ Implementation Note:** AgentCore's `RetrieveMemoryRecordsCommand` `filter` parameter currently **only supports namespace prefix filtering**, NOT native key-value metadata filtering. Metadata-based filtering (e.g., `stage=oc_prep`, `subject=reading`) must be implemented as **client-side post-retrieval filtering** in the application layer. Retrieve by namespace prefix → filter results in code by metadata fields.
+>
+> ```typescript
+> // Retrieve all learning records for student, then filter in application
+> const allRecords = await retrieveMemoryRecords({
+>   query: parentQuestion,
+>   namespace: `/students/${studentId}/learning/`,
+>   maxResults: 20,  // over-fetch to allow for post-filter reduction
+> });
+> // Application-layer metadata filter
+> const filtered = allRecords.filter(r =>
+>   r.metadata?.stage === activeStage &&
+>   r.metadata?.subject === targetSubject
+> );
+> ```
 
 ### Namespace Contents
 
@@ -208,6 +224,18 @@ Contains parent-facing context and preferences:
 ---
 
 ## 3. LTM Strategy Configuration
+
+### Design Decision: Custom Extraction vs Built-in LTM Strategies
+
+> **Decision:** EduLens uses a **custom extraction pipeline** (SQS → Lambda) rather than AgentCore's built-in LTM strategies (`summaryMemoryStrategy`, `semanticMemoryStrategy`).
+>
+> **Rationale:**
+> 1. **Structured metadata auto-tagging** — We need every LTM record tagged with `stage`, `subject`, `skill`, `error_type`, and `cognitive_depth`. Built-in strategies do not support custom metadata injection during extraction.
+> 2. **Deduplication control** — We require semantic similarity deduplication (threshold 0.92) to prevent redundant Learning DNA entries. Built-in strategies do not expose dedup configuration.
+> 3. **Learning DNA integration** — LTM extraction must trigger Learning DNA updates (skill mastery recalculation, error pattern redistribution). This requires application-level coordination that built-in strategies cannot provide.
+> 4. **Multi-source extraction** — We extract from both conversation sessions AND test result analysis, each with different extraction prompts. Built-in strategies assume a single extraction pattern.
+>
+> **Trade-off:** Higher implementation cost, but essential for EduLens's core differentiator (structured diagnostic intelligence). Revisit if AgentCore adds custom metadata support to built-in strategies.
 
 ### Extraction Rules
 
@@ -277,6 +305,11 @@ Lambda: edulens-memory-extractor
   │
   ├── 5. Deduplicate against existing LTM entries
   │      (semantic similarity > 0.92 → merge)
+  │      NOTE: AgentCore does NOT have built-in dedup.
+  │      Implementation: Retrieve existing entries for same namespace →
+  │      compute embedding similarity (Titan Embeddings v2) →
+  │      if similarity > 0.92 → merge metadata, keep latest content.
+  │      Requires: additional Lambda + Bedrock Titan Embeddings calls.
   │
   ├── 6. Write new/merged entries to LTM via AgentCore API
   │

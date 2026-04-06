@@ -151,7 +151,11 @@ When a parent sends a message, the system must determine which child is being di
 ```
 1. LOAD    family context
            ├── Family ID, parent name, language preference
-           └── Children roster: [{student_id, name, stage, grade}]
+           ├── Children roster: [{student_id, name, chinese_name, nickname, stage, grade}]
+           └── SOURCE: Application DB (students table JOIN users),
+               NOT AgentCore Memory. Loaded by Lambda and injected
+               as session initialization parameter into Agent prompt.
+               This ensures name→student_id mapping is always fresh.
 
 2. NLU     Identify which child is being discussed (Rules 1-4 above)
 
@@ -448,3 +452,17 @@ Multiple skill packs can be active simultaneously. For example, a parent asking 
 - ✅ Log: session IDs, model calls, latency, error codes, feature flags
 - ❌ Never log: student names, parent messages, conversation content, PII
 - ⚠️ Redact before logging: any field that could contain user-generated content
+
+---
+
+## 11. Existing Code Compatibility Notes
+
+These changes are needed in the existing `feat/ai-chatbot-redesign` branch:
+
+| File | Change Required |
+|------|----------------|
+| `edulens-backend/services/conversation-engine/src/lib/agentcore.ts` | Add `stage` field to `invokeAgent` payload so agent knows current OC vs Selective context |
+| `edulens-backend/agents/shared/agentcore-memory-client.ts` | Extend `retrieveMemoryRecords` return parsing to include `metadata` fields for client-side filtering |
+| `prototype/edulens-agent/src/memory/agentcore-memory.ts` | Update mock data with multi-child family scenarios and stage-aware namespace patterns |
+| `edulens-infrastructure/lib/stacks/agentcore-stack.ts` | Update Memory namespace config if hierarchical namespace support is available |
+| Cedar Policy | New — create policy for cross-student retrieve blocking (not yet in branch) |

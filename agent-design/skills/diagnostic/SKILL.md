@@ -242,6 +242,18 @@ Consider these signals:
 - Whether similar skill questions were correct elsewhere
 ```
 
+### Confidence Calibration (Post-Processing)
+
+LLM self-reported confidence scores tend to be overestimated. Apply these calibration rules in the extraction Lambda (post-Haiku classification):
+
+| Signal Pattern | Calibrated Confidence | Rationale |
+|---|---|---|
+| **3+ signals consistently point to the same error type** | `≥ 0.8` | High agreement across independent signals |
+| **2 signals agree, 1 neutral** | `0.65 - 0.79` | Moderate agreement |
+| **Signals contradict** (e.g., time_spent suggests time_pressure but question is in first third of section) | **Cap at 0.6** | Conflicting evidence — classification uncertain |
+| **Only 1 signal available** (e.g., no time data) | **Cap at 0.5** | Insufficient evidence for high confidence |
+| **Question was skipped entirely** | Set error_type to `time_pressure`, confidence `0.7` | Skipping is unambiguous signal |
+
 ---
 
 ## Webb's Cognitive Depth Tagging
