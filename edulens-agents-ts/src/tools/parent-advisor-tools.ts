@@ -10,6 +10,14 @@ import { MOCK_STUDENT } from './mock-data.js';
  * Get the student's Learning DNA overview including mastery level, strengths, weaknesses, and recent trends.
  */
 export function queryStudentProfile(studentId: string): string {
+  // Only return data for known mock student — unknown students get empty results
+  if (studentId !== MOCK_STUDENT.studentId && studentId !== 'stu_emily') {
+    return JSON.stringify({
+      studentId,
+      error: 'no_data',
+      message: 'No test data available for this student yet. They may need to complete their first practice test.',
+    }, null, 2);
+  }
   const s = MOCK_STUDENT;
   const history = s.testHistory;
 
@@ -37,6 +45,14 @@ export function queryStudentProfile(studentId: string): string {
  * Get recent test scores and details for a student.
  */
 export function queryTestResults(studentId: string, limit = 5): string {
+  if (studentId !== MOCK_STUDENT.studentId && studentId !== 'stu_emily') {
+    return JSON.stringify({
+      studentName: 'Unknown',
+      testCount: 0,
+      tests: [],
+      message: 'No test history available for this student yet.',
+    }, null, 2);
+  }
   const tests = MOCK_STUDENT.testHistory.slice(0, limit);
 
   return JSON.stringify({
@@ -54,6 +70,14 @@ export function queryTestResults(studentId: string, limit = 5): string {
  * Get per-skill mastery percentages for a given subject.
  */
 export function querySkillBreakdown(studentId: string, subject: string): string {
+  if (studentId !== MOCK_STUDENT.studentId && studentId !== 'stu_emily') {
+    return JSON.stringify({
+      studentName: 'Unknown',
+      subject,
+      skills: [],
+      message: 'No skill data available for this student yet.',
+    }, null, 2);
+  }
   const breakdown = MOCK_STUDENT.skillBreakdown[subject] || {};
   const skills = [];
 
