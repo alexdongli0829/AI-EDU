@@ -260,7 +260,11 @@ export class GuardrailHook {
       /\[?\s*(?:system|assistant|user)\s*\]?\s*:/i,
       /pretend\s+(?:you are|to be)/i,
       /roleplay\s+(?:as|being)/i,
-      /act\s+like\s+you\s+(?:are|were)/i
+      /act\s+like\s+you\s+(?:are|were)/i,
+      // SQL injection patterns
+      /(?:drop|delete|truncate|alter|update|insert)\s+(?:table|database|from|into)/i,
+      /(?:union\s+select|or\s+1\s*=\s*1|'\s*;\s*--)/i,
+      /(?:exec|execute)\s*\(/i
     ];
 
     for (const pattern of injectionPatterns) {
