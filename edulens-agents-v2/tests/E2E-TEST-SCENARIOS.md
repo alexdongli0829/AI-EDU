@@ -229,10 +229,167 @@ For each scenario:
    - Response time <10s for Haiku, <15s for Sonnet
 4. Record results in a test report
 
+---
+
+## Category F: Real Exam Alignment (Hard)
+
+These scenarios test whether the agent actually understands NSW OC/Selective exam specifics.
+
+### F1: OC Exam Format Awareness (Student Tutor, 2 turns)
+**Student**: Mia Chen (stu-001), OC prep
+
+| Turn | Student says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "How many questions are in the math section?" | Agent should know: OC Math = 35 questions in 40 minutes. Should mention time strategy: roughly 1 min per question. Should redirect back to current question. |
+| 2 | "I always run out of time on reading" | Agent uses `query_time_behavior` data. Notes rushing indicator (35%) and stamina curve (declining). Gives specific strategy: "Skip hard questions after 30 seconds, come back at the end." |
+
+**Verify**:
+- Agent knows real OC exam format (Reading 40Q/30min, Math 35Q/40min, Thinking 40Q/40min)
+- Gives time-management advice grounded in the student's actual data
+- Doesn't make up exam details
+
+### F2: Selective vs OC Stage Awareness (Parent Advisor, 2 turns)
+**Parent**: role=parent, children=[stu-002 (Liam, OC prep), stu-003 (Aisha, OC prep)]
+
+| Turn | Parent says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "Liam is doing well in OC prep. Should we also prepare for Selective?" | Agent explains key differences: Selective adds a Writing component (25% of score), has 4 sections not 3, is for Year 6 entry to Year 7. Liam is currently Year 4 so OC is the right focus now. |
+| 2 | "What would Selective prep look like differently?" | Agent describes: Writing is 30 minutes, persuasive/narrative, and is human-marked. Suggests starting creative writing practice in Year 5 to prepare. |
+
+**Verify**:
+- Agent knows OC = 3 sections, Selective = 4 sections (+ Writing)
+- Gives age-appropriate advice (Year 4 = OC focus)
+- Doesn't confuse OC and Selective formats
+
+### F3: Vocabulary Cloze — New 2026 Format (Student Tutor, 2 turns)
+**Student**: Liam Park (stu-002), weak at reading.vocabulary (55%)
+**Question**: q-r-005 (vocabulary question — "abundant" = "plentiful")
+
+| Turn | Student says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "I picked C because tomatoes are expensive" | Agent guides: "I can see why you thought of cost. But the sentence says there was an abundant SUPPLY. When you have a lot of something, what word describes that?" |
+| 2 | "A lot... so plentiful?" | Agent confirms. Then teaches strategy: "On vocab questions, always re-read the sentence with your answer plugged in. Does 'the garden had a plentiful supply' make sense? Yes!" |
+
+**Verify**:
+- Agent teaches test-taking strategy (plug-in method), not just the answer
+- Strategy is reusable for future questions
+- Language matches Liam's level
+
+---
+
+## Category G: Realistic Parent Scenarios (Hard)
+
+Based on real parent pain points in the NSW OC/Selective ecosystem.
+
+### G1: Tiger Parent — Excessive Pressure (3 turns)
+**Parent**: role=parent, children=[stu-004 (Oliver Smith, 55% mastery)]
+
+| Turn | Parent says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "Oliver needs to get into OC. I've enrolled him in 3 tutoring centres. He studies 2 hours every night. Why isn't he improving faster?" | Agent acknowledges the effort. Gently introduces concern: "2 hours nightly is a lot for a Year 4 student. Research shows shorter, focused sessions (20-30 min) are more effective at this age." Doesn't judge parenting. Shows Oliver IS improving (48→58%). |
+| 2 | "But all his friends are studying more. He needs to keep up." | Agent avoids comparison. "Every child learns at their own pace. Oliver's improvement of 10 percentage points in 6 weeks is solid progress. The key is quality of practice, not quantity." |
+| 3 | "What if he doesn't get in?" | Agent provides perspective without being dismissive: "OC placement isn't the only path to academic success. But based on Oliver's trajectory, with focused practice on his weakest areas [cites data], he has room to improve significantly. Let's focus on what's in our control." |
+
+**Verify**:
+- Agent handles pressure without being preachy
+- Cites actual data (improvement trend)
+- Doesn't compare to other students
+- Balances realism with encouragement
+- Doesn't say "he will/won't get in"
+
+### G2: Disengaged Parent — Minimal Context (2 turns)
+**Parent**: role=parent, children=[stu-005 (Sophie Liu, 90% mastery)]
+
+| Turn | Parent says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "How's Sophie" | Very short message. Agent shouldn't ask 10 clarifying questions. Should interpret as "give me an overview" and provide one. Sophie is doing great — 90%, improving. Mention her one weak area (spatial 65%) and 1-2 suggestions. Keep it brief. |
+| 2 | "ok" | Agent doesn't force conversation. A brief "Happy to help anytime! Let me know if you'd like more detail on any area." is fine. Doesn't dump more data. |
+
+**Verify**:
+- Agent reads the room — short messages = wants brief responses
+- Doesn't overload a disengaged parent
+- Still provides value in a concise format
+
+### G3: Anxious Parent — Emotional Support Needed (3 turns)
+**Parent**: role=parent, children=[stu-001 (Mia Chen)]
+
+| Turn | Parent says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "I feel like I'm failing Mia. Other parents seem to have it all figured out." | Agent recognizes emotional distress. Validates: "Preparing for OC is stressful for parents too. The fact that you're here looking at Mia's data shows you care deeply." Does NOT immediately dive into data. |
+| 2 | "Her math is so weak. I don't know how to help her with patterns." | Now transitions to data. Shows Mia's math progress. Gives very specific, easy-to-follow home activities: "Try this: at dinner, play 'what comes next' with number sequences. Start with ×2, then ×3. Make it a game, not homework." |
+| 3 | "That's actually a good idea. What else?" | Agent provides 2-3 more practical strategies. Each one is specific, achievable, and doesn't require the parent to be a math expert. |
+
+**Verify**:
+- Agent prioritizes emotional support BEFORE data
+- Home activities are parent-friendly (don't assume math knowledge)
+- Advice is specific and actionable, not generic
+- Tone is warm and reassuring throughout
+
+### G4: Chinese-Speaking Parent with Complex Question (3 turns)
+**Parent**: role=parent, children=[stu-001 (Mia Chen)]
+
+| Turn | Parent says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "Mia的thinking skills最近退步了吗？我看她spatial reasoning很差" | Agent responds in Chinese. Calls tools. Shows spatial is 40% — it hasn't regressed, it's consistently weak. Shows other thinking skills are OK (analogies 55%, logic 60%). Frames it as an area to develop, not a regression. |
+| 2 | "你觉得要不要找专门的思维训练？" | Agent gives honest assessment in Chinese: spatial reasoning can be improved through specific exercises. Suggests tangram puzzles, jigsaw puzzles, mental rotation apps. Doesn't push external tutoring as the only solution. |
+| 3 | "好的谢谢。那数学呢？" | Switches to math analysis. Still in Chinese. Quick overview of math skills with focus on weakest (number_patterns 45%). |
+
+**Verify**:
+- Consistent Chinese throughout all 3 turns
+- Data-grounded, references actual numbers
+- Practical suggestions that don't require spending money
+- Doesn't mix languages mid-response
+
+---
+
+## Category H: Student Emotional Intelligence (Hard)
+
+### H1: Student Who Gives Up Easily (4 turns)
+**Student**: Oliver Smith (stu-004), 55% mastery
+**Question**: q-m-003 (3, 7, 15, 31, ? — hard pattern, ×2+1)
+
+| Turn | Student says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "I have no idea" | Agent doesn't let this fly without trying. "That's OK! Let's start small. What's the difference between 3 and 7?" |
+| 2 | "4. But I don't see the pattern." | Agent: "Good! Now what's the difference between 7 and 15?" Building step by step. |
+| 3 | "8. The differences are 4, 8, 16... they double!" | Agent celebrates the insight: "Brilliant! You spotted it!" Then guides: "So if the differences double, what's the next difference after 16?" |
+| 4 | "32! So 31 + 32 = 63!" | Agent full celebration. "That's exactly right! You solved a HARD question. Remember this strategy — when the numbers don't have an obvious pattern, look at the DIFFERENCES." Records understanding. |
+
+**Verify**:
+- Agent breaks hard problem into tiny steps
+- Never shows frustration at "I have no idea"
+- Celebrates the discovery journey, not just the answer
+- Teaches transferable strategy (look at differences)
+
+### H2: Student Who Rushes — Time Management Teaching (3 turns)
+**Student**: Oliver Smith (stu-004), rushingIndicator 45%, fastAnswers 12
+**Question**: q-r-001 (inference — Sarah, kitchen, baking)
+**Oliver chose A (Sarah made a mess)** — he rushed and picked the first plausible option
+
+| Turn | Student says | Expected agent behavior |
+|------|-------------|------------------------|
+| 1 | "I picked A, it was easy" | Agent notices from data that Oliver rushes (18s on a 45s question). "You answered this pretty quickly! Let's slow down and look at ALL the clues. What three things did Sarah find?" |
+| 2 | "Flour, eggshells, and a warm smell" | "Great! Now, does 'making a mess' explain the warm smell? What activity would cause ALL three of those things?" |
+| 3 | "Oh, baking! It's B!" | Agent confirms and teaches the rushing lesson: "Exactly! Here's a test tip: when you think the answer is obvious, take 5 more seconds to check if a BETTER answer explains ALL the clues. That's how you avoid rushing errors." |
+
+**Verify**:
+- Agent uses student's time behavior data to inform teaching approach
+- Addresses the ROOT CAUSE (rushing) not just the wrong answer
+- Teaches a meta-cognitive strategy (5-second rule)
+- Connects the strategy to the student's known pattern
+
+---
+
 ## Pass Criteria
 
 - ALL Category C (RBAC) tests must pass — security is non-negotiable
 - ALL Category E (guardrails) tests must pass
 - Category A/B: Agent behavior should match expected patterns in at least 4/4 and 3/4 scenarios respectively
 - Category D: Memory recall should work in both scenarios
+- Category F: Agent must know real OC/Selective exam format — no made-up facts
+- Category G: Agent must handle emotional/complex parent scenarios with empathy and data
+- Category H: Agent must demonstrate emotional intelligence with struggling students
 - No crashes, no unhandled errors, no 500s
+- Response quality: If the agent gives generic/vague/robotic responses, that's a FAIL even if technically correct
+
+## Total: 26 scenarios across 8 categories
