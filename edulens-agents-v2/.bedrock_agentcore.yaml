@@ -1,0 +1,122 @@
+default_agent: foundation-agent
+agents:
+  foundation-agent:
+    name: edulens_foundation_agent_v2
+    language: typescript
+    node_version: '20'
+    entrypoint: dist/dev-server.js
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: null
+    source_path: null
+    aws:
+      execution_role: arn:aws:iam::534409838809:role/AmazonBedrockAgentCoreSDKRuntime-us-west-2-0a6d0039ab
+      execution_role_auto_create: false
+      account: '534409838809'
+      region: us-west-2
+      ecr_repository: 534409838809.dkr.ecr.us-west-2.amazonaws.com/bedrock-agentcore-edulens_foundation_agent_v2
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: edulens_foundation_agent_v2-Y48RPZ5weA
+      agent_arn: arn:aws:bedrock-agentcore:us-west-2:534409838809:runtime/edulens_foundation_agent_v2-Y48RPZ5weA
+      agent_session_id: 0faa7be8-481f-4881-8992-7d32f0d57cf2
+    codebuild:
+      project_name: bedrock-agentcore-edulens_foundation_agent_v2-builder
+      execution_role: arn:aws:iam::534409838809:role/AmazonBedrockAgentCoreSDKCodeBuild-us-west-2-0a6d0039ab
+      source_bucket: bedrock-agentcore-codebuild-sources-534409838809-us-west-2
+    memory:
+      mode: NO_MEMORY
+      memory_id: null
+      memory_arn: null
+      memory_name: null
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+      was_created_by_toolkit: false
+    identity:
+      credential_providers: []
+      workload: null
+    aws_jwt:
+      enabled: false
+      audiences: []
+      signing_algorithm: ES384
+      issuer_url: null
+      duration_seconds: 300
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
+    api_key_env_var_name: null
+    api_key_credential_provider_name: null
+    is_generated_by_agentcore_create: false
+  edulens_foundation_agent_v2:
+    name: edulens_foundation_agent_v2
+    language: typescript
+    node_version: '20'
+    entrypoint: dist/dev-server.js
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: null
+    source_path: null
+    aws:
+      execution_role: arn:aws:iam::534409838809:role/AmazonBedrockAgentCoreSDKRuntime-us-west-2-0a6d0039ab
+      execution_role_auto_create: false
+      account: '534409838809'
+      region: us-west-2
+      ecr_repository: 534409838809.dkr.ecr.us-west-2.amazonaws.com/bedrock-agentcore-edulens_foundation_agent_v2
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: edulens_foundation_agent_v2-Y48RPZ5weA
+      agent_arn: arn:aws:bedrock-agentcore:us-west-2:534409838809:runtime/edulens_foundation_agent_v2-Y48RPZ5weA
+      agent_session_id: 0faa7be8-481f-4881-8992-7d32f0d57cf2
+    codebuild:
+      project_name: bedrock-agentcore-edulens_foundation_agent_v2-builder
+      execution_role: arn:aws:iam::534409838809:role/AmazonBedrockAgentCoreSDKCodeBuild-us-west-2-0a6d0039ab
+      source_bucket: bedrock-agentcore-codebuild-sources-534409838809-us-west-2
+    memory:
+      mode: NO_MEMORY
+      memory_id: null
+      memory_arn: null
+      memory_name: null
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+      was_created_by_toolkit: false
+    identity:
+      credential_providers: []
+      workload: null
+    aws_jwt:
+      enabled: false
+      audiences: []
+      signing_algorithm: ES384
+      issuer_url: null
+      duration_seconds: 300
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
+    api_key_env_var_name: null
+    api_key_credential_provider_name: null
+    is_generated_by_agentcore_create: false

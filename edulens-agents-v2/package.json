@@ -1,0 +1,58 @@
+{
+  "name": "edulens-agents-v2",
+  "version": "2.0.0",
+  "description": "EduLens Foundation Agent + Domain Harness - Production Agent System",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc && cp -r src/harnesses dist/harnesses && cp -r src/prompts dist/prompts",
+    "clean": "rm -rf dist",
+    "dev": "tsc --watch",
+    "dev:server": "npm run build && node dist/dev-server.js",
+    "start": "node dist/entrypoint.js",
+    "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:e2e": "jest tests/e2e",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@strands-agents/sdk": "^1.0.0-rc.3",
+    "axios": "^1.15.0",
+    "bedrock-agentcore": "^0.2.2",
+    "express": "^4.18.2",
+    "langfuse": "^3.38.20",
+    "yaml": "^2.8.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.8",
+    "@types/node": "^20.10.6",
+    "@typescript-eslint/eslint-plugin": "^6.13.2",
+    "@typescript-eslint/parser": "^6.13.2",
+    "eslint": "^8.55.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.1.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "education",
+    "bedrock",
+    "agentcore",
+    "strands",
+    "foundation-agent",
+    "domain-harness"
+  ],
+  "author": "EduLens Team",
+  "license": "UNLICENSED"
+}

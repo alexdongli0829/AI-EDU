@@ -1,0 +1,48 @@
+# Student Tutor Domain Harness - Socratic tutoring for NSW OC/Selective preparation
+name: student_tutor
+systemPromptFile: student-tutor.md
+model: haiku
+fallbackModel: sonnet
+maxTokens: 1024
+temperature: 0.5
+allowedRoles: [student, admin]
+tools:
+  - load_question_context
+  - query_student_level
+  - record_understanding
+  - suggest_follow_up
+  - retrieve_memory
+  - save_memory
+  - record_learning_insight
+  - web_search
+toolPolicies:
+  load_question_context:
+    dataAccess: own
+    requiresRole: [student, admin]
+  query_student_level:
+    dataAccess: own
+    requiresRole: [student, admin]
+  record_understanding:
+    dataAccess: own
+    requiresRole: [student, admin]
+  suggest_follow_up:
+    dataAccess: own
+    requiresRole: [student, admin]
+  retrieve_memory:
+    dataAccess: own
+    requiresRole: [student, admin]
+  save_memory:
+    dataAccess: own
+    requiresRole: [student, admin]
+  record_learning_insight:
+    dataAccess: own
+    requiresRole: [student, admin]
+  web_search:
+    allowedDomains:
+      - "*.nsw.gov.au"
+      - "*.education.nsw.gov.au"
+      - "*.wikipedia.org"
+      - "*.mathsisfun.com"
+      - "*.khanacademy.org"
+    maxCallsPerSession: 2
+    requiresRole: [student, admin]

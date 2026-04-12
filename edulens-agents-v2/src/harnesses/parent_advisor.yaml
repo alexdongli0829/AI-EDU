@@ -1,0 +1,64 @@
+# Parent Advisor Domain Harness - Comprehensive student insights for NSW OC/Selective preparation
+name: parent_advisor
+systemPromptFile: parent-advisor.md
+model: sonnet
+fallbackModel: haiku
+maxTokens: 2048
+temperature: 0.3
+allowedRoles: [parent, admin]
+tools:
+  - query_student_profile
+  - query_test_results
+  - query_skill_breakdown
+  - query_time_behavior
+  - query_error_patterns
+  - compare_students
+  - retrieve_memory
+  - save_memory
+  - update_preferences
+  - get_conversation_summary
+  - record_learning_insight
+  - web_search
+toolPolicies:
+  query_student_profile:
+    dataAccess: children
+    requiresRole: [parent, admin]
+  query_test_results:
+    dataAccess: children
+    requiresRole: [parent, admin]
+  query_skill_breakdown:
+    dataAccess: children
+    requiresRole: [parent, admin]
+  query_time_behavior:
+    dataAccess: children
+    requiresRole: [parent, admin]
+  query_error_patterns:
+    dataAccess: children
+    requiresRole: [parent, admin]
+  compare_students:
+    dataAccess: children
+    requiresRole: [parent, admin]
+  retrieve_memory:
+    dataAccess: own
+    requiresRole: [parent, admin]
+  save_memory:
+    dataAccess: own
+    requiresRole: [parent, admin]
+  update_preferences:
+    dataAccess: own
+    requiresRole: [parent, admin]
+  get_conversation_summary:
+    dataAccess: own
+    requiresRole: [parent, admin]
+  record_learning_insight:
+    dataAccess: children
+    requiresRole: [parent, admin]
+  web_search:
+    allowedDomains:
+      - "*.nsw.gov.au"
+      - "*.education.nsw.gov.au"
+      - "*.naplan.edu.au"
+      - "*.acara.edu.au"
+      - "*.wikipedia.org"
+    maxCallsPerSession: 5
+    requiresRole: [parent, admin]
