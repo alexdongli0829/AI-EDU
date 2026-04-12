@@ -37,7 +37,7 @@ describe('ModelRouter', () => {
       const model = router.getModelForTask('conversation', mockHaikuHarness);
 
       expect(model).toBeDefined();
-      expect(model.modelId).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-haiku-4-5-20251001-v1:0');
       // Note: BedrockModel doesn't expose region, temperature, maxTokens properties
       // These are internal to the model configuration
     });
@@ -46,7 +46,7 @@ describe('ModelRouter', () => {
       const model = router.getModelForTask('conversation', mockSonnetHarness);
 
       expect(model).toBeDefined();
-      expect(model.modelId).toBe('us.anthropic.claude-sonnet-4-20250514-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-sonnet-4-6');
       // Note: BedrockModel doesn't expose region, temperature, maxTokens properties
     });
 
@@ -54,14 +54,14 @@ describe('ModelRouter', () => {
       // Even if harness prefers Sonnet, should use Haiku for cheap tasks
       const model = router.getModelForTask('classification', mockSonnetHarness);
 
-      expect(model.modelId).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-haiku-4-5-20251001-v1:0');
     });
 
     test('should respect harness model for expensive tasks', () => {
       // For expensive tasks, should use harness preference
       const model = router.getModelForTask('conversation', mockSonnetHarness);
 
-      expect(model.modelId).toBe('us.anthropic.claude-sonnet-4-20250514-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-sonnet-4-6');
     });
   });
 
@@ -82,14 +82,14 @@ describe('ModelRouter', () => {
     test('should use Haiku for cheap tasks', () => {
       cheapTasks.forEach(taskType => {
         const model = router.getModelForTask(taskType, mockHarness);
-        expect(model.modelId).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0');
+        expect(model.modelId).toBe('global.anthropic.claude-haiku-4-5-20251001-v1:0');
       });
     });
 
     test('should use harness preference for expensive tasks', () => {
       expensiveTasks.forEach(taskType => {
         const model = router.getModelForTask(taskType, mockHarness);
-        expect(model.modelId).toBe('us.anthropic.claude-sonnet-4-20250514-v1:0');
+        expect(model.modelId).toBe('global.anthropic.claude-sonnet-4-6');
       });
     });
   });
@@ -99,7 +99,7 @@ describe('ModelRouter', () => {
       const config = router.getModelConfig('haiku');
 
       expect(config).toEqual({
-        modelId: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+        modelId: 'global.anthropic.claude-haiku-4-5-20251001-v1:0',
         region: 'us-west-2',
         temperature: 0.3,
         maxTokens: 1024,
@@ -111,7 +111,7 @@ describe('ModelRouter', () => {
       const config = router.getModelConfig('sonnet');
 
       expect(config).toEqual({
-        modelId: 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+        modelId: 'global.anthropic.claude-sonnet-4-6',
         region: 'us-west-2',
         temperature: 0.5,
         maxTokens: 2048,
@@ -131,7 +131,7 @@ describe('ModelRouter', () => {
       const model = router.createModel('haiku');
 
       expect(model).toBeDefined();
-      expect(model.modelId).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-haiku-4-5-20251001-v1:0');
       // Note: BedrockModel doesn't expose temperature, maxTokens properties
     });
 
@@ -139,7 +139,7 @@ describe('ModelRouter', () => {
       const model = router.createModel('sonnet');
 
       expect(model).toBeDefined();
-      expect(model.modelId).toBe('us.anthropic.claude-sonnet-4-20250514-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-sonnet-4-6');
       // Note: BedrockModel doesn't expose temperature, maxTokens properties
     });
 
@@ -150,7 +150,7 @@ describe('ModelRouter', () => {
       });
 
       expect(model).toBeDefined();
-      expect(model.modelId).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0'); // Should preserve base config
+      expect(model.modelId).toBe('global.anthropic.claude-haiku-4-5-20251001-v1:0'); // Should preserve base config
       // Note: BedrockModel doesn't expose temperature, maxTokens properties
     });
 
@@ -174,10 +174,10 @@ describe('ModelRouter', () => {
       );
 
       const haikuModel = models.find(m => m.name === 'haiku');
-      expect(haikuModel?.config.modelId).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0');
+      expect(haikuModel?.config.modelId).toBe('global.anthropic.claude-haiku-4-5-20251001-v1:0');
 
       const sonnetModel = models.find(m => m.name === 'sonnet');
-      expect(sonnetModel?.config.modelId).toBe('us.anthropic.claude-sonnet-4-20250514-v1:0');
+      expect(sonnetModel?.config.modelId).toBe('global.anthropic.claude-sonnet-4-6');
     });
   });
 
@@ -194,7 +194,7 @@ describe('ModelRouter', () => {
       };
 
       const model = router.getModelForTask('conversation', harnessWithoutFallback);
-      expect(model.modelId).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-haiku-4-5-20251001-v1:0');
     });
 
     test('should handle extreme temperature values', () => {
@@ -210,7 +210,7 @@ describe('ModelRouter', () => {
 
       const model = router.getModelForTask('conversation', extremeHarness);
       expect(model).toBeDefined();
-      expect(model.modelId).toBe('us.anthropic.claude-sonnet-4-20250514-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-sonnet-4-6');
       // Note: BedrockModel doesn't expose temperature property
     });
 
@@ -227,7 +227,7 @@ describe('ModelRouter', () => {
 
       const model = router.getModelForTask('conversation', maxTokenHarness);
       expect(model).toBeDefined();
-      expect(model.modelId).toBe('us.anthropic.claude-sonnet-4-20250514-v1:0');
+      expect(model.modelId).toBe('global.anthropic.claude-sonnet-4-6');
       // Note: BedrockModel doesn't expose maxTokens property
     });
   });

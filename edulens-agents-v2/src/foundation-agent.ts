@@ -13,6 +13,7 @@ import { GuardrailHook } from './hooks/guardrail-hook.js';
 import { LangfuseHook } from './hooks/langfuse-hook.js';
 import { AuditHook } from './hooks/audit-hook.js';
 import { getToolByName } from './tools/index.js';
+import { registerToolGuards } from './tools/rbac-wrapper.js';
 
 export interface FoundationAgentConfig {
   harnessName: string;
@@ -150,6 +151,9 @@ export class FoundationAgent {
         messages,
         printer: false
       });
+
+      // Register RBAC + observability hooks on every tool call via Strands native hook system
+      registerToolGuards(strandsAgent, this.rbacHook, this.langfuseHook, hookContext);
 
       // Invoke the agent and extract the text response
       const result = await strandsAgent.invoke(userInput);

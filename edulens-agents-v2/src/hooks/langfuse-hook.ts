@@ -303,6 +303,47 @@ export class LangfuseHook {
   }
 
   /**
+   * Track an individual tool call (called by RBAC wrapper)
+   */
+  trackToolCall(
+    data: {
+      toolName: string;
+      input: unknown;
+      output: unknown;
+      duration: number;
+      success: boolean;
+      error?: string;
+    },
+    context: HookContext
+  ): void {
+    const level = data.success ? 'DEFAULT' : 'WARNING';
+    console.log(`[INFO] ${new Date().toISOString()} tool_call_${data.success ? 'complete' : 'error'} (${context.actorIdentity?.role}:${context.actorIdentity?.actorId}) tool=${data.toolName} duration=${data.duration}ms`);
+
+    if (this.langfuse) {
+      try {
+        this.langfuse.span({
+          name: `tool_${data.toolName}`,
+          input: data.input,
+          output: data.output,
+          startTime: new Date(Date.now() - data.duration),
+          endTime: new Date(),
+          metadata: {
+            toolName: data.toolName,
+            success: data.success,
+            error: data.error,
+            role: context.actorIdentity?.role,
+            actorId: context.actorIdentity?.actorId,
+            sessionId: context.sessionId
+          },
+          level: data.success ? 'DEFAULT' : 'ERROR'
+        });
+      } catch (error) {
+        console.error('Failed to track tool call in Langfuse:', error);
+      }
+    }
+  }
+
+  /**
    * Check if Langfuse is available
    */
   isEnabled(): boolean {

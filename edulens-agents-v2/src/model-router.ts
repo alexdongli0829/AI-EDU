@@ -28,14 +28,14 @@ export class ModelRouter {
   constructor() {
     this.models = new Map([
       ['haiku', {
-        modelId: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+        modelId: 'global.anthropic.claude-haiku-4-5-20251001-v1:0',
         region: 'us-west-2',
         temperature: 0.3,
         maxTokens: 1024,
         stream: true
       }],
       ['sonnet', {
-        modelId: 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+        modelId: 'global.anthropic.claude-sonnet-4-6',
         region: 'us-west-2',
         temperature: 0.5,
         maxTokens: 2048,
