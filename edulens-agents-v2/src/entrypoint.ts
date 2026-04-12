@@ -113,6 +113,8 @@ async function handleInvocation(
       fallbackIdentity: !jwtToken ? {
         actorId: validatedRequest.actorId,
         role: validatedRequest.role,
+        studentId: validatedRequest.studentId || (validatedRequest.role === 'student' ? validatedRequest.actorId : undefined),
+        children: validatedRequest.children?.map(c => c.id) || [],
       } : undefined,
     });
 

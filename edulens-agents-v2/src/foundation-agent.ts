@@ -23,6 +23,8 @@ export interface FoundationAgentConfig {
   fallbackIdentity?: {
     actorId: string;
     role: string;
+    studentId?: string;
+    children?: string[];
   };
 }
 
@@ -76,7 +78,8 @@ export class FoundationAgent {
         this.actorIdentity = {
           actorId: this.config.fallbackIdentity.actorId,
           role: this.config.fallbackIdentity.role as 'student' | 'parent' | 'admin',
-          children: [],
+          studentId: this.config.fallbackIdentity.studentId,
+          children: this.config.fallbackIdentity.children || [],
         };
       }
 
