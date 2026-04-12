@@ -10,6 +10,7 @@
  *   5. AlbStack                   — ALB + SSE target groups  (wired after Lambda)
  *   6. EventBridge targets        — addTarget() calls using constructed ARNs (no cyclic CFN refs)
  *   7. MonitoringStack            — CloudWatch alarms
+ *   8. AgentCoreStack             — ECR repos + Memory store + Runtime (AI agents)
  *
  * Cyclic dependency strategy:
  *   LambdaStack receives queue/eventBus ARNs as constructed strings (not CDK tokens),
@@ -30,6 +31,8 @@ import { AlbStack } from '../lib/stacks/alb-stack';
 import { JobsStack } from '../lib/stacks/jobs-stack';
 import { LambdaStack } from '../lib/stacks/lambda-stack';
 import { MonitoringStack } from '../lib/stacks/monitoring-stack';
+import { AgentCoreStack } from '../lib/stacks/agentcore-stack';
+import { AgentCoreContainerStack } from '../lib/stacks/agentcore-stack-container';
 import { getConfig } from '../config/environments';
 
 const app = new cdk.App();
@@ -121,6 +124,24 @@ const summarizationQueueArn = `arn:aws:sqs:${config.region}:${config.account}:ed
 const insightsQueueArn      = `arn:aws:sqs:${config.region}:${config.account}:edulens-insights-queue-${config.stage}`;
 const eventBusArn           = `arn:aws:events:${config.region}:${config.account}:event-bus/default`;
 
+// ============================================================
+// AgentCore Stack  (S3 + IAM + Runtime + Endpoints)
+// Phase 1: Keep existing Python runtimes, add ECR IAM permissions
+// Phase 2 (next deploy): Switch to AgentCoreContainerStack
+// ============================================================
+
+const agentCoreStack = new AgentCoreStack(app, `EduLensAgentCoreStack-${config.stage}`, {
+  env,
+  config,
+  vpc: networkStack.vpc,
+  lambdaSecurityGroup: networkStack.lambdaSecurityGroup,
+  auroraSecret: databaseStack.auroraSecret,
+  description: `EduLens AgentCore AI Agents (${config.stage})`,
+  tags: config.tags,
+});
+agentCoreStack.addDependency(networkStack);
+agentCoreStack.addDependency(databaseStack);
+
 const lambdaStack = new LambdaStack(app, `EduLensLambdaStack-${config.stage}`, {
   env,
   config,
@@ -132,6 +153,8 @@ const lambdaStack = new LambdaStack(app, `EduLensLambdaStack-${config.stage}`, {
   insightsQueueArn,
   eventBusArn,
   connectionsTable: databaseStack.connectionsTable,
+  parentAdvisorRuntimeArn: agentCoreStack.parentAdvisorRuntimeArn,
+  studentTutorRuntimeArn: agentCoreStack.studentTutorRuntimeArn,
   description: `EduLens Lambda Functions (${config.stage})`,
   tags: config.tags,
 });
@@ -139,6 +162,7 @@ const lambdaStack = new LambdaStack(app, `EduLensLambdaStack-${config.stage}`, {
 lambdaStack.addDependency(networkStack);
 lambdaStack.addDependency(databaseStack);
 lambdaStack.addDependency(jobsStack);   // ensures queues exist before Lambda tries to consume them
+lambdaStack.addDependency(agentCoreStack); // ensures runtime ARNs are available
 
 // ============================================================
 // 7. Wire API Gateway routes (REST + WebSocket)

@@ -75,6 +75,21 @@ export class PythonLambda extends Construct {
               'cp -au /asset-input/src /asset-output/',
             ].join(' && '),
           ],
+          local: {
+            tryBundle(outputDir: string) {
+              try {
+                const { execSync } = require('child_process');
+                execSync(
+                  `pip3 install -r ${codePath}/${requirementsFile} -t ${outputDir} --quiet --no-cache-dir --platform manylinux2014_x86_64 --only-binary=:all: 2>/dev/null || pip3 install -r ${codePath}/${requirementsFile} -t ${outputDir} --quiet --no-cache-dir`,
+                  { stdio: 'inherit' }
+                );
+                execSync(`cp -au ${codePath}/src ${outputDir}/`, { stdio: 'inherit' });
+                return true;
+              } catch {
+                return false;
+              }
+            },
+          },
         },
       }),
       description,

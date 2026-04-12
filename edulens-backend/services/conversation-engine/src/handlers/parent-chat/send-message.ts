@@ -11,6 +11,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../../lib/database';
+import { invokeAgent } from '../../lib/agentcore';
 import { getChatCompletion, Message } from '../../lib/bedrock';
 
 // How many recent turns to keep verbatim in the context window
@@ -87,13 +88,62 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // ----------------------------------------------------------------
     // 6. Call the AI — transition PROCESSING → RESPONDING
+    //    Uses AgentCore Runtime (Strands Python agent) when configured,
+    //    otherwise falls back to direct Bedrock Converse.
     // ----------------------------------------------------------------
     await query(
       `UPDATE chat_sessions SET agent_state = 'responding' WHERE id = $1::uuid`,
       sessionId
     );
 
-    const aiResponse = await getChatCompletion(chatHistory, systemPrompt);
+    let aiResponse: string;
+
+    if (process.env.PARENT_ADVISOR_RUNTIME_ARN) {
+      // AgentCore Runtime path — agent handles its own system prompt + tools
+      // Look up ALL children for this parent so agent can handle multi-child families
+      const parentId = meta.parentId || null;
+      let children: Array<{ id: string; name: string; gradeLevel: number }> = [];
+      let currentStudentName: string | undefined;
+
+      if (parentId) {
+        const childRows = await query(
+          `SELECT s.id, u.name, s.grade_level as "gradeLevel"
+           FROM students s JOIN users u ON s.user_id = u.id
+           WHERE s.parent_id = $1::uuid
+           ORDER BY u.name`,
+          parentId
+        ) as any[];
+        children = childRows || [];
+        // Find current student's name
+        const current = children.find(c => c.id === studentId);
+        currentStudentName = current?.name;
+      } else if (studentId) {
+        // Fallback: just look up the one student
+        const nameRows = await query(
+          `SELECT u.name FROM students s JOIN users u ON s.user_id = u.id WHERE s.id = $1::uuid LIMIT 1`,
+          studentId
+        ) as any[];
+        currentStudentName = nameRows?.[0]?.name;
+      }
+
+      const agentResult = await invokeAgent('parent-advisor', {
+        prompt: message,
+        conversationHistory: chatHistory,
+        studentId: studentId ?? undefined,
+        studentName: currentStudentName,
+        children: children.length > 0 ? children : undefined,
+      });
+
+      if (agentResult.blocked) {
+        // Agent guardrails blocked the input
+        aiResponse = agentResult.response || 'I can only help with educational topics. Please ask about your child\'s learning progress.';
+      } else {
+        aiResponse = agentResult.response;
+      }
+    } else {
+      // Fallback: direct Bedrock Converse (legacy path)
+      aiResponse = await getChatCompletion(chatHistory, systemPrompt);
+    }
 
     // ----------------------------------------------------------------
     // 7. Persist the assistant message

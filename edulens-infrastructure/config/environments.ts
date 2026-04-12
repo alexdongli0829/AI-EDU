@@ -40,7 +40,7 @@ export interface EnvironmentConfig {
 
 // Development environment
 export const devConfig: EnvironmentConfig = {
-  account: process.env.CDK_DEFAULT_ACCOUNT || '163629398585',
+  account: process.env.CDK_DEFAULT_ACCOUNT || '534409838809',
   // TARGET_REGION allows cross-region deployments from a server in a different region.
   // On a server in ap-southeast-2, CDK_DEFAULT_REGION is used automatically.
   region: process.env.TARGET_REGION || process.env.CDK_DEFAULT_REGION || 'us-west-2',

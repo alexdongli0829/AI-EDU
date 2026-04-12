@@ -35,6 +35,11 @@ export interface LambdaStackProps extends cdk.StackProps {
   /** EventBridge default bus ARN — pass as a constructed string */
   eventBusArn: string;
   connectionsTable: dynamodb.Table;
+  /** AgentCore Runtime ARNs — pass as constructed strings to avoid cross-stack deps */
+  parentAdvisorRuntimeArn?: string;
+  studentTutorRuntimeArn?: string;
+  parentAdvisorEndpointName?: string;
+  studentTutorEndpointName?: string;
 }
 
 export class LambdaStack extends cdk.Stack {
@@ -386,10 +391,19 @@ export class LambdaStack extends cdk.Stack {
     // 2. CONVERSATION ENGINE SERVICE (Node.js)
     // ============================================================
 
-    const conversationEnvironment = {
+    const conversationEnvironment: Record<string, string> = {
       AI_PROVIDER: 'bedrock',
       BEDROCK_REGION: cdk.Aws.REGION,
       BEDROCK_MODEL_ID: bedrockModelId,
+      ...(props.parentAdvisorRuntimeArn && {
+        PARENT_ADVISOR_RUNTIME_ARN: props.parentAdvisorRuntimeArn,
+        PARENT_ADVISOR_ENDPOINT_NAME: props.parentAdvisorEndpointName || `edulens_parent_advisor_ep_${config.stage}`,
+        AGENTCORE_REGION: config.region,
+      }),
+      ...(props.studentTutorRuntimeArn && {
+        STUDENT_TUTOR_RUNTIME_ARN: props.studentTutorRuntimeArn,
+        STUDENT_TUTOR_ENDPOINT_NAME: props.studentTutorEndpointName || `edulens_student_tutor_ep_${config.stage}`,
+      }),
     };
 
     this.parentChatCreateFunction = new NodejsLambda(this, 'ParentChatCreateLambda', {
@@ -439,6 +453,19 @@ export class LambdaStack extends cdk.Stack {
         ],
       })
     );
+
+    // AgentCore invoke permission for parent chat
+    if (props.parentAdvisorRuntimeArn) {
+      this.parentChatSendFunction.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['bedrock-agentcore:InvokeAgentRuntime'],
+          resources: [
+            props.parentAdvisorRuntimeArn,
+            `${props.parentAdvisorRuntimeArn}/*`,
+          ],
+        })
+      );
+    }
 
     this.parentChatSendStreamFunction = new NodejsLambda(this, 'ParentChatSendStreamLambda', {
       config,
@@ -543,6 +570,19 @@ export class LambdaStack extends cdk.Stack {
         ],
       })
     );
+
+    // AgentCore invoke permission for student chat
+    if (props.studentTutorRuntimeArn) {
+      this.studentChatSendFunction.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['bedrock-agentcore:InvokeAgentRuntime'],
+          resources: [
+            props.studentTutorRuntimeArn,
+            `${props.studentTutorRuntimeArn}/*`,
+          ],
+        })
+      );
+    }
 
     this.studentChatSendStreamFunction = new NodejsLambda(this, 'StudentChatSendStreamLambda', {
       config,
@@ -705,6 +745,7 @@ export class LambdaStack extends cdk.Stack {
       redisEndpoint,
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
+      requirementsFile: 'requirements-light.txt',
     }).function;
 
     // Grant EventBridge permission to invoke calculateProfile (TestCompletedRule)

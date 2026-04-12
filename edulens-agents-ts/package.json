@@ -1,0 +1,41 @@
+{
+  "name": "edulens-agents-ts",
+  "version": "1.0.0",
+  "description": "EduLens AI Agents - TypeScript Implementation for Container Deployment",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "dev": "tsc --watch",
+    "start:parent-advisor": "node dist/agents/parent-advisor.js",
+    "start:student-tutor": "node dist/agents/student-tutor.js",
+    "docker:build": "docker build -t edulens-agents .",
+    "docker:run:parent": "docker run -e AGENT_TYPE=parent-advisor -p 8080:8080 edulens-agents",
+    "docker:run:tutor": "docker run -e AGENT_TYPE=student-tutor -p 8080:8080 edulens-agents"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1010.0",
+    "@strands-agents/sdk": "^0.6.0",
+    "bedrock-agentcore": "^0.2.2",
+    "fastify": "^4.24.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "education",
+    "bedrock",
+    "agentcore",
+    "strands"
+  ],
+  "author": "EduLens Team",
+  "license": "UNLICENSED"
+}
