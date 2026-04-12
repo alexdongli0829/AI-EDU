@@ -50,6 +50,39 @@ export class GuardrailHook {
   async beforeModelCall(input: GuardrailInput, context: HookContext): Promise<HookResult> {
     const text = input.input.toLowerCase();
 
+    // Check message length (prevent abuse)
+    if (input.input.length > 2000) {
+      console.log(`Input blocked - message too long: ${input.input.length} chars`);
+      return {
+        blocked: true,
+        reason: 'Message is too long. Please keep your message under 2000 characters.',
+        metadata: {
+          type: 'message_too_long',
+          length: input.input.length
+        }
+      };
+    }
+
+    // Check for profanity
+    const profanityPatterns = [
+      /\b(?:fuck|shit|bullshit|damn|ass|bitch|crap|hell)\b/i,
+      /\b(?:wtf|stfu|lmao|af)\b/i
+    ];
+
+    for (const pattern of profanityPatterns) {
+      if (pattern.test(text)) {
+        console.log(`Input blocked by profanity filter: ${pattern.source}`);
+        return {
+          blocked: true,
+          reason: 'Please use respectful language. I\'m here to help with your studies!',
+          metadata: {
+            pattern: pattern.source,
+            type: 'profanity'
+          }
+        };
+      }
+    }
+
     // Check for blocked content
     for (const pattern of this.blockedPatterns) {
       if (pattern.test(text)) {
@@ -130,15 +163,84 @@ export class GuardrailHook {
 
     for (const pattern of inappropriateEducational) {
       if (pattern.test(text) && context.domainHarness?.name === 'student_tutor') {
-        console.log(`Response flagged - inappropriate tutoring approach: ${pattern.source}`);
-        // Don't block, but log for review
+        console.log(`Response blocked - Socratic violation: ${pattern.source}`);
         return {
-          blocked: false,
+          blocked: true,
+          reason: 'Response reveals the answer directly. Socratic method requires guiding the student to discover it.',
           metadata: {
-            warning: 'Response may not follow Socratic method',
+            warning: 'Socratic method violation — answer given directly',
             pattern: pattern.source
           }
         };
+      }
+    }
+
+    // Check for admission prediction language
+    const predictionPatterns = [
+      /\bwill\s+(?:definitely|certainly)\s+(?:pass|get\s+in|be\s+accepted)\b/i,
+      /\bguaranteed?\b/i,
+      /\bchances\s+are\s+(?:very\s+)?(?:high|good)\b/i,
+      /\bI(?:'m|\s+am)\s+(?:sure|certain)\s+(?:he|she|they|your\s+child)\s+will\b/i,
+      /\bwill\s+(?:surely|absolutely)\s+(?:pass|succeed|get\s+(?:in|accepted))\b/i
+    ];
+
+    for (const pattern of predictionPatterns) {
+      if (pattern.test(response.response)) {
+        console.log(`Response blocked - admission prediction: ${pattern.source}`);
+        return {
+          blocked: true,
+          reason: 'Response contains admission prediction language',
+          metadata: {
+            pattern: pattern.source,
+            type: 'admission_prediction'
+          }
+        };
+      }
+    }
+
+    // Check for student ID leakage in responses
+    const studentIdPatterns = [
+      /\bstu[-_]\d+\b/i,
+      /\bstudent[_-]?id\s*[:=]\s*\S+/i,
+      /\bparent[-_]\d+\b/i,
+      /\bactor[-_]id\s*[:=]\s*\S+/i
+    ];
+
+    for (const pattern of studentIdPatterns) {
+      if (pattern.test(response.response)) {
+        console.log(`Response blocked - student ID leak: ${pattern.source}`);
+        return {
+          blocked: true,
+          reason: 'Response contains internal student/actor identifiers',
+          metadata: {
+            pattern: pattern.source,
+            type: 'id_leak'
+          }
+        };
+      }
+    }
+
+    // Check for sibling comparison language (parent domain only)
+    if (context.domainHarness?.name === 'parent_advisor') {
+      const comparisonPatterns = [
+        /\bbetter\s+than\s+(?:his|her|their)\s+(?:sister|brother|sibling)\b/i,
+        /\bcompared\s+to\s+(?:his|her|their)\s+(?:sister|brother|sibling)\b/i,
+        /\bfalls?\s+behind\s+(?:his|her|their)\s+(?:sister|brother|sibling)\b/i,
+        /\bnot\s+as\s+(?:good|smart|capable)\s+as\s+(?:his|her|their)\s+(?:sister|brother|sibling)\b/i
+      ];
+
+      for (const pattern of comparisonPatterns) {
+        if (pattern.test(response.response)) {
+          console.log(`Response blocked - sibling comparison: ${pattern.source}`);
+          return {
+            blocked: true,
+            reason: 'Response contains harmful sibling comparison language',
+            metadata: {
+              pattern: pattern.source,
+              type: 'sibling_comparison'
+            }
+          };
+        }
       }
     }
 

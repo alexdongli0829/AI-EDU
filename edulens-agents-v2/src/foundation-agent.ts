@@ -160,7 +160,31 @@ export class FoundationAgent {
 
       // Invoke the agent and extract the text response
       const result = await strandsAgent.invoke(userInput);
-      const responseText = result.toString();
+      let responseText = result.toString();
+
+      // Output guardrail check — retry once if blocked
+      const outputCheck = await this.guardrailHook.beforeResponse(
+        { response: responseText },
+        hookContext
+      );
+      if (outputCheck.blocked) {
+        console.warn(`[GUARDRAIL] Output blocked: ${outputCheck.reason}. Retrying...`);
+        // Retry with a safety nudge appended to the conversation
+        const retryResult = await strandsAgent.invoke(
+          'Please rephrase your previous response. Do not reveal student IDs, do not make admission predictions, and do not compare siblings.'
+        );
+        const retryText = retryResult.toString();
+        const retryCheck = await this.guardrailHook.beforeResponse(
+          { response: retryText },
+          hookContext
+        );
+        if (retryCheck.blocked) {
+          console.error(`[GUARDRAIL] Retry also blocked: ${retryCheck.reason}. Using safe fallback.`);
+          responseText = "Let's work through this together! Can you tell me what you noticed about the question? What clues stood out to you?";
+        } else {
+          responseText = retryText;
+        }
+      }
 
       // Add to conversation history
       this.conversationHistory.push(
